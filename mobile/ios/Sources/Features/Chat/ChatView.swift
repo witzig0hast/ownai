@@ -34,7 +34,7 @@ struct ChatView: View {
         List(selection: $viewModel.selectedConversationID) {
             ForEach(viewModel.conversations) { conversation in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(conversation.title.isEmpty ? "Untitled" : conversation.title)
+                    Text((conversation.title?.isEmpty == false ? conversation.title : nil) ?? "Untitled")
                         .font(.headline)
                         .lineLimit(1)
                     Text(conversation.updatedAt, style: .relative)

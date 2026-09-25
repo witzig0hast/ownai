@@ -10,7 +10,7 @@ Verbindliche Schnittstelle zwischen `backend/` und den drei Clients (`web/`, `mo
   { "error": { "code": "invalid_credentials", "message": "E-Mail oder Passwort falsch." } }
   ```
 - Zeitangaben: ISO-8601 UTC, z. B. `"2026-09-25T14:30:00Z"`
-- IDs: UUID v4 als String
+- IDs: UUID v4 als String, **immer lowercase** (so wie sie vom Server ausgegeben werden). ID-Vergleiche im Backend sind case-sensitive — ein Client, der eine empfangene ID zurück in einen Request/URL-Pfad einbaut, darf sie nicht hochcasen (z.B. Swifts `UUID.uuidString` liefert Großbuchstaben und muss vor Verwendung `.lowercased()` werden).
 
 ## Auth
 
@@ -78,7 +78,9 @@ Request: `{ "url": string, "username": string, "password": string }`
 Response `200`: `{ "connected": true }`
 Anmeldedaten werden serverseitig **verschlüsselt** (Fernet, Schlüssel aus `SECRET_KEY`) gespeichert, nie im Klartext zurückgegeben.
 
-### `GET /calendar/events?start={date}&end={date}`  *(Bearer)*
+### `GET /calendar/events?start={iso-datetime}&end={iso-datetime}`  *(Bearer)*
+
+`start`/`end` are full ISO-8601 datetimes (UTC), same format as everywhere else in this document — not date-only strings.
 Response `200`: `{ "events": [ { "id": string, "title": string, "start": datetime, "end": datetime, "location": string | null, "source": "caldav" } ] }`
 
 ### `POST /calendar/events`  *(Bearer)*

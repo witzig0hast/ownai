@@ -33,7 +33,7 @@ struct AuthTokens: Codable {
 
 struct Conversation: Codable, Identifiable {
     let id: UUID
-    let title: String
+    let title: String?
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {

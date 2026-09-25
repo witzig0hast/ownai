@@ -109,7 +109,7 @@ final class APIClient: @unchecked Sendable {
     }
 
     func messages(conversationID: UUID) async throws -> [ChatMessage] {
-        let request = try makeRequest(path: "/chat/conversations/\(conversationID.uuidString)/messages", method: "GET", auth: .bearer)
+        let request = try makeRequest(path: "/chat/conversations/\(conversationID.uuidString.lowercased())/messages", method: "GET", auth: .bearer)
         let response: MessagesResponse = try await perform(request, auth: .bearer)
         return response.messages
     }
@@ -119,7 +119,7 @@ final class APIClient: @unchecked Sendable {
     @discardableResult
     func sendMessage(conversationID: UUID, content: String) async throws -> ChatMessage {
         let body = try encoder.encode(SendMessageRequest(content: content))
-        let request = try makeRequest(path: "/chat/conversations/\(conversationID.uuidString)/messages", method: "POST", bodyData: body, auth: .bearer)
+        let request = try makeRequest(path: "/chat/conversations/\(conversationID.uuidString.lowercased())/messages", method: "POST", bodyData: body, auth: .bearer)
         let response: SendMessageResponse = try await perform(request, auth: .bearer)
         return response.message
     }
@@ -160,13 +160,13 @@ final class APIClient: @unchecked Sendable {
 
     @discardableResult
     func applySuggestion(id: UUID) async throws -> Suggestion {
-        let request = try makeRequest(path: "/notifications/suggestions/\(id.uuidString)/apply", method: "POST", auth: .bearer)
+        let request = try makeRequest(path: "/notifications/suggestions/\(id.uuidString.lowercased())/apply", method: "POST", auth: .bearer)
         return try await perform(request, auth: .bearer)
     }
 
     @discardableResult
     func dismissSuggestion(id: UUID) async throws -> String {
-        let request = try makeRequest(path: "/notifications/suggestions/\(id.uuidString)/dismiss", method: "POST", auth: .bearer)
+        let request = try makeRequest(path: "/notifications/suggestions/\(id.uuidString.lowercased())/dismiss", method: "POST", auth: .bearer)
         let response: DismissSuggestionResponse = try await perform(request, auth: .bearer)
         return response.status
     }
