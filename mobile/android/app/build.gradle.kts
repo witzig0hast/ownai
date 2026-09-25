@@ -56,6 +56,9 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // Json.asConverterFactory(...) (com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter)
+        // is annotated @ExperimentalSerializationApi - opted in project-wide rather than at every call site.
+        freeCompilerArgs += listOf("-opt-in=kotlinx.serialization.ExperimentalSerializationApi")
     }
 
     packaging {

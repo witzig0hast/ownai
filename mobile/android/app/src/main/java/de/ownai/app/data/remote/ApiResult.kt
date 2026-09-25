@@ -34,10 +34,12 @@ suspend fun <T> safeApiCall(json: Json, block: suspend () -> T): ApiResult<T> {
 }
 
 private fun parseErrorBody(json: Json, e: HttpException): ErrorResponse? {
-    val body = e.response()?.errorBody()?.string() ?: return null
     return try {
+        val body = e.response()?.errorBody()?.string() ?: return null
         json.decodeFromString(ErrorResponse.serializer(), body)
-    } catch (ex: SerializationException) {
+    } catch (ex: Exception) {
+        // Reading/parsing the error body is best-effort only - fall back to a generic
+        // message (built from e.code() by the caller) rather than let this throw.
         null
     }
 }
