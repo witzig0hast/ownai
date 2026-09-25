@@ -45,11 +45,13 @@ Response `201`: `{ "id": uuid, "platform": string, "device_api_key": string, "la
 ## Chat
 
 ### `GET /chat/conversations`  *(Bearer)*
-Response `200`: `{ "conversations": [ { "id": uuid, "title": string, "updated_at": datetime } ] }`
+Response `200`: `{ "conversations": [ { "id": uuid, "title": string | null, "updated_at": datetime } ] }`
+
+`title` is `null` until the conversation is explicitly named (a new conversation created without a title starts untitled — clients should render a fallback like "Untitled conversation").
 
 ### `POST /chat/conversations`  *(Bearer)*
 Request: `{ "title": string | null }`
-Response `201`: `{ "id": uuid, "title": string, "updated_at": datetime }`
+Response `201`: `{ "id": uuid, "title": string | null, "updated_at": datetime }`
 
 ### `GET /chat/conversations/{id}/messages`  *(Bearer)*
 Response `200`: `{ "messages": [ Message ] }`

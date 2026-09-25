@@ -65,10 +65,13 @@ services:
   web:
     build:
       context: ./web
+      # NEXT_PUBLIC_* vars are inlined into the client bundle at build time by Next.js,
+      # not read at container start — must be passed as a build arg, not `environment:`
+      # (see web/README.md, "NEXT_PUBLIC_API_BASE_URL gotcha").
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://${DOMAIN}/api/v1
     container_name: ownai-web
     restart: unless-stopped
-    environment:
-      - NEXT_PUBLIC_API_BASE_URL=https://${DOMAIN}/api/v1
     depends_on:
       - backend
     ports:
