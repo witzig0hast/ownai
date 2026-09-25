@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Window-level theme only. All actual UI theming (colors, typography,
+        light/dark ColorScheme) is done in Compose - see ui/theme/Theme.kt.
+        This just sets a sane background behind/around the Compose content
+        (e.g. during activity start-up) and enables day/night switching via
+        AppCompat's DayNight parent.
+    -->
+    <style name="Theme.OwnAI" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/theme_window_background</item>
+        <item name="android:statusBarColor">@color/ic_launcher_background</item>
+    </style>
+</resources>

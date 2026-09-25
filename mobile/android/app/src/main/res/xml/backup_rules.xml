@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Sensitive: tokens and the device API key live in EncryptedSharedPreferences
+   (androidx.security.crypto), which is itself excluded from Auto Backup by
+   default. This file exists to make that exclusion explicit for the file the
+   EncryptedSharedPreferences implementation writes to.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="ownai_secure_prefs.xml" />
+</full-backup-content>

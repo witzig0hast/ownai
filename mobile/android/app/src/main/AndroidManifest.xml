@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Talk to the OwnAI backend -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Required on API 33+ for the app to post its own notifications.
+         OwnAI does not currently post any local notifications itself, but this
+         is requested up front (see NotificationAccessScreen) so it is available
+         if a future version adds e.g. "suggestion ready" heads-up notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- NOTE: android.permission.READ_SMS / RECEIVE_SMS are intentionally NOT
+         requested here. See README.md ("SMS nuance") for why raw SMS capture
+         is out of scope for v1 and what it would take to add later. -->
+
+    <application
+        android:name=".OwnAiApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OwnAI">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.OwnAI">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Core Android-specific feature: reads notifications posted by other apps
+             (with the user's explicit "Notification access" grant, see
+             NotificationAccessScreen) and forwards relevant ones to the backend. -->
+        <service
+            android:name=".notification.NotificationForwardingService"
+            android:exported="true"
+            android:label="@string/notification_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>
