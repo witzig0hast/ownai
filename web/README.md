@@ -94,9 +94,16 @@ the `{"error":{"code","message"}}` envelope).
 - **Chat** (`/chat`): conversation sidebar (`GET /chat/conversations`,
   create via `POST /chat/conversations`), message thread
   (`GET .../messages`), and a synchronous send flow (`POST .../messages`)
-  with a "Thinking..." loading state, since v1 has no streaming. The user's
-  own message is rendered optimistically (the API only returns the new
-  assistant message, per `API.md`).
+  with an animated three-dot "thinking" indicator (`.animate-typing-dot` in
+  `globals.css`), since v1 has no streaming. The user's own message is
+  rendered optimistically (the API only returns the new assistant message,
+  per `API.md`). Visual pass (user asked for something closer to Claude's
+  look): assistant messages get a small circular avatar, bubbles are
+  `rounded-2xl` with a shadow instead of flat `rounded-lg`, each message has
+  a subtle fade/slide-in (`.animate-message-in`) and a timestamp underneath,
+  and the composer is a single pill-shaped container (image/mic/send buttons
+  as circular icons inside it, not separate boxed buttons) with a textarea
+  that auto-grows with content up to `max-h-40` instead of a fixed 2-row box.
   - **Code Interpreter**: a message's content is split into text/code segments
     (`src/lib/parseMessageContent.ts`, looks for ```` ```lang\n...\n``` ```` fences) and a
     Python code block gets an "Ausführen" button (`src/components/CodeBlock.tsx`). Execution

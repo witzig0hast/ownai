@@ -93,6 +93,14 @@ function FileDownloadIcon() {
   );
 }
 
+function SendIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function ImageUploadIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
@@ -139,7 +147,7 @@ function ConversationSidebar({
           type="button"
           onClick={onCreate}
           disabled={creating}
-          className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-zinc-700 hover:shadow-sm active:scale-95 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
         >
           {creating ? "Creating..." : "+ New chat"}
         </button>
@@ -148,19 +156,19 @@ function ConversationSidebar({
         <input type="checkbox" checked={showArchived} onChange={onToggleShowArchived} className="h-3 w-3" />
         Archivierte anzeigen
       </label>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-2">
         {loading ? (
           <p className="p-3 text-sm text-zinc-500">Loading...</p>
         ) : conversations.length === 0 ? (
           <p className="p-3 text-sm text-zinc-500">No conversations yet. Start one above.</p>
         ) : (
-          <ul>
+          <ul className="space-y-0.5">
             {conversations.map((c) => (
               <li key={c.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => onSelect(c.id)}
-                  className={`block w-full truncate px-3 py-2.5 pr-16 text-left text-sm transition-colors ${
+                  className={`block w-full truncate rounded-lg px-3 py-2.5 pr-16 text-left text-sm transition-colors ${
                     c.id === selectedId
                       ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-900"
@@ -174,7 +182,7 @@ function ConversationSidebar({
                     {formatTime(c.updated_at)}
                   </span>
                 </button>
-                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="absolute top-1/2 right-3 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -207,68 +215,83 @@ function ConversationSidebar({
   );
 }
 
+function AssistantAvatar() {
+  return (
+    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 dark:bg-zinc-100">
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+        <circle cx="10.5" cy="10.8" r="4" className="fill-white dark:fill-zinc-900" />
+        <circle cx="15.8" cy="16" r="1.8" className="fill-indigo-400" />
+      </svg>
+    </div>
+  );
+}
+
 function MessageBubble({ message, conversationId }: { message: Message; conversationId: string }) {
   const isUser = message.role === "user";
   const segments = parseMessageContent(message.content);
   const { openArtifact } = useArtifactPanel();
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`group max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-          isUser
-            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-            : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-        }`}
-      >
-        {segments.map((segment, i) =>
-          segment.type === "code" ? (
-            <CodeBlock key={i} language={segment.language} code={segment.value} />
-          ) : (
-            <span key={i} className="whitespace-pre-wrap">
-              {segment.value}
-            </span>
-          ),
-        )}
-        {!isUser && isTtsSupported() ? (
-          <button
-            type="button"
-            onClick={() => speak(message.content)}
-            title="Antwort vorlesen"
-            className="ml-2 inline-flex align-middle text-zinc-400 opacity-0 transition-opacity hover:text-zinc-700 group-hover:opacity-100 dark:hover:text-zinc-200"
-          >
-            <SpeakerIcon />
-          </button>
-        ) : null}
-        {message.tool_calls && message.tool_calls.length > 0 ? (
-          <div className="mt-2 space-y-1 border-t border-black/10 pt-2 text-xs opacity-70 dark:border-white/10">
-            {message.tool_calls.map((tc, i) => {
-              const fileId = tc.tool === "create_file" ? tc.result.id : undefined;
-              const filename = tc.tool === "create_file" ? tc.result.filename : undefined;
-              const sizeBytes = tc.tool === "create_file" ? tc.result.size_bytes : undefined;
-              if (typeof fileId === "string" && typeof filename === "string") {
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() =>
-                      openArtifact({
-                        type: "file",
-                        conversationId,
-                        fileId,
-                        filename,
-                        sizeBytes: typeof sizeBytes === "number" ? sizeBytes : undefined,
-                      })
-                    }
-                    className="flex items-center gap-1.5 rounded-md border border-black/10 bg-white/50 px-2 py-1 font-medium text-zinc-700 opacity-100 transition-colors hover:bg-white dark:border-white/10 dark:bg-black/20 dark:text-zinc-200 dark:hover:bg-black/30"
-                  >
-                    <FileDownloadIcon /> {filename}
-                  </button>
-                );
-              }
-              return <div key={i}>tool: {tc.tool}</div>;
-            })}
-          </div>
-        ) : null}
+    <div className={`animate-message-in flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
+      {!isUser ? <AssistantAvatar /> : null}
+      <div className={`flex max-w-[75%] flex-col ${isUser ? "items-end" : "items-start"}`}>
+        <div
+          className={`group rounded-2xl px-4 py-2.5 text-sm ${
+            isUser
+              ? "rounded-br-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              : "rounded-bl-md bg-zinc-100 text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100"
+          }`}
+        >
+          {segments.map((segment, i) =>
+            segment.type === "code" ? (
+              <CodeBlock key={i} language={segment.language} code={segment.value} />
+            ) : (
+              <span key={i} className="whitespace-pre-wrap">
+                {segment.value}
+              </span>
+            ),
+          )}
+          {!isUser && isTtsSupported() ? (
+            <button
+              type="button"
+              onClick={() => speak(message.content)}
+              title="Antwort vorlesen"
+              className="ml-2 inline-flex align-middle text-zinc-400 opacity-0 transition-opacity hover:text-zinc-700 group-hover:opacity-100 dark:hover:text-zinc-200"
+            >
+              <SpeakerIcon />
+            </button>
+          ) : null}
+          {message.tool_calls && message.tool_calls.length > 0 ? (
+            <div className="mt-2 space-y-1 border-t border-black/10 pt-2 text-xs opacity-70 dark:border-white/10">
+              {message.tool_calls.map((tc, i) => {
+                const fileId = tc.tool === "create_file" ? tc.result.id : undefined;
+                const filename = tc.tool === "create_file" ? tc.result.filename : undefined;
+                const sizeBytes = tc.tool === "create_file" ? tc.result.size_bytes : undefined;
+                if (typeof fileId === "string" && typeof filename === "string") {
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() =>
+                        openArtifact({
+                          type: "file",
+                          conversationId,
+                          fileId,
+                          filename,
+                          sizeBytes: typeof sizeBytes === "number" ? sizeBytes : undefined,
+                        })
+                      }
+                      className="flex items-center gap-1.5 rounded-md border border-black/10 bg-white/50 px-2 py-1 font-medium text-zinc-700 opacity-100 transition-colors hover:bg-white dark:border-white/10 dark:bg-black/20 dark:text-zinc-200 dark:hover:bg-black/30"
+                    >
+                      <FileDownloadIcon /> {filename}
+                    </button>
+                  );
+                }
+                return <div key={i}>tool: {tc.tool}</div>;
+              })}
+            </div>
+          ) : null}
+        </div>
+        <span className="mt-1 px-1 text-[11px] text-zinc-400">{formatTime(message.created_at)}</span>
       </div>
     </div>
   );
@@ -305,8 +328,18 @@ export default function ChatPage() {
   const voiceRecorder = useVoiceRecorder();
   const [describingImage, setDescribingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-grow the composer with content, like Claude's - capped by the max-h-40 CSS class on
+  // the textarea itself, which also gives it a scrollbar once it hits that cap.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   const toggleAutoRead = useCallback(() => {
     unlockSpeech(); // must run synchronously in this click handler - see tts.ts
@@ -612,9 +645,16 @@ export default function ChatPage() {
                   <MessageBubble key={m.id} message={m} conversationId={selectedId} />
                 ))}
                 {sending ? (
-                  <div className="flex justify-start">
-                    <div className="max-w-[75%] rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-500 dark:bg-zinc-800">
-                      Thinking...
+                  <div className="animate-message-in flex items-end justify-start gap-2">
+                    <AssistantAvatar />
+                    <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-zinc-100 px-4 py-3 shadow-sm dark:bg-zinc-800">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          style={{ animationDelay: `${i * 0.15}s` }}
+                          className="animate-typing-dot h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500"
+                        />
+                      ))}
                     </div>
                   </div>
                 ) : null}
@@ -636,67 +676,71 @@ export default function ChatPage() {
                 )}
                 {voiceRecorder.error ? <ErrorMessage message={voiceRecorder.error} /> : null}
               </div>
-              <form onSubmit={handleSend} className="flex items-end gap-2 p-3">
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelected}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={describingImage || sending}
-                  title="Bild hochladen (Texterkennung/Beschreibung)"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  <ImageUploadIcon />
-                </button>
-                {typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function" ? (
+              <form onSubmit={handleSend} className="p-3">
+                <div className="flex items-end gap-1.5 rounded-2xl border border-zinc-300 bg-white p-1.5 shadow-sm transition-colors focus-within:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:focus-within:border-zinc-600">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelected}
+                    className="hidden"
+                  />
                   <button
                     type="button"
-                    onClick={handleMicClick}
-                    disabled={voiceRecorder.isTranscribing || sending}
-                    title={voiceRecorder.isRecording ? "Aufnahme beenden" : "Spracheingabe starten"}
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
-                      voiceRecorder.isRecording
-                        ? "animate-pulse border-red-500 bg-red-500 text-white"
-                        : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    }`}
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={describingImage || sending}
+                    title="Bild hochladen (Texterkennung/Beschreibung)"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   >
-                    <MicIcon active={voiceRecorder.isRecording} />
+                    <ImageUploadIcon />
                   </button>
-                ) : null}
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend(e);
+                  {typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function" ? (
+                    <button
+                      type="button"
+                      onClick={handleMicClick}
+                      disabled={voiceRecorder.isTranscribing || sending}
+                      title={voiceRecorder.isRecording ? "Aufnahme beenden" : "Spracheingabe starten"}
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-50 ${
+                        voiceRecorder.isRecording
+                          ? "animate-pulse bg-red-500 text-white"
+                          : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <MicIcon active={voiceRecorder.isRecording} />
+                    </button>
+                  ) : null}
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend(e);
+                      }
+                    }}
+                    placeholder={
+                      voiceRecorder.isTranscribing
+                        ? "Transkribiere..."
+                        : voiceRecorder.isRecording
+                          ? "Aufnahme läuft..."
+                          : describingImage
+                            ? "Analysiere Bild..."
+                            : "Message OwnAI..."
                     }
-                  }}
-                  placeholder={
-                    voiceRecorder.isTranscribing
-                      ? "Transkribiere..."
-                      : voiceRecorder.isRecording
-                        ? "Aufnahme läuft..."
-                        : describingImage
-                          ? "Analysiere Bild..."
-                          : "Message OwnAI..."
-                  }
-                  rows={2}
-                  disabled={sending}
-                  className="flex-1 resize-none rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !input.trim()}
-                  className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  {sending ? "Sending..." : "Send"}
-                </button>
+                    rows={1}
+                    disabled={sending}
+                    className="max-h-40 flex-1 resize-none self-center bg-transparent px-1.5 py-2 text-sm placeholder:text-zinc-400 focus:outline-none disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sending || !input.trim()}
+                    title="Senden"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white transition-all hover:bg-zinc-700 active:scale-95 disabled:opacity-30 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    <SendIcon />
+                  </button>
+                </div>
               </form>
               {sendError ? (
                 <div className="px-3 pb-3">

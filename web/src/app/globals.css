@@ -40,3 +40,37 @@ body {
 .animate-toast-in {
   animation: toast-slide-in 0.25s ease-out;
 }
+
+/* Chat message entrance - each new bubble settles in rather than just popping into place. */
+@keyframes message-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-message-in {
+  animation: message-in 0.2s ease-out;
+}
+
+/* Three-dot "thinking" indicator, Claude/iMessage-style staggered bounce. */
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.animate-typing-dot {
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
