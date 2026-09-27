@@ -12,8 +12,6 @@ curl -fsSL https://get.docker.com | sh
 
 (Das Nvidia Container Toolkit brauchst du nur, falls deine Ollama-Instanz selbst in Docker läuft und noch keinen GPU-Zugriff hat — dann hast du das aber vermutlich schon eingerichtet, sonst würde sie nicht auf der P40 laufen.)
 
-Der letzte Befehl muss deine P40 auflisten. Wenn nicht: Nvidia-Treiber auf dem Host prüfen (`nvidia-smi` außerhalb von Docker muss schon funktionieren), bevor du weitermachst.
-
 ## 2. Repo klonen und konfigurieren
 
 ```bash
