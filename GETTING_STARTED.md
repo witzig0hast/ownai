@@ -57,6 +57,12 @@ Steht `"ollama":"unreachable"` da: `docker compose logs backend` checken, meist 
 
 Details/Hintergrund zur Modellwahl und VRAM-Begrenzung: [`infra/ollama/README.md`](./infra/ollama/README.md).
 
+**Für Sprachsteuerung** (Speech-to-Text) zusätzlich `WHISPER_HOST`/`WHISPER_PORT` in `.env` prüfen — Default `host.docker.internal:10300` erreicht eine bestehende Wyoming-Whisper-Instanz auf demselben Server automatisch. Läuft sie woanders, hier die echte Adresse eintragen. Kurzer Check, ob sie erreichbar ist (nicht nur auf `127.0.0.1`, gleiches Prinzip wie bei Ollama):
+
+```bash
+ss -tlnp | grep 10300
+```
+
 ## 4. Web-App starten und im Browser testen
 
 Erstmal **ohne Caddy**, direkt per IP:Port — reicht völlig zum Testen im eigenen Netz (Caddy/Domain/TLS kommt in Schritt 6/7 dazu, falls gewünscht):
@@ -135,6 +141,11 @@ App öffnen, einloggen, dann **„Notification access" gewähren**, wenn die App
 
 Details: [`mobile/android/README.md`](./mobile/android/README.md).
 
+## Sprachsteuerung testen
+
+- **Android**: Mikrofon-Button im Chat antippen, „Notification access"-artige Berechtigungsabfrage für Mikrofon bestätigen (einmalig), kurz sprechen, Button erneut antippen — der erkannte Text landet im Eingabefeld zum Prüfen/Bearbeiten vor dem Senden. Antworten werden automatisch vorgelesen, wenn du „Vorlesen" oben rechts im Chat aktivierst (oder tippe das Lautsprecher-Symbol an einer einzelnen Antwort an).
+- **Web/PWA**: Der Mikrofon-Button erscheint **nur über HTTPS oder `localhost`** — Browser blockieren Mikrofonzugriff auf normalem `http://<ip>:<port>`. Für Sprache in der Web-App brauchst du also entweder Schritt 6's Caddy-Option (echte Domain + HTTPS) oder Zugriff direkt über `http://localhost:<WEB_PORT>` (z. B. per SSH-Portweiterleitung vom PC aus). Ohne HTTPS ist das kein Bug, sondern eine Browser-Sicherheitsregel — der Rest der Web-App funktioniert trotzdem ganz normal, nur der Mikrofon-Button bleibt ausgeblendet.
+
 ---
 
 ## Kurz-Checkliste zum Abhaken
@@ -148,5 +159,6 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 - [ ] Tailscale auf Server + allen Geräten, `NEXT_PUBLIC_API_BASE_URL`/`CORS_ORIGINS` auf Tailscale-Adresse gesetzt, `web` neu gebaut
 - [ ] Web-App auf iPad und PC als App installiert
 - [ ] Android-App gebaut, per `adb install` aufs S25 Ultra, Notification-Zugriff gewährt, ein Vorschlag erfolgreich erzeugt
+- [ ] Sprachsteuerung getestet: Android-Mikrofon-Button + Vorlesen; Web nur falls HTTPS/localhost verfügbar
 
 Wenn du an einem Punkt hängen bleibst: einfach den Fehler/die Ausgabe hier reinkopieren, dann schauen wir's uns zusammen an.
