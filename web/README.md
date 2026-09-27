@@ -53,6 +53,25 @@ the `{"error":{"code","message"}}` envelope).
   request; if refresh also fails, clears the session and hard-redirects to
   `/login`. Throws `ApiError` (`code`, `message`, `status`) parsed from the
   backend's error envelope.
+- **Live Talk / Voice** (`/voice`, the landing page after login): a fully hands-free
+  voice conversation loop — `src/lib/useLiveTalk.ts` (`LiveTalkEngine`, a plain class
+  held in a ref, not hook-body closures — see the file's comment for why: React's
+  compiler-era `react-hooks/purity` lint rule flags timing-sensitive code like a
+  `requestAnimationFrame` loop when it's written as plain functions inside a hook body,
+  since it can't prove they never run during render). Tap once to start; the loop is
+  listen → detect end-of-turn via energy-based voice-activity detection (silence after
+  speech, ~1.2s) → `POST /voice/transcribe` → `POST /chat/conversations/{id}/messages`
+  → speak the reply (`speakAndWait` in `src/lib/tts.ts`) → listen again, with no buttons
+  in between. A big animated circle (`src/app/voice/page.tsx`) shows the current phase
+  (listening/transcribing/thinking/speaking) and pulses with live mic volume while
+  listening; the last exchange is shown as text below it for confirmation, not a
+  scrolling message list — this is the "helpful agent" surface, deliberately not styled
+  as a chat thread. Auto-creates its own conversation per session
+  (`POST /chat/conversations`) so it doesn't interleave with regular `/chat` history.
+  **Not verified against a real microphone/room** in this environment (no browser with
+  mic access here) — the VAD silence/volume thresholds in `useLiveTalk.ts` are a
+  reasonable starting point, not tuned; if turns cut off too early or drag on, that's
+  the first thing to adjust.
 - **Chat** (`/chat`): conversation sidebar (`GET /chat/conversations`,
   create via `POST /chat/conversations`), message thread
   (`GET .../messages`), and a synchronous send flow (`POST .../messages`)
@@ -67,10 +86,11 @@ the `{"error":{"code","message"}}` envelope).
   (`GET /notifications/suggestions?status=open`), with Apply/Dismiss buttons
   (`POST .../{id}/apply` / `.../dismiss`) that remove the item from the list
   on success.
-- Shared nav (Chat / Calendar / Suggestions) + logout, route protection via
+- Shared nav (Voice / Chat / Calendar / Suggestions) + logout, route protection via
   a client-side `ProtectedRoute` guard that redirects unauthenticated users
   to `/login`.
-- **Voice** (in `/chat`): a mic button (`src/lib/useVoiceRecorder.ts`, browser
+- **Push-to-talk in Chat** (`/chat`, separate from the Live Talk screen above): a mic
+  button (`src/lib/useVoiceRecorder.ts`, browser
   `MediaRecorder` API) records a clip, uploads it to `POST /voice/transcribe`
   (multipart — see `API.md`), and fills the message input with the
   transcript for you to review/edit before sending (never auto-sent, in case
@@ -173,6 +193,12 @@ against a backend on the same machine. Either:
 
 ## Known gaps / TODOs
 
+- **Live Talk's VAD thresholds are untuned** (see the "Live Talk / Voice" bullet
+  above) — needs a real microphone/room to dial in.
+- Live Talk has no interrupt-while-speaking (tap the orb to cut off a reply early) —
+  you wait for the full reply to finish playing before the next turn starts listening.
+- No Android equivalent of Live Talk yet — Android has push-to-talk + TTS (see
+  `mobile/android/README.md`), not the hands-free loop.
 - No streaming chat (matches `API.md` v1 — `stream=true` is a documented
   future extension that currently 501s).
 - No token-expiry countdown/UI warning; refresh is fully transparent unless

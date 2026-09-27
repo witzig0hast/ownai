@@ -22,3 +22,21 @@ export function stopSpeaking(): void {
     window.speechSynthesis.cancel();
   }
 }
+
+/**
+ * Like [speak], but resolves once playback finishes (or immediately if TTS isn't
+ * supported / the text is empty) — used by the Live Talk loop to know when it's safe
+ * to start listening again. Resolves rather than rejects on a synthesis error, since a
+ * failed read-aloud shouldn't break the conversation loop.
+ */
+export function speakAndWait(text: string, lang = "de-DE"): Promise<void> {
+  if (!isTtsSupported() || !text.trim()) return Promise.resolve();
+  window.speechSynthesis.cancel();
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}

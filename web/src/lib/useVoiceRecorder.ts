@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
 import { transcribeVoice } from "./api/voice";
 
-function pickMimeType(): string | undefined {
+/** Shared with useLiveTalk.ts — picks whatever recording format this browser supports. */
+export function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   return candidates.find((type) => MediaRecorder.isTypeSupported(type));
@@ -97,6 +98,19 @@ export function useVoiceRecorder() {
     mediaRecorderRef.current = null;
     chunksRef.current = [];
     setIsRecording(false);
+  }, []);
+
+  // Release the mic if the component using this hook unmounts mid-recording (e.g.
+  // navigating away from the chat page) rather than leaving the stream open.
+  useEffect(() => {
+    return () => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder) {
+        recorder.onstop = null;
+        recorder.stop();
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
   }, []);
 
   return { isRecording, isTranscribing, error, startRecording, stopRecording, cancelRecording };
