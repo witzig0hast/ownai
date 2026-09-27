@@ -291,6 +291,23 @@ Eine Nachricht an `"ownai"` löst zusätzlich eine **Push-Benachrichtigung** an 
 
 Der Chat/Voice-Agent selbst ist ebenfalls Teilnehmer: die Tools `agent_bus_list_agents`/`agent_bus_send_message` (siehe `app/agent/tools.py`) lassen ihn im Auftrag des Nutzers Nachrichten an registrierte Agents schicken (`from = "ownai"`).
 
+## Gedächtnis (Memory)
+
+Kurze Fakten, die sich der Assistent über den Nutzer merkt (z.B. "Mag keine Zwiebeln", "Wohnt in Berlin") und die bei **jeder** Unterhaltung automatisch in den System-Prompt eingemischt werden (siehe `_system_prompt()` in `app/agent/orchestrator.py`), ohne dass der Nutzer sie wiederholen muss. Maximal die letzten 50 Fakten werden eingemischt (`MAX_MEMORIES_IN_PROMPT` in `app/services/memory_service.py`), neueste zuerst.
+
+Fakten entstehen entweder manuell über die Settings-UI (Tab "Gedächtnis") oder automatisch während des Chats über die Tools `remember_fact` / `list_memories` / `forget_fact` (siehe `app/agent/tools.py`) — der Agent entscheidet selbst, wann ein vom Nutzer erwähntes Detail es wert ist, gemerkt zu werden.
+
+### `POST /memory`  *(Bearer)*
+Request: `{ "content": string }` (max. 512 Zeichen).
+Response `201`: `{ "id": uuid, "content": string, "created_at": datetime }`
+
+### `GET /memory`  *(Bearer)*
+Response `200`: `{ "memories": [ { "id", "content", "created_at" } ] }` — neueste zuerst.
+
+### `DELETE /memory/{id}`  *(Bearer)*
+Response `204`.
+Fehler: `404 not_found` (Fakt existiert nicht oder gehört einem anderen Nutzer).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

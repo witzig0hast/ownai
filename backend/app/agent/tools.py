@@ -11,6 +11,7 @@ from app.services import (
     email_service,
     file_service,
     home_assistant_service,
+    memory_service,
     timer_service,
 )
 from app.utils import ensure_utc
@@ -138,6 +139,23 @@ async def _spawn_subagent(db: AsyncSession, user: User, conversation: Conversati
     from app.agent.subagent import run_subagent  # lazy: subagent.py imports TOOL_SCHEMAS/TOOL_HANDLERS from here
 
     return await run_subagent(db, user, conversation, task=arguments["task"])
+
+
+async def _remember_fact(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    memory = await memory_service.add_memory(db, user, arguments["content"])
+    return {"id": memory.id, "content": memory.content}
+
+
+async def _list_memories(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    memories = await memory_service.list_memories(db, user)
+    return [{"id": m.id, "content": m.content} for m in memories]
+
+
+async def _forget_fact(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    await memory_service.delete_memory(db, user, arguments["memory_id"])
+    return {"forgotten": True}
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -380,6 +398,53 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "remember_fact",
+            "description": (
+                "Speichert einen Fakt über den Nutzer dauerhaft (z.B. Vorlieben, wiederkehrende Details, "
+                "Kontext), damit du ihn dir in jeder zukünftigen Unterhaltung merkst, ohne dass der Nutzer "
+                "es erneut sagen muss. Nutze das proaktiv, wenn der Nutzer etwas über sich erzählt, das "
+                "später nützlich sein könnte — nicht für einmalige, unwichtige Details."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Der Fakt, kurz und in sich verständlich formuliert, z.B. 'Mag keine Zwiebeln'",
+                    },
+                },
+                "required": ["content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_memories",
+            "description": "Listet alle bisher über den Nutzer gemerkten Fakten auf (mit ihrer ID).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "forget_fact",
+            "description": (
+                "Löscht einen gemerkten Fakt wieder, z.B. wenn er nicht mehr stimmt oder der Nutzer darum "
+                "bittet. memory_id vorher über list_memories herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "memory_id": {"type": "string", "description": "ID des Fakts (aus list_memories)"},
+                },
+                "required": ["memory_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -395,4 +460,7 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "spawn_subagent": _spawn_subagent,
     "agent_bus_list_agents": _agent_bus_list_agents,
     "agent_bus_send_message": _agent_bus_send_message,
+    "remember_fact": _remember_fact,
+    "list_memories": _list_memories,
+    "forget_fact": _forget_fact,
 }

@@ -8,14 +8,16 @@ import { AgentBusTab } from "@/components/settings/AgentBusTab";
 import { CalendarTab } from "@/components/settings/CalendarTab";
 import { EmailTab } from "@/components/settings/EmailTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
+import { MemoryTab } from "@/components/settings/MemoryTab";
 
-type SettingsTab = "integrations" | "calendar" | "email" | "agent-bus" | "account";
+type SettingsTab = "integrations" | "calendar" | "email" | "agent-bus" | "memory" | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   integrations: IntegrationsTab,
   calendar: CalendarTab,
   email: EmailTab,
   "agent-bus": AgentBusTab,
+  memory: MemoryTab,
   account: AccountTab,
 };
 
@@ -24,6 +26,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "calendar", label: "Kalender" },
   { key: "email", label: "E-Mail" },
   { key: "agent-bus", label: "Agent Bus" },
+  { key: "memory", label: "Gedächtnis" },
   { key: "account", label: "Konto" },
 ];
 

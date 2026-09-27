@@ -100,6 +100,12 @@ export interface AgentMessage {
   updated_at: string;
 }
 
+export interface Memory {
+  id: string;
+  content: string;
+  created_at: string;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

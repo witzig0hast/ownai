@@ -16,6 +16,7 @@ from app.api import (
     email,
     health,
     home_assistant,
+    memory,
     notifications,
     push,
     timer,
@@ -84,6 +85,7 @@ api_v1_routers = (
     vision.router,
     push.router,
     agent_bus.router,
+    memory.router,
     health.router,
 )
 for router in api_v1_routers:

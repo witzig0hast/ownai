@@ -9,7 +9,7 @@ from app.agent.skills import Skill, get_skill
 from app.agent.tools import TOOL_HANDLERS, TOOL_SCHEMAS
 from app.db.models import Conversation, Message, User
 from app.errors import APIError
-from app.services import ollama_client
+from app.services import memory_service, ollama_client
 
 MAX_TOOL_ITERATIONS = 5
 
@@ -32,7 +32,7 @@ def _tools_for_skill(skill: Skill) -> list[dict]:
     return [s for s in TOOL_SCHEMAS if s["function"]["name"] in skill.tool_names]
 
 
-def _system_prompt(skill: Skill) -> str:
+def _system_prompt(skill: Skill, memories: list[str]) -> str:
     now = datetime.now(timezone.utc).isoformat()
     base = (
         "Du bist OwnAI, der persönliche Assistent des Nutzers. Das ist deine Identität, kein Zusatz zu einer "
@@ -70,7 +70,14 @@ def _system_prompt(skill: Skill) -> str:
         "wissen muss."
     )
     if skill.prompt_addition:
-        return f"{base}\n\n{skill.prompt_addition}"
+        base = f"{base}\n\n{skill.prompt_addition}"
+    if memories:
+        facts = "\n".join(f"- {m}" for m in memories)
+        base = (
+            f"{base}\n\nBekannte Fakten über den Nutzer (von dir selbst gemerkt, nutze sie natürlich in "
+            f"deinen Antworten, ohne sie dem Nutzer nochmal vorzulesen oder zu erwähnen, dass du sie "
+            f"'gemerkt' hast):\n{facts}"
+        )
     return base
 
 
@@ -85,7 +92,8 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
     history = history_result.scalars().all()
 
     skill = get_skill(conversation.skill)
-    ollama_messages: list[dict] = [{"role": "system", "content": _system_prompt(skill)}]
+    memories = await memory_service.memories_for_prompt(db, user)
+    ollama_messages: list[dict] = [{"role": "system", "content": _system_prompt(skill, memories)}]
     for past_message in history:
         ollama_messages.append({"role": past_message.role, "content": past_message.content})
 

@@ -134,9 +134,9 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently five tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Konto) - the tab bar scrolls horizontally on narrow screens rather than wrapping, since
-  more tabs keep getting added:
+  einstellen können" in one place). Currently six tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
     connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
@@ -164,6 +164,12 @@ the `{"error":{"code","message"}}` envelope).
     exchange (from/to/kind/content/status/time) across all of the account's agents. Verified
     live: registered an agent, sent a real message through its API key via `curl`, confirmed
     it showed up in the log table.
+  - **Gedächtnis** tab (`src/components/settings/MemoryTab.tsx`): CRUD UI for
+    `GET/POST/DELETE /memory` — short facts about the user (e.g. "Wohnt in Berlin") that get
+    mixed into every conversation's system prompt automatically, so the assistant doesn't need
+    to be re-told. Facts are added here manually or by the assistant itself during chat via the
+    `remember_fact`/`list_memories`/`forget_fact` tools. Verified live: added a memory through
+    the form, confirmed it listed with its date, deleted it, confirmed the empty state.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

@@ -43,6 +43,7 @@ class User(Base):
     agent_identities: Mapped[list["AgentIdentity"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    memories: Mapped[list["UserMemory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -309,3 +310,18 @@ class AgentMessage(Base):
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class UserMemory(Base):
+    """A fact the assistant has learned about the user (the remember_fact tool, but can also be
+    added/removed manually in Settings) - injected into every chat system prompt
+    (orchestrator._system_prompt) so the assistant doesn't need to be told again."""
+
+    __tablename__ = "user_memories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content: Mapped[str] = mapped_column(String(512), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="memories")
