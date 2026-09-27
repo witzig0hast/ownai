@@ -4,14 +4,18 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import User
-from app.services import calendar_service, home_assistant_service, timer_service
+from app.db.models import Conversation, User
+from app.services import calendar_service, email_service, file_service, home_assistant_service, timer_service
 from app.utils import ensure_utc
 
-ToolHandler = Callable[[AsyncSession, User, dict[str, Any]], Awaitable[Any]]
+# Every handler gets the current conversation too (not just db/user) - needed by create_file,
+# which scopes files per-conversation; the others just ignore it (leading underscore).
+ToolHandler = Callable[[AsyncSession, User, Conversation, dict[str, Any]], Awaitable[Any]]
 
 
-async def _calendar_list_events(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+async def _calendar_list_events(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
     now = datetime.now(timezone.utc)
     start = _parse_dt(arguments.get("start")) or now
     end = _parse_dt(arguments.get("end")) or (start + timedelta(days=7))
@@ -19,7 +23,9 @@ async def _calendar_list_events(db: AsyncSession, user: User, arguments: dict[st
     return [{**e, "start": e["start"].isoformat(), "end": e["end"].isoformat()} for e in events]
 
 
-async def _calendar_create_event(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+async def _calendar_create_event(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
     start = _parse_dt(arguments["start"])
     end = _parse_dt(arguments.get("end")) or (start + timedelta(hours=1))
     event = await calendar_service.create_event(
@@ -28,11 +34,15 @@ async def _calendar_create_event(db: AsyncSession, user: User, arguments: dict[s
     return {**event, "start": event["start"].isoformat(), "end": event["end"].isoformat()}
 
 
-async def _home_assistant_list_entities(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+async def _home_assistant_list_entities(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
     return await home_assistant_service.list_entities(db, user, domain=arguments.get("domain"))
 
 
-async def _home_assistant_call_service(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+async def _home_assistant_call_service(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
     return await home_assistant_service.call_service(
         db,
         user,
@@ -42,14 +52,16 @@ async def _home_assistant_call_service(db: AsyncSession, user: User, arguments: 
     )
 
 
-async def _set_timer(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+async def _set_timer(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
     timer = await timer_service.create_timer(
         db, user, duration_seconds=int(arguments["duration_seconds"]), label=arguments.get("label")
     )
     return {"id": timer.id, "label": timer.label, "ends_at": ensure_utc(timer.ends_at).isoformat()}
 
 
-async def _list_timers(db: AsyncSession, user: User, _arguments: dict[str, Any]) -> Any:
+async def _list_timers(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
     now = datetime.now(timezone.utc)
     timers = await timer_service.list_active_timers(db, user)
     return [
@@ -63,9 +75,33 @@ async def _list_timers(db: AsyncSession, user: User, _arguments: dict[str, Any])
     ]
 
 
-async def _cancel_timer(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+async def _cancel_timer(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
     timer = await timer_service.cancel_timer(db, user, arguments["timer_id"])
     return {"id": timer.id, "cancelled": True}
+
+
+async def _create_file(db: AsyncSession, user: User, conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    record = await file_service.create_file(
+        db,
+        user,
+        conversation,
+        filename=arguments["filename"],
+        content=arguments["content"],
+        file_format=arguments.get("format", "txt"),
+    )
+    return {
+        "id": record.id,
+        "filename": record.filename,
+        "size_bytes": record.size_bytes,
+        "download_url": f"/api/v1/chat/conversations/{conversation.id}/files/{record.id}",
+    }
+
+
+async def _send_email(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    await email_service.send_email(
+        db, user, to=arguments["to"], subject=arguments["subject"], body=arguments["body"]
+    )
+    return {"sent": True, "to": arguments["to"]}
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -205,6 +241,49 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_file",
+            "description": (
+                "Erstellt eine Datei (PDF, Text oder Markdown) mit dem angegebenen Inhalt und speichert sie "
+                "für diesen Nutzer in dieser Unterhaltung ab. Nutze das, wenn der Nutzer dich bittet, etwas "
+                "zu verfassen, aufzuschreiben oder als Dokument/PDF anzulegen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {"type": "string", "description": "Anzeigename der Datei, z.B. 'Einkaufsliste.pdf'"},
+                    "content": {"type": "string", "description": "Vollständiger Textinhalt der Datei"},
+                    "format": {
+                        "type": "string",
+                        "enum": ["pdf", "txt", "md"],
+                        "description": "Dateiformat, Standard 'txt'",
+                    },
+                },
+                "required": ["filename", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_email",
+            "description": (
+                "Verschickt eine E-Mail über das E-Mail-Konto des Nutzers (persönlich hinterlegt oder "
+                "System-Standard). Nutze das nur, wenn der Nutzer dich explizit bittet, eine E-Mail zu senden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Empfänger-E-Mail-Adresse"},
+                    "subject": {"type": "string", "description": "Betreff"},
+                    "body": {"type": "string", "description": "Nachrichtentext"},
+                },
+                "required": ["to", "subject", "body"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -215,4 +294,6 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "set_timer": _set_timer,
     "list_timers": _list_timers,
     "cancel_timer": _cancel_timer,
+    "create_file": _create_file,
+    "send_email": _send_email,
 }

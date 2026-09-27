@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +17,8 @@ from app.schemas.chat import (
     MessageCreateResponse,
     MessagesListOut,
 )
-from app.services import ollama_client
+from app.schemas.files import GeneratedFilesListOut
+from app.services import file_service, ollama_client
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -134,3 +136,33 @@ async def post_message(
             await db.commit()
 
     return MessageCreateResponse(message=assistant_message)
+
+
+@router.get("/conversations/{conversation_id}/files", response_model=GeneratedFilesListOut)
+async def list_conversation_files(
+    conversation_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> GeneratedFilesListOut:
+    conversation = await _get_owned_conversation(db, user, conversation_id)
+    files = await file_service.list_files(db, conversation)
+    return GeneratedFilesListOut(files=files)
+
+
+@router.get("/conversations/{conversation_id}/files/{file_id}")
+async def download_conversation_file(
+    conversation_id: str,
+    file_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> FileResponse:
+    conversation = await _get_owned_conversation(db, user, conversation_id)
+    record = await file_service.get_owned_file(db, user, conversation, file_id)
+    disk_path = file_service.disk_path_for(user.id, conversation.id, record)
+    if not disk_path.is_file():
+        raise NotFound("Datei nicht gefunden.")
+    return FileResponse(
+        disk_path,
+        media_type=record.mime_type,
+        filename=record.filename,
+    )

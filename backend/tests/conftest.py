@@ -9,6 +9,7 @@ os.close(_tmp_db_fd)
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_tmp_db_path}"
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production-use"
 os.environ["OLLAMA_BASE_URL"] = "http://ollama.invalid"
+os.environ["FILES_STORAGE_DIR"] = tempfile.mkdtemp(suffix="-files")
 
 from app.db.session import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402

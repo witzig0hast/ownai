@@ -23,11 +23,14 @@ def _system_prompt() -> str:
         "zugrundeliegenden Modell (Hermes, Llama, o.ä.) du basierst, außer der Nutzer fragt explizit danach. "
         "Antworte auf Deutsch, es sei denn der Nutzer schreibt in einer anderen Sprache. "
         f"Die aktuelle Zeit ist {now} (UTC). "
-        "Du hast Zugriff auf Werkzeuge (Kalender, Smart-Home-Geräte über Home Assistant, Timer). Nutze sie "
-        "aktiv, wenn eine Anfrage das braucht — rate nichts, prüfe/handle stattdessen über die Werkzeuge. "
+        "Du hast Zugriff auf Werkzeuge (Kalender, Smart-Home-Geräte über Home Assistant, Timer, Dateien "
+        "erstellen, E-Mails versenden). Nutze sie aktiv, wenn eine Anfrage das braucht — rate nichts, "
+        "prüfe/handle stattdessen über die Werkzeuge. "
         "Insbesondere: wenn der Nutzer einen Timer/Wecker/Countdown möchte ('stell mir einen Timer auf 5 "
         "Minuten', 'weck mich in einer halben Stunde'), nutze IMMER set_timer, statt zu sagen, dass du das "
-        "nicht kannst — du kannst es. "
+        "nicht kannst — du kannst es. Wenn der Nutzer dich bittet, etwas aufzuschreiben, zu verfassen oder "
+        "als Dokument/PDF anzulegen, nutze create_file. Wenn er dich explizit bittet, eine E-Mail zu senden, "
+        "nutze send_email. "
         "Wichtiges Prinzip: erledige jede Umrechnung, Vorbereitung oder Zwischenschritt, den EIN Werkzeug "
         "selbst braucht, immer selbst (z.B. Zeitangaben in Sekunden umrechnen, Datumsangaben in ISO-8601 "
         "umwandeln) — frag den Nutzer niemals, dir das in einem für Werkzeuge passenden Format zu geben. Der "
@@ -76,7 +79,7 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
                 result: object = {"error": f"Unbekanntes Werkzeug: {name}"}
             else:
                 try:
-                    result = await handler(db, user, arguments)
+                    result = await handler(db, user, conversation, arguments)
                 except APIError as exc:
                     result = {"error": exc.message}
                 except Exception as exc:  # noqa: BLE001 - tool failures must not crash the chat turn

@@ -34,6 +34,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
     timers: Mapped[list["Timer"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    email_account: Mapped["EmailAccount | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class RefreshToken(Base):
@@ -75,6 +78,9 @@ class Conversation(Base):
     user: Mapped["User"] = relationship(back_populates="conversations")
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at"
+    )
+    files: Mapped[list["GeneratedFile"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
     )
 
 
@@ -140,6 +146,49 @@ class Timer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="timers")
+
+
+class GeneratedFile(Base):
+    """A file the assistant created (e.g. a PDF) via the create_file tool, scoped to the user +
+    conversation that requested it. The row's `id` is also the on-disk filename (see
+    app/services/file_service.py) - the user-facing `filename` here is display-only and never
+    touches the filesystem path, so nothing about it needs to be validated for path safety."""
+
+    __tablename__ = "generated_files"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    conversation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="files")
+
+
+class EmailAccount(Base):
+    """Optional per-user SMTP override so the assistant sends email as the user's own address
+    instead of the system-wide default (see app/services/email_service.py) - same 1:1-per-user
+    pattern as CalendarAccount/HomeAssistantAccount."""
+
+    __tablename__ = "email_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    smtp_host: Mapped[str] = mapped_column(String(255), nullable=False)
+    smtp_port: Mapped[int] = mapped_column(nullable=False)
+    smtp_username: Mapped[str] = mapped_column(String(255), nullable=False)
+    encrypted_smtp_password: Mapped[str] = mapped_column(Text, nullable=False)
+    from_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    use_tls: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="email_account")
 
 
 class AppSettings(Base):

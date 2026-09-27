@@ -85,6 +85,17 @@ Fehler: `503 system_paused` (Admin hat das System pausiert — `message` enthäl
 
 **Auto-Titel**: ist die Unterhaltung beim ersten Austausch (erste Nutzernachricht) noch unbenannt (`title: null`), generiert das Backend nach der Antwort automatisch einen kurzen Titel (per LLM, best-effort — schlägt die Generierung fehl, bleibt die Unterhaltung unbenannt, kein Fehler nach außen). Eine bereits explizit gesetzte `title` wird dadurch nie überschrieben.
 
+### Dateien
+
+Der Assistent kann Dateien (PDF, Text, Markdown) erstellen — über das Tool `create_file` (siehe `app/agent/tools.py`), nicht über einen eigenen REST-Endpunkt zum Anlegen. Jede Datei ist pro Nutzer und pro Unterhaltung gespeichert. Der Dateiname auf der Festplatte ist immer eine server-generierte UUID, nie der vom LLM übergebene `filename` — der ist rein für Anzeige/Download-Header, damit egal, was das LLM als Dateiname vorschlägt, nie ein Pfad-Traversal oder eine sonstige Manipulation des Speicherorts möglich ist.
+
+### `GET /chat/conversations/{id}/files`  *(Bearer)*
+Response `200`: `{ "files": [ { "id": uuid, "filename": string, "mime_type": string, "size_bytes": int, "created_at": datetime } ] }`
+
+### `GET /chat/conversations/{id}/files/{file_id}`  *(Bearer)*
+Response `200`: Roh-Dateiinhalt (`Content-Type` je nach Dateityp, `Content-Disposition: attachment` mit dem Anzeigenamen).
+Fehler: `404` (Datei/Unterhaltung existiert nicht oder gehört einem anderen Nutzer).
+
 ## Kalender
 
 ### `POST /integrations/caldav`  *(Bearer)*
@@ -117,6 +128,20 @@ Response `200`: `{ "entities": [ { "entity_id": string, "domain": string, "state
 Fehler: `409 home_assistant_not_connected` (kein HA verbunden), `502 home_assistant_error` (HA nicht erreichbar oder hat den Request abgelehnt).
 
 Steuern von Geräten (z. B. Licht an/aus) läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür die Tools `home_assistant_list_entities`/`home_assistant_call_service` auf (siehe `app/agent/tools.py`). Aus Sicherheitsgründen sind nur unkritische Domains erlaubt (`light`, `switch`, `climate`, `cover`, `fan`, `lock`, `media_player`, `scene`, `script`, `vacuum`, `humidifier`, `water_heater`, `input_boolean`) — administrative HA-Domains (`homeassistant.*`, `shell_command`, `python_script`) sind für das LLM gesperrt.
+
+## E-Mail
+
+Es gibt eine **system-weite Standard-E-Mail** (`SYSTEM_SMTP_*`-Umgebungsvariablen), die der Assistent nutzt, falls ein Nutzer kein eigenes Konto verbunden hat. Verbindet ein Nutzer sein eigenes SMTP-Konto, hat das immer Vorrang — gleiches 1:1-Muster wie bei CalDAV/Home Assistant.
+
+### `POST /integrations/email`  *(Bearer)*
+Request: `{ "smtp_host": string, "smtp_port": int, "smtp_username": string, "smtp_password": string, "from_address": string, "use_tls": bool }`
+Response `200`: `{ "connected": true }`
+Das Passwort wird serverseitig **verschlüsselt** (Fernet, Schlüssel aus `SECRET_KEY`) gespeichert, nie im Klartext zurückgegeben.
+
+### `GET /integrations/email`  *(Bearer)*
+Response `200`: `{ "has_custom_account": bool, "effective_from_address": string | null }` — `effective_from_address` ist die Absenderadresse, die aktuell tatsächlich verwendet würde (eigenes Konto oder System-Standard), `null` falls weder noch konfiguriert ist.
+
+Versenden läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür das Tool `send_email` auf (siehe `app/agent/tools.py`), nur wenn der Nutzer explizit danach fragt. Fehler (z. B. kein Konto konfiguriert, SMTP-Fehler) kommen als Tool-Ergebnis `{ "error": string }` zurück, nicht als HTTP-Fehler des Chat-Endpunkts — der Chat-Turn selbst schlägt dadurch nie fehl.
 
 ## Timer
 
@@ -179,6 +204,18 @@ Response `200`: `{ "text": string }`
 Fehler: `400 empty_audio`, `413 audio_too_large`, `502 whisper_unavailable` (Whisper-Server nicht erreichbar/kein Transkript).
 
 Reiner Speech-to-Text-Endpunkt — liefert nur den transkribierten Text zurück. Client schickt den Text danach ganz normal über `POST /chat/conversations/{id}/messages`. Text-to-Speech (Antworten vorlesen) läuft **client-seitig** über die jeweilige Plattform-API (Web: `speechSynthesis`, Android: `TextToSpeech`) — dafür gibt es keinen Backend-Endpunkt, da On-Device-TTS kostenlos, privat und ohne Server-Rundtrip funktioniert.
+
+## Bilderkennung (Vision)
+
+### `POST /vision/describe`  *(Bearer, multipart/form-data)*
+Request: `multipart/form-data` mit Feld `image` (Bilddatei, max. 15 MB).
+Response `200`: `{ "ocr_text": string | null, "description": string | null }`
+
+Zwei unabhängige, beide **best-effort** (nie ein harter Fehler, nur `null` bei Nichtverfügbarkeit):
+- `ocr_text`: per Tesseract-OCR extrahierter Text im Bild (Deutsch+Englisch). `null` z. B. wenn kein Text erkannt wurde oder die `tesseract-ocr`-Systembibliothek fehlt.
+- `description`: Bildbeschreibung durch ein Vision-fähiges Ollama-Modell (`OLLAMA_VISION_MODEL`, z. B. `llava`). `null`, wenn kein Vision-Modell konfiguriert ist — OCR funktioniert unabhängig davon immer.
+
+Fehler: `400 empty_image`, `413 image_too_large`.
 
 ## Admin
 

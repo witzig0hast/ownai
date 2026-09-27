@@ -49,7 +49,7 @@ async def test_chat_turn_executes_tool_call_then_answers(client: AsyncClient, au
 
     monkeypatch.setattr(ollama_client, "chat", fake_chat)
 
-    async def fake_handler(db, user, arguments):  # noqa: ARG001
+    async def fake_handler(db, user, conversation, arguments):  # noqa: ARG001
         return []
 
     from app.agent import tools as agent_tools

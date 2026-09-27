@@ -23,11 +23,31 @@ class Settings(BaseSettings):
     # chat call, not just the warmup one (see app/api/chat.py's /chat/warmup), so normal usage
     # already keeps it warm between messages.
     ollama_keep_alive: str = "30m"
+    # Optional vision-capable model (e.g. "llama3.2-vision", "llava") for image understanding
+    # (see app/services/vision_service.py) - unset by default since it's a separate model the
+    # user has to pull themselves; OCR (pytesseract) works regardless of this.
+    ollama_vision_model: str | None = None
 
     # Wyoming-protocol ASR (speech-to-text), e.g. an existing wyoming-whisper instance.
     whisper_host: str = "host.docker.internal"
     whisper_port: int = 10300
     whisper_language: str = "de"
+
+    # Where the create_file tool's output lives on disk, per user/conversation (see
+    # app/services/file_service.py) - mount a volume here in production so files survive
+    # container restarts.
+    files_storage_dir: str = "./data/files"
+    files_max_content_chars: int = 20000
+
+    # System-wide default SMTP account the assistant sends email from when a user hasn't
+    # connected their own (see app/services/email_service.py). All optional - if unset, only
+    # users with their own connected account can use the send_email tool.
+    system_smtp_host: str | None = None
+    system_smtp_port: int = 587
+    system_smtp_username: str | None = None
+    system_smtp_password: str | None = None
+    system_smtp_from_address: str | None = None
+    system_smtp_use_tls: bool = True
 
     cors_origins: str = "http://localhost:3000"
 
