@@ -23,3 +23,20 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Slide-in for NotificationToast (macOS Notification Center-style banners) - no animation
+   plugin installed, so this is plain CSS rather than a Tailwind utility class. */
+@keyframes toast-slide-in {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.25s ease-out;
+}

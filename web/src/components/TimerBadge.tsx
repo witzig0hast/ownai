@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { NotificationToastStack, type ToastItem } from "@/components/NotificationToast";
 import * as timersApi from "@/lib/api/timers";
 import type { Timer } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 20000;
 const TICK_INTERVAL_MS = 1000;
+const TOAST_AUTO_DISMISS_MS = 15000;
 
 function remainingSeconds(timer: Timer): number {
   return Math.max(0, Math.floor((new Date(timer.ends_at).getTime() - Date.now()) / 1000));
@@ -50,6 +52,7 @@ export function TimerBadge() {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [open, setOpen] = useState(false);
   const [tick, setTick] = useState(0);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const alertedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -85,6 +88,23 @@ export function TimerBadge() {
     return () => clearInterval(interval);
   }, []);
 
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const handleDismiss = useCallback(
+    async (id: string) => {
+      dismissToast(id);
+      setTimers((prev) => prev.filter((t) => t.id !== id));
+      try {
+        await timersApi.cancelTimer(id);
+      } catch {
+        // already removed locally; a stray server-side row isn't worth surfacing an error for
+      }
+    },
+    [dismissToast],
+  );
+
   useEffect(() => {
     for (const timer of timers) {
       if (remainingSeconds(timer) <= 0 && !alertedRef.current.has(timer.id)) {
@@ -97,22 +117,25 @@ export function TimerBadge() {
             // best-effort only
           }
         }
+        setToasts((prev) => [
+          ...prev,
+          {
+            id: timer.id,
+            title: "Timer abgelaufen",
+            body: timer.label ?? undefined,
+            action: { label: "Beenden", onClick: () => handleDismiss(timer.id) },
+          },
+        ]);
+        setTimeout(() => dismissToast(timer.id), TOAST_AUTO_DISMISS_MS);
       }
     }
     // `tick` isn't read here, but it's what makes an already-listed timer's expiry get noticed
     // a second after it happens rather than only on the next 20s poll.
-  }, [timers, tick]);
+  }, [timers, tick, handleDismiss, dismissToast]);
 
-  async function handleDismiss(id: string) {
-    setTimers((prev) => prev.filter((t) => t.id !== id));
-    try {
-      await timersApi.cancelTimer(id);
-    } catch {
-      // already removed locally; a stray server-side row isn't worth surfacing an error for
-    }
+  if (timers.length === 0) {
+    return <NotificationToastStack toasts={toasts} onDismiss={dismissToast} />;
   }
-
-  if (timers.length === 0) return null;
 
   const sorted = [...timers].sort((a, b) => remainingSeconds(a) - remainingSeconds(b));
   const nearest = sorted[0];
@@ -120,6 +143,7 @@ export function TimerBadge() {
 
   return (
     <div className="relative">
+      <NotificationToastStack toasts={toasts} onDismiss={dismissToast} />
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
