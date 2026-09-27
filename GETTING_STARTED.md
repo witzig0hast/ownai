@@ -26,6 +26,8 @@ cp .env.example .env
 - `SECRET_KEY`: generieren mit `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`
 - `POSTGRES_PASSWORD`: ein beliebiges starkes Passwort
 - `DOMAIN`: fürs Erste reicht `localhost` oder die IP deines Servers im lokalen Netz — echte Domain erst bei Schritt 6 nötig
+- `BACKEND_PORT`/`WEB_PORT`: Standard `8000`/`3000`. Belegt auf deinem Server (du hast ja schon andere Dienste laufen)? Erst prüfen: `ss -tlnp | awk '{print $4}' | grep -oE '[0-9]+$' | sort -n -u`, dann hier auf freie Ports ändern. In den restlichen Anleitungsschritten unten `8000`/`3000` gedanklich durch deine gewählten Ports ersetzen.
+- Greifst du direkt per IP:Port zu (ohne Caddy/Domain, siehe Schritt 6): zusätzlich `NEXT_PUBLIC_API_BASE_URL` (z.B. `http://192.168.1.50:8000/api/v1`) und `CORS_ORIGINS` (z.B. `http://192.168.1.50:3000`) auf deine echte Server-Adresse setzen
 
 ## 3. Backend starten (nutzt deine vorhandene Ollama-Instanz)
 

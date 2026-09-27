@@ -40,7 +40,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
 
   web:
     build:
@@ -48,14 +48,17 @@ services:
       # NEXT_PUBLIC_* vars are inlined into the client bundle at build time by Next.js,
       # not read at container start — must be passed as a build arg, not `environment:`
       # (see web/README.md, "NEXT_PUBLIC_API_BASE_URL gotcha").
+      # Set NEXT_PUBLIC_API_BASE_URL in .env to whatever address your browser will
+      # actually use to reach the backend — through Caddy (https://DOMAIN/api/v1) or
+      # directly by IP/Tailscale-host and BACKEND_PORT (http://host:8000/api/v1).
       args:
-        NEXT_PUBLIC_API_BASE_URL: https://${DOMAIN}/api/v1
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://${DOMAIN}/api/v1}
     container_name: ownai-web
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${WEB_PORT:-3000}:3000"
 
   caddy:
     image: caddy:2-alpine
