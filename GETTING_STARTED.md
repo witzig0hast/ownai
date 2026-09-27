@@ -71,7 +71,9 @@ Erstmal **ohne Caddy**, direkt per IP:Port — reicht völlig zum Testen im eige
 docker compose up -d web
 ```
 
-Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen, eine Chat-Nachricht schicken. Das ist der erste echte End-to-End-Test des ganzen Systems.
+Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen — du landest direkt auf dem neuen „Voice"-Screen (Live Talk); für den ersten Test reicht aber auch einfach eine Text-Nachricht im „Chat"-Tab. Das ist der erste echte End-to-End-Test des ganzen Systems.
+
+Live Talk (der Mikro-Kreis auf „Voice") braucht zusätzlich HTTPS oder `localhost` — siehe „Sprachsteuerung testen" weiter unten.
 
 Falls etwas schiefgeht: `docker compose logs backend` bzw. `docker compose logs web`. Kommt beim Laden der Seite ein CORS-Fehler in der Browser-Konsole: `CORS_ORIGINS` in `.env` passt nicht zur URL, unter der du die Seite öffnest (siehe `.env.example`) — anpassen und `docker compose up -d backend` neu starten.
 
@@ -144,7 +146,10 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 ## Sprachsteuerung testen
 
 - **Android**: Mikrofon-Button im Chat antippen, „Notification access"-artige Berechtigungsabfrage für Mikrofon bestätigen (einmalig), kurz sprechen, Button erneut antippen — der erkannte Text landet im Eingabefeld zum Prüfen/Bearbeiten vor dem Senden. Antworten werden automatisch vorgelesen, wenn du „Vorlesen" oben rechts im Chat aktivierst (oder tippe das Lautsprecher-Symbol an einer einzelnen Antwort an).
-- **Web/PWA**: Der Mikrofon-Button erscheint **nur über HTTPS oder `localhost`** — Browser blockieren Mikrofonzugriff auf normalem `http://<ip>:<port>`. Für Sprache in der Web-App brauchst du also entweder Schritt 6's Caddy-Option (echte Domain + HTTPS) oder Zugriff direkt über `http://localhost:<WEB_PORT>` (z. B. per SSH-Portweiterleitung vom PC aus). Ohne HTTPS ist das kein Bug, sondern eine Browser-Sicherheitsregel — der Rest der Web-App funktioniert trotzdem ganz normal, nur der Mikrofon-Button bleibt ausgeblendet.
+- **Web/PWA — „Voice" (Live Talk, vollautomatisch)**: der Mikro-Kreis-Screen, den du nach dem Login siehst. Einmal antippen zum Starten — danach läuft alles von selbst: sprechen, kurz Pause machen (~1,2s), die App transkribiert und schickt automatisch, die Antwort wird vorgelesen, danach hört sie automatisch wieder zu. Kein erneutes Antippen nötig, bis du auf „Beenden" tippst.
+- **Web/PWA — Push-to-Talk im „Chat"-Tab**: Mikro-Button antippen → sprechen → nochmal antippen zum Stoppen → Text erscheint zur Kontrolle im Eingabefeld vor dem Senden. Eher für kurze, gezielte Nachrichten als für ein Gespräch.
+- **Beides (Web) braucht HTTPS oder `localhost`** — Browser blockieren Mikrofonzugriff auf normalem `http://<ip>:<port>`. Du brauchst also entweder Schritt 6's Caddy-Option (echte Domain + HTTPS) oder Zugriff direkt über `http://localhost:<WEB_PORT>` (z. B. per SSH-Portweiterleitung vom PC aus). Ohne HTTPS ist das kein Bug, sondern eine Browser-Sicherheitsregel — der Rest der Web-App funktioniert trotzdem ganz normal, nur die Mikro-Funktionen bleiben ausgeblendet/inaktiv.
+- Die Erkennung, wann du aufhörst zu reden (Live Talk), ist noch nicht an ein echtes Mikrofon/deinen Raum angepasst — falls Turns zu früh oder zu spät abgeschnitten werden, sag Bescheid, das lässt sich in `web/src/lib/useLiveTalk.ts` fein einstellen.
 
 ---
 
