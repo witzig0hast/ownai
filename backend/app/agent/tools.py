@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
-from app.services import calendar_service
+from app.services import calendar_service, home_assistant_service
 
 ToolHandler = Callable[[AsyncSession, User, dict[str, Any]], Awaitable[Any]]
 
@@ -25,6 +25,20 @@ async def _calendar_create_event(db: AsyncSession, user: User, arguments: dict[s
         db, user, title=arguments["title"], start=start, end=end, location=arguments.get("location")
     )
     return {**event, "start": event["start"].isoformat(), "end": event["end"].isoformat()}
+
+
+async def _home_assistant_list_entities(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+    return await home_assistant_service.list_entities(db, user, domain=arguments.get("domain"))
+
+
+async def _home_assistant_call_service(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+    return await home_assistant_service.call_service(
+        db,
+        user,
+        entity_id=arguments["entity_id"],
+        service=arguments["service"],
+        data=arguments.get("data"),
+    )
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -73,9 +87,59 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "home_assistant_list_entities",
+            "description": (
+                "Listet Smart-Home-Geräte (Home Assistant Entities) des Nutzers auf, mit aktuellem Zustand. "
+                "Nutze das, um zu prüfen, was es gibt oder wie der aktuelle Status ist, bevor du etwas steuerst."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": (
+                            "Optional: nur diese Art von Gerät auflisten, z.B. 'light', 'switch', 'climate', "
+                            "'cover', 'fan', 'lock', 'media_player'. Weggelassen = alle."
+                        ),
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "home_assistant_call_service",
+            "description": (
+                "Steuert ein Smart-Home-Gerät (Home Assistant) — z.B. Licht an/aus, Rollladen hoch/runter, "
+                "Temperatur setzen. entity_id vorher über home_assistant_list_entities herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_id": {"type": "string", "description": "z.B. 'light.wohnzimmer'"},
+                    "service": {
+                        "type": "string",
+                        "description": "Home-Assistant-Service-Name, z.B. 'turn_on', 'turn_off', 'toggle', 'set_temperature'",
+                    },
+                    "data": {
+                        "type": "object",
+                        "description": "Zusätzliche Parameter für den Service, z.B. {\"temperature\": 21} bei set_temperature",
+                    },
+                },
+                "required": ["entity_id", "service"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
     "calendar_list_events": _calendar_list_events,
     "calendar_create_event": _calendar_create_event,
+    "home_assistant_list_entities": _home_assistant_list_entities,
+    "home_assistant_call_service": _home_assistant_call_service,
 }

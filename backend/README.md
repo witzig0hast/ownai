@@ -1,6 +1,6 @@
 # OwnAI Backend
 
-FastAPI-Backend: Auth, Chat/Agent-Loop gegen Ollama, Kalender (CalDAV), Android-Notification-Ingestion + KI-Vorschläge, Sprach-Eingabe (Whisper/Wyoming). Implementiert exakt den Vertrag aus [`../API.md`](../API.md).
+FastAPI-Backend: Auth, Chat/Agent-Loop gegen Ollama, Kalender (CalDAV), Home Assistant (Smart-Home-Steuerung), Android-Notification-Ingestion + KI-Vorschläge, Sprach-Eingabe (Whisper/Wyoming). Implementiert exakt den Vertrag aus [`../API.md`](../API.md).
 
 Für Sprach-Transkription (`POST /voice/transcribe`) wird `ffmpeg` benötigt (im Docker-Image bereits enthalten; für lokale Entwicklung außerhalb Docker: `apt install ffmpeg` bzw. Äquivalent).
 
@@ -24,7 +24,7 @@ Ohne laufendes Ollama antwortet `/api/v1/health` mit `"ollama": "unreachable"` �
 
 ```bash
 pip install -r requirements-dev.txt
-pytest        # 22 Tests, laufen gegen eine temporäre SQLite-DB; Ollama/CalDAV sind gemockt,
+pytest        # 27 Tests, laufen gegen eine temporäre SQLite-DB; Ollama/CalDAV/Home-Assistant sind gemockt,
               # der Wyoming/Whisper-Roundtrip läuft echt gegen einen Test-TCP-Server (kein Mock)
 ruff check app tests
 ```
@@ -36,6 +36,7 @@ Beides lief in dieser Session tatsächlich grün (siehe Session-Zusammenfassung)
 - `app/db/models.py` — SQLAlchemy-2.0-Modelle, dialektunabhängig gehalten (String-UUIDs, generisches JSON) — funktioniert identisch gegen SQLite (Tests/Dev) und Postgres (Prod).
 - `app/agent/` — Tool-Loop: `orchestrator.py` ruft Ollama (`app/services/ollama_client.py`, natives `/api/chat` mit `tools`) auf, führt zurückgemeldete Tool-Calls über `app/agent/tools.py` aus (max. 5 Runden), persistiert am Ende eine einzelne Assistant-Message mit allen `tool_calls` (siehe `API.md`, bewusst kein Streaming in v1).
 - `app/services/calendar_service.py` — CalDAV via `python-caldav`, Zugangsdaten Fernet-verschlüsselt in der DB (`app/services/crypto.py`, Schlüssel von `SECRET_KEY` abgeleitet).
+- `app/services/home_assistant_service.py` — Home Assistant REST-API (`GET /api/states`, `POST /api/services/{domain}/{service}`) via `httpx`. Jeder Nutzer verbindet seine **eigene** HA-Instanz (kein globales Setup) — Long-Lived-Token Fernet-verschlüsselt gespeichert, analog zu CalDAV. `ALLOWED_DOMAINS` sperrt administrative HA-Domains (`homeassistant.*`, `shell_command`, `python_script`) für das LLM-Tool, damit der Agent nur unkritische Geräte (Licht, Steckdosen, Heizung, ...) steuern kann.
 - `app/services/notification_service.py` — nimmt Android-Notifications entgegen, klassifiziert sie asynchron (FastAPI `BackgroundTasks`) per LLM-Prompt zu einem strikten JSON-Urteil, legt bei Relevanz eine `NotificationSuggestion` an.
 - `app/mcp_servers/` — dieselbe Kalender-/Notification-Logik zusätzlich als eigenständige MCP-Server (stdio) für externe MCP-Clients (z.B. Claude Desktop), unabhängig vom internen Tool-Loop-Pfad des Chat-Endpunkts (siehe Docstrings in den Dateien, warum beide Pfade bewusst getrennt sind).
 - `app/services/whisper_client.py` — Speech-to-Text über eine bestehende Wyoming-ASR-Instanz (z.B. wyoming-whisper). Kein REST-API — Wyoming ist ein eigenes Event-Protokoll über eine rohe TCP-Verbindung (Python-Paket `wyoming`, siehe [github.com/rhasspy/wyoming](https://github.com/rhasspy/wyoming)). Empfangenes Audio (WebM/Opus, MP4/AAC, ...) wird per `ffmpeg`-Subprozess zu 16kHz-Mono-PCM dekodiert (das von Wyoming erwartete Format), dann als `Transcribe`→`AudioStart`→`AudioChunk`(s)→`AudioStop`-Event-Sequenz gesendet; die Antwort ist ein `Transcript`-Event mit dem erkannten Text.

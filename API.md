@@ -87,6 +87,23 @@ Response `200`: `{ "events": [ { "id": string, "title": string, "start": datetim
 Request: `{ "title": string, "start": datetime, "end": datetime, "location": string | null }`
 Response `201`: Event-Objekt wie oben
 
+## Home Assistant
+
+Jeder Nutzer verbindet seine **eigene** Home-Assistant-Instanz — es gibt keine globale/geteilte HA-Konfiguration, genau wie bei CalDAV ist das ein 1:1-Zusammenhang pro User.
+
+### `POST /integrations/home-assistant`  *(Bearer)*
+Request: `{ "url": string, "token": string }` — `url` ist die Basis-URL der Home-Assistant-Instanz (z. B. `http://homeassistant.local:8123`), `token` ein Long-Lived Access Token aus dem HA-Profil des Nutzers.
+Response `200`: `{ "connected": true }`
+Der Token wird serverseitig **verschlüsselt** (Fernet, Schlüssel aus `SECRET_KEY`) gespeichert, nie im Klartext zurückgegeben.
+
+### `GET /home-assistant/entities?domain={domain}`  *(Bearer)*
+`domain` optional (z. B. `light`, `switch`, `climate`) — ohne Angabe werden alle Entities zurückgegeben.
+Response `200`: `{ "entities": [ { "entity_id": string, "domain": string, "state": string | null, "friendly_name": string } ] }`
+
+Fehler: `409 home_assistant_not_connected` (kein HA verbunden), `502 home_assistant_error` (HA nicht erreichbar oder hat den Request abgelehnt).
+
+Steuern von Geräten (z. B. Licht an/aus) läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür die Tools `home_assistant_list_entities`/`home_assistant_call_service` auf (siehe `app/agent/tools.py`). Aus Sicherheitsgründen sind nur unkritische Domains erlaubt (`light`, `switch`, `climate`, `cover`, `fan`, `lock`, `media_player`, `scene`, `script`, `vacuum`, `humidifier`, `water_heater`, `input_boolean`) — administrative HA-Domains (`homeassistant.*`, `shell_command`, `python_script`) sind für das LLM gesperrt.
+
 ## Notifications (Android → Backend)
 
 ### `POST /notifications/ingest`  *(X-Device-Key)*

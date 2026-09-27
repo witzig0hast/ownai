@@ -29,6 +29,9 @@ class User(Base):
     calendar_account: Mapped["CalendarAccount | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
+    home_assistant_account: Mapped["HomeAssistantAccount | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class RefreshToken(Base):
@@ -100,6 +103,22 @@ class CalendarAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="calendar_account")
+
+
+class HomeAssistantAccount(Base):
+    """One Home Assistant instance per user (each user runs/owns their own HA, per the user)."""
+
+    __tablename__ = "home_assistant_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    encrypted_token: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="home_assistant_account")
 
 
 class NotificationRaw(Base):
