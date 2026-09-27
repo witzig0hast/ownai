@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import (
     admin,
+    agent_bus,
     auth,
     calendar,
     chat,
@@ -82,6 +83,7 @@ api_v1_routers = (
     email.router,
     vision.router,
     push.router,
+    agent_bus.router,
     health.router,
 )
 for router in api_v1_routers:

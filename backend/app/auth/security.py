@@ -58,12 +58,24 @@ def decode_token(token: str, expected_type: Literal["access", "refresh"]) -> dic
     return payload
 
 
-def generate_device_api_key() -> tuple[str, str]:
+def _generate_prefixed_api_key(prefix: str) -> tuple[str, str]:
     """Returns (raw_key_shown_once, sha256_hash_to_store)."""
-    raw_key = f"ownai_dk_{secrets.token_urlsafe(32)}"
+    raw_key = f"{prefix}_{secrets.token_urlsafe(32)}"
     key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     return raw_key, key_hash
 
 
+def generate_device_api_key() -> tuple[str, str]:
+    return _generate_prefixed_api_key("ownai_dk")
+
+
 def hash_device_api_key(raw_key: str) -> str:
+    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+
+def generate_agent_api_key() -> tuple[str, str]:
+    return _generate_prefixed_api_key("ownai_ak")
+
+
+def hash_agent_api_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()

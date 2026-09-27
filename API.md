@@ -228,6 +228,64 @@ Ein fehlgeschlagener/abgelaufener Push (Browser antwortet `404`/`410`) entfernt 
 
 **iOS-Einschränkung**: Web Push liefert auf iPhone/iPad nur an eine Seite, die über "Zum Home-Bildschirm hinzufügen" installiert wurde — ein offener Safari-Tab im Hintergrund bekommt grundsätzlich keine Push-Events, das ist eine Plattform-Einschränkung von iOS/Safari, keine Einstellungssache dieser App.
 
+## Agent Bus
+
+Ein zentraler Hub (in diesem Backend, nicht extern), über den **eigene andere Projekte/Webseiten** des Nutzers mit OwnAI (und potenziell untereinander, sofern beide über OwnAI registriert sind) Freitext-Nachrichten und strukturierte Aufgaben austauschen können — alles detailliert geloggt. Pro OwnAI-Konto isoliert: kein plattformweiter Bus zwischen verschiedenen Nutzern oder OwnAI-Installationen.
+
+Jeder externe Teilnehmer registriert sich einmal (`POST /agent-bus/agents`, Bearer) und bekommt einen eigenen API-Key (`X-Agent-Key`-Header), mit dem er danach selbstständig Nachrichten senden/empfangen kann — unabhängig vom Login-Token des Nutzers. Der reservierte Name `"ownai"` adressiert immer den Kontobesitzer selbst (keine Registrierung nötig).
+
+### `POST /agent-bus/agents`  *(Bearer)*
+Request: `{ "name": string, "description": string | null }` — `name` muss pro Konto eindeutig sein (nicht `"ownai"`, das ist reserviert).
+Response `201`: `{ "id": uuid, "name": string, "description": string | null, "api_key": string, "created_at": datetime }` — `api_key` wird nur hier einmalig im Klartext zurückgegeben, danach nur noch gehasht gespeichert (analog zu `POST /devices/register`).
+Fehler: `409 agent_name_taken`.
+
+### `GET /agent-bus/agents`  *(Bearer)*
+Response `200`: `{ "agents": [ { "id", "name", "description", "created_at" } ] }` (kein `api_key`).
+
+### `DELETE /agent-bus/agents/{id}`  *(Bearer)*
+Response `204`.
+
+### `POST /agent-bus/messages`  *(Bearer **oder** `X-Agent-Key`)*
+Request: `{ "to": string, "kind": "text" | "task", "content": string | null, "task_type": string | null, "payload": object | null }` — `to` ist ein registrierter Agent-Name oder `"ownai"`. Bei `kind="text"` ist `content` Pflicht, bei `kind="task"` ist `task_type` Pflicht (`payload` optional).
+Response `201`: die erstellte Nachricht (siehe unten). Mit `Bearer` sendet OwnAI/der Nutzer selbst (`from = "ownai"`); mit `X-Agent-Key` sendet der jeweilige Agent.
+Fehler: `404 agent_not_found` (unbekanntes `to`).
+
+Nachrichtenobjekt:
+```json
+{
+  "id": "uuid",
+  "from_label": "shop-backend",
+  "to_label": "ownai",
+  "kind": "text",
+  "content": "Neue Bestellung eingegangen",
+  "task_type": null,
+  "payload": null,
+  "status": "sent",
+  "result": null,
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+`status` ist bei `kind="text"` immer `"sent"`; bei `kind="task"` startet es als `"pending"` und wird vom Empfänger-Agent über `POST /agent-bus/messages/{id}/result` auf `"completed"`/`"failed"` gesetzt.
+
+### `GET /agent-bus/messages?agent_id={id}&status={status}`  *(Bearer)*
+Log-Ansicht für den Nutzer — alle Nachrichten seines Bus (gesendet und empfangen), neueste zuerst. Beide Query-Parameter optional.
+Response `200`: `{ "messages": [ Nachricht ] }`
+
+### `GET /agent-bus/inbox`  *(`X-Agent-Key`)*
+Posteingang eines einzelnen Agents — nur Nachrichten, die an ihn adressiert sind (`to == dieser Agent`). Zum Pollen durch den externen Agent gedacht.
+Response `200`: `{ "messages": [ Nachricht ] }`
+
+### `POST /agent-bus/messages/{id}/result`  *(`X-Agent-Key`)*
+Meldet das Ergebnis einer Task zurück — nur erlaubt für den Agent, an den die Nachricht adressiert war, und nur bei `kind="task"`.
+Request: `{ "status": "completed" | "failed", "result": object | null }`
+Response `200`: die aktualisierte Nachricht.
+Fehler: `404 agent_not_found` (Nachricht existiert nicht oder ist nicht an diesen Agent adressiert), `422 not_a_task`.
+
+Eine Nachricht an `"ownai"` löst zusätzlich eine **Push-Benachrichtigung** an den Nutzer aus (siehe oben) — das macht den Agent Bus zu einem weiteren proaktiven Kontaktkanal: ein eigenes anderes Projekt kann OwnAI/den Nutzer so unaufgefordert erreichen.
+
+Der Chat/Voice-Agent selbst ist ebenfalls Teilnehmer: die Tools `agent_bus_list_agents`/`agent_bus_send_message` (siehe `app/agent/tools.py`) lassen ihn im Auftrag des Nutzers Nachrichten an registrierte Agents schicken (`from = "ownai"`).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

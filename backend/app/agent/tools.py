@@ -5,7 +5,14 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Conversation, User
-from app.services import calendar_service, email_service, file_service, home_assistant_service, timer_service
+from app.services import (
+    agent_bus_service,
+    calendar_service,
+    email_service,
+    file_service,
+    home_assistant_service,
+    timer_service,
+)
 from app.utils import ensure_utc
 
 # Every handler gets the current conversation too (not just db/user) - needed by create_file,
@@ -102,6 +109,29 @@ async def _send_email(db: AsyncSession, user: User, _conversation: Conversation,
         db, user, to=arguments["to"], subject=arguments["subject"], body=arguments["body"]
     )
     return {"sent": True, "to": arguments["to"]}
+
+
+async def _agent_bus_send_message(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    message = await agent_bus_service.send_message(
+        db,
+        user,
+        from_agent=None,
+        to_name=arguments["to"],
+        kind=arguments["kind"],
+        content=arguments.get("content"),
+        task_type=arguments.get("task_type"),
+        payload=arguments.get("payload"),
+    )
+    return {"id": message.id, "to": message.to_label, "status": message.status}
+
+
+async def _agent_bus_list_agents(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    agents = await agent_bus_service.list_agents(db, user)
+    return [{"name": a.name, "description": a.description} for a in agents]
 
 
 async def _spawn_subagent(db: AsyncSession, user: User, conversation: Conversation, arguments: dict[str, Any]) -> Any:
@@ -293,6 +323,43 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "agent_bus_list_agents",
+            "description": (
+                "Listet die vom Nutzer registrierten externen Agents (eigene andere Projekte/Webseiten) "
+                "auf, die über den Agent Bus erreichbar sind. Nutze das, bevor du eine Nachricht sendest, "
+                "um den richtigen Namen zu kennen."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "agent_bus_send_message",
+            "description": (
+                "Sendet eine Nachricht oder eine strukturierte Aufgabe an einen registrierten externen "
+                "Agent (ein anderes Projekt/eine andere Webseite des Nutzers) über den Agent Bus. Nutze "
+                "agent_bus_list_agents, um gültige Namen herauszufinden, statt zu raten."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Name des Ziel-Agents (aus agent_bus_list_agents)"},
+                    "kind": {"type": "string", "enum": ["text", "task"]},
+                    "content": {"type": "string", "description": "Nachrichtentext — erforderlich bei kind='text'"},
+                    "task_type": {"type": "string", "description": "Aufgabentyp — erforderlich bei kind='task'"},
+                    "payload": {
+                        "type": "object",
+                        "description": "Zusätzliche Parameter der Aufgabe (bei kind='task')",
+                    },
+                },
+                "required": ["to", "kind"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "spawn_subagent",
             "description": (
                 "Delegiert eine klar abgegrenzte Teilaufgabe an einen eigenständigen Sub-Agenten, der sie "
@@ -326,4 +393,6 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "create_file": _create_file,
     "send_email": _send_email,
     "spawn_subagent": _spawn_subagent,
+    "agent_bus_list_agents": _agent_bus_list_agents,
+    "agent_bus_send_message": _agent_bus_send_message,
 }

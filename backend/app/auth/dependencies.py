@@ -4,10 +4,10 @@ from fastapi import Depends, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.security import TokenError, decode_token, hash_device_api_key
-from app.db.models import Device, User
+from app.auth.security import TokenError, decode_token, hash_agent_api_key, hash_device_api_key
+from app.db.models import AgentIdentity, Device, User
 from app.db.session import get_db
-from app.errors import InvalidDeviceKey, NotAdmin, NotAuthenticated, SystemPaused
+from app.errors import InvalidAgentKey, InvalidDeviceKey, NotAdmin, NotAuthenticated, SystemPaused
 from app.services import admin_service
 
 
@@ -58,3 +58,17 @@ async def get_device_by_api_key(
     if device is None:
         raise InvalidDeviceKey()
     return device
+
+
+async def get_agent_by_api_key(
+    x_agent_key: Annotated[str | None, Header()] = None,
+    db: AsyncSession = Depends(get_db),
+) -> AgentIdentity:
+    if not x_agent_key:
+        raise InvalidAgentKey("X-Agent-Key Header fehlt.")
+    key_hash = hash_agent_api_key(x_agent_key)
+    result = await db.execute(select(AgentIdentity).where(AgentIdentity.api_key_hash == key_hash))
+    agent = result.scalar_one_or_none()
+    if agent is None:
+        raise InvalidAgentKey()
+    return agent

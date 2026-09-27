@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -38,6 +38,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
     push_subscriptions: Mapped[list["PushSubscription"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    agent_identities: Mapped[list["AgentIdentity"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -259,3 +262,50 @@ class NotificationSuggestion(Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="open")  # open | applied | dismissed
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentIdentity(Base):
+    """A registered external agent (one of the user's own other projects/websites) allowed to
+    talk on this user's Agent Bus (see app/services/agent_bus_service.py). Scoped to a single
+    OwnAI account - the bus is per-user, not a shared/global network between different OwnAI
+    installs or users."""
+
+    __tablename__ = "agent_identities"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_agent_identity_user_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    api_key_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="agent_identities")
+
+
+class AgentMessage(Base):
+    """One entry in the Agent Bus log - either a freeform text message or a structured task
+    exchanged between registered agents (or the special "ownai" target, meaning the user/OwnAI
+    itself). `from_label`/`to_label` are denormalized display names captured at send time, so
+    the log stays readable even after an agent is renamed or removed."""
+
+    __tablename__ = "agent_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    from_agent_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("agent_identities.id", ondelete="SET NULL"), nullable=True
+    )
+    from_label: Mapped[str] = mapped_column(String(64), nullable=False)
+    to_agent_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("agent_identities.id", ondelete="SET NULL"), nullable=True
+    )
+    to_label: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # text | task
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    task_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="sent")  # sent|pending|in_progress|completed|failed
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

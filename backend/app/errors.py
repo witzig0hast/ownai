@@ -61,3 +61,18 @@ class RegistrationClosed(APIError):
 class SystemPaused(APIError):
     def __init__(self, message: str = "Das System ist aktuell pausiert."):
         super().__init__(503, "system_paused", message)
+
+
+class InvalidAgentKey(APIError):
+    def __init__(self, message: str = "Ungültiger Agent-Schlüssel."):
+        super().__init__(401, "invalid_agent_key", message)
+
+
+class AgentNameTaken(APIError):
+    def __init__(self, message: str = "Dieser Agent-Name ist bereits vergeben."):
+        super().__init__(409, "agent_name_taken", message)
+
+
+class AgentNotFound(APIError):
+    def __init__(self, message: str = "Agent nicht gefunden."):
+        super().__init__(404, "agent_not_found", message)
