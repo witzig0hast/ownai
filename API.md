@@ -129,6 +129,16 @@ Führt die Aktion aus (z. B. Kalendereintrag anlegen) und setzt `status=applied`
 ### `POST /notifications/suggestions/{id}/dismiss`  *(Bearer)*
 Response `200`: `{ "status": "dismissed" }`
 
+## Sprache (Voice)
+
+### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*
+Request: `multipart/form-data` mit Feld `audio` (Datei, beliebiges gängiges Audioformat — WebM/Opus, MP4/AAC, WAV etc.; das Backend dekodiert serverseitig via `ffmpeg`). Max. 25 MB.
+Response `200`: `{ "text": string }`
+
+Fehler: `400 empty_audio`, `413 audio_too_large`, `502 whisper_unavailable` (Whisper-Server nicht erreichbar/kein Transkript).
+
+Reiner Speech-to-Text-Endpunkt — liefert nur den transkribierten Text zurück. Client schickt den Text danach ganz normal über `POST /chat/conversations/{id}/messages`. Text-to-Speech (Antworten vorlesen) läuft **client-seitig** über die jeweilige Plattform-API (Web: `speechSynthesis`, Android: `TextToSpeech`) — dafür gibt es keinen Backend-Endpunkt, da On-Device-TTS kostenlos, privat und ohne Server-Rundtrip funktioniert.
+
 ## Health
 
 ### `GET /health`  *(kein Auth)*

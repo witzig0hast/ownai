@@ -1,6 +1,8 @@
 # OwnAI Backend
 
-FastAPI-Backend: Auth, Chat/Agent-Loop gegen Ollama, Kalender (CalDAV), Android-Notification-Ingestion + KI-Vorschläge. Implementiert exakt den Vertrag aus [`../API.md`](../API.md).
+FastAPI-Backend: Auth, Chat/Agent-Loop gegen Ollama, Kalender (CalDAV), Android-Notification-Ingestion + KI-Vorschläge, Sprach-Eingabe (Whisper/Wyoming). Implementiert exakt den Vertrag aus [`../API.md`](../API.md).
+
+Für Sprach-Transkription (`POST /voice/transcribe`) wird `ffmpeg` benötigt (im Docker-Image bereits enthalten; für lokale Entwicklung außerhalb Docker: `apt install ffmpeg` bzw. Äquivalent).
 
 ## Lokale Entwicklung
 
@@ -22,7 +24,8 @@ Ohne laufendes Ollama antwortet `/api/v1/health` mit `"ollama": "unreachable"` �
 
 ```bash
 pip install -r requirements-dev.txt
-pytest        # 15 Tests, laufen gegen eine temporäre SQLite-DB, Ollama/CalDAV sind gemockt
+pytest        # 22 Tests, laufen gegen eine temporäre SQLite-DB; Ollama/CalDAV sind gemockt,
+              # der Wyoming/Whisper-Roundtrip läuft echt gegen einen Test-TCP-Server (kein Mock)
 ruff check app tests
 ```
 
@@ -35,6 +38,7 @@ Beides lief in dieser Session tatsächlich grün (siehe Session-Zusammenfassung)
 - `app/services/calendar_service.py` — CalDAV via `python-caldav`, Zugangsdaten Fernet-verschlüsselt in der DB (`app/services/crypto.py`, Schlüssel von `SECRET_KEY` abgeleitet).
 - `app/services/notification_service.py` — nimmt Android-Notifications entgegen, klassifiziert sie asynchron (FastAPI `BackgroundTasks`) per LLM-Prompt zu einem strikten JSON-Urteil, legt bei Relevanz eine `NotificationSuggestion` an.
 - `app/mcp_servers/` — dieselbe Kalender-/Notification-Logik zusätzlich als eigenständige MCP-Server (stdio) für externe MCP-Clients (z.B. Claude Desktop), unabhängig vom internen Tool-Loop-Pfad des Chat-Endpunkts (siehe Docstrings in den Dateien, warum beide Pfade bewusst getrennt sind).
+- `app/services/whisper_client.py` — Speech-to-Text über eine bestehende Wyoming-ASR-Instanz (z.B. wyoming-whisper). Kein REST-API — Wyoming ist ein eigenes Event-Protokoll über eine rohe TCP-Verbindung (Python-Paket `wyoming`, siehe [github.com/rhasspy/wyoming](https://github.com/rhasspy/wyoming)). Empfangenes Audio (WebM/Opus, MP4/AAC, ...) wird per `ffmpeg`-Subprozess zu 16kHz-Mono-PCM dekodiert (das von Wyoming erwartete Format), dann als `Transcribe`→`AudioStart`→`AudioChunk`(s)→`AudioStop`-Event-Sequenz gesendet; die Antwort ist ein `Transcript`-Event mit dem erkannten Text.
 - Alle Fehler laufen über `app/errors.py` (`APIError`) durch zentrale Exception-Handler in `app/main.py` und liefern exakt `{"error": {"code", "message"}}` wie in `API.md` spezifiziert.
 
 ## Migrationen
@@ -52,3 +56,4 @@ python -m app.mcp_servers.notifications_mcp --user-email du@example.com
 
 - Kein echter CalDAV-/Ollama-Server in dieser Session verfügbar — die entsprechenden Codepfade sind durch Unit-Tests mit gemockten Schnittstellen abgedeckt (siehe `tests/`), aber nicht gegen einen echten Server End-to-End getestet. Vor dem produktiven Einsatz einmal gegen deinen echten CalDAV-Account und ein laufendes Ollama testen.
 - SSE-Streaming für Chat-Antworten ist bewusst noch nicht implementiert (`stream=true` liefert `501`, siehe `API.md`).
+- Wyoming/Whisper (`POST /voice/transcribe`): das Protokoll-Handling (`app/services/whisper_client.py`) läuft in `tests/test_whisper_client.py` echt über TCP gegen einen selbstgebauten Wyoming-Test-Server (inkl. echtem `ffmpeg`-Aufruf) — nicht nur gemockt. Trotzdem einmal gegen deine echte wyoming-whisper-Instanz testen (Sprachqualität, Latenz auf deiner P40 parallel zum LLM, tatsächliche Transkriptionsgüte auf Deutsch).

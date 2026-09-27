@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, calendar, chat, devices, health, notifications
+from app.api import auth, calendar, chat, devices, health, notifications, voice
 from app.config import get_settings
 from app.errors import APIError
 
@@ -41,6 +41,14 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
     )
 
 
-api_v1_routers = (auth.router, devices.router, chat.router, calendar.router, notifications.router, health.router)
+api_v1_routers = (
+    auth.router,
+    devices.router,
+    chat.router,
+    calendar.router,
+    notifications.router,
+    voice.router,
+    health.router,
+)
 for router in api_v1_routers:
     app.include_router(router, prefix="/api/v1")

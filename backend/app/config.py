@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     ollama_chat_model: str = "hermes3:8b"
     ollama_embed_model: str = "nomic-embed-text"
 
+    # Wyoming-protocol ASR (speech-to-text), e.g. an existing wyoming-whisper instance.
+    whisper_host: str = "host.docker.internal"
+    whisper_port: int = 10300
+    whisper_language: str = "de"
+
     cors_origins: str = "http://localhost:3000"
 
     @property
