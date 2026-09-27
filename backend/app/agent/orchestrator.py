@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -11,6 +12,18 @@ from app.errors import APIError
 from app.services import ollama_client
 
 MAX_TOOL_ITERATIONS = 5
+
+_INTERNAL_API_PATH_RE = re.compile(r"/api/v1/\S+")
+
+
+def _strip_internal_urls(text: str) -> str:
+    """Local models sometimes ignore the system prompt's "never mention tool-result URLs"
+    instruction and echo a tool result's raw download_url/path back in their reply (e.g. after
+    create_file). That's confusing text at best (the client already renders a download button
+    from tool_calls, see the web app's Artifact Panel) and actively bad when read aloud in
+    Voice, so this is a hard guarantee, not just a prompt ask."""
+    cleaned = _INTERNAL_API_PATH_RE.sub("", text)
+    return re.sub(r" {2,}", " ", cleaned).strip()
 
 
 def _tools_for_skill(skill: Skill) -> list[dict]:
@@ -48,6 +61,9 @@ def _system_prompt(skill: Skill) -> str:
         "selbst braucht, immer selbst (z.B. Zeitangaben in Sekunden umrechnen, Datumsangaben in ISO-8601 "
         "umwandeln) — frag den Nutzer niemals, dir das in einem für Werkzeuge passenden Format zu geben. Der "
         "Nutzer soll nie merken, dass im Hintergrund Werkzeuge mit technischen Parametern aufgerufen werden. "
+        "Erwähne NIEMALS URLs, Dateipfade oder IDs aus einem Werkzeug-Ergebnis in deiner Antwort (z.B. nach "
+        "create_file) — die Oberfläche zeigt dafür automatisch einen Download-Button/ein Panel an. Sag "
+        "einfach knapp, dass du es erledigt hast (z.B. 'Ich habe die Datei erstellt.'). "
         "Antworte knapp und konkret, wie ein hilfsbereiter persönlicher Assistent, der wirklich handelt, "
         "nicht wie ein Chatbot, der jede Anfrage mit Disclaimern und langen Erklärungen einleitet, Fähigkeiten "
         "verneint, die du tatsächlich hast, oder technische Details an den Nutzer zurückgibt, die er nicht "
@@ -82,7 +98,7 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
         tool_calls = response_message.get("tool_calls") or []
 
         if not tool_calls:
-            final_content = response_message.get("content", "")
+            final_content = _strip_internal_urls(response_message.get("content", ""))
             break
 
         ollama_messages.append({"role": "assistant", "content": response_message.get("content", "")})

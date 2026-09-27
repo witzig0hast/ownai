@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { ArtifactPanel } from "@/components/ArtifactPanel";
 import { AuthProvider } from "@/lib/auth-context";
+import { ArtifactPanelProvider } from "@/lib/artifactPanel";
 import "./globals.css";
 
 // Makes the app installable (Windows/Edge/Chrome "Install app", iPad Safari
@@ -31,7 +33,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col font-sans">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ArtifactPanelProvider>
+            {children}
+            <ArtifactPanel />
+          </ArtifactPanelProvider>
+        </AuthProvider>
       </body>
     </html>
   );

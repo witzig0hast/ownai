@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +9,7 @@ from app.db.models import Conversation, User
 from app.errors import APIError
 from app.services import ollama_client
 
-MAX_SUBAGENT_ITERATIONS = 3
+MAX_SUBAGENT_ITERATIONS = 5
 
 
 async def run_subagent(db: AsyncSession, user: User, conversation: Conversation, task: str) -> dict[str, Any]:
@@ -28,13 +29,18 @@ async def run_subagent(db: AsyncSession, user: User, conversation: Conversation,
     ]
     tool_name_set = {t["function"]["name"] for t in tools}
 
+    now = datetime.now(timezone.utc).isoformat()
     messages: list[dict] = [
         {
             "role": "system",
             "content": (
                 "Du bist ein Sub-Agent von OwnAI, beauftragt mit genau einer abgegrenzten Aufgabe. Löse "
                 "sie eigenständig mit den verfügbaren Werkzeugen und antworte am Ende knapp mit dem "
-                "Ergebnis, nicht mit den Zwischenschritten."
+                "Ergebnis, nicht mit den Zwischenschritten. "
+                f"Die aktuelle Zeit ist {now} (UTC). "
+                "Wichtig: du kannst KEINE Rückfrage an den Nutzer stellen — es gibt niemanden, der "
+                "antwortet. Ist die Aufgabe unterspezifiziert, triff eine vernünftige Annahme, erledige "
+                "die Aufgabe damit, und nenne die Annahme kurz in deiner Antwort, statt nachzufragen."
             ),
         },
         {"role": "user", "content": task},

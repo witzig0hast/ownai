@@ -3,6 +3,7 @@ import { ApiError } from "./api-client";
 import * as chatApi from "./api/chat";
 import { transcribeVoice } from "./api/voice";
 import { speakAndWait, stopSpeaking } from "./tts";
+import type { ToolCall } from "./types";
 import { pickMimeType } from "./useVoiceRecorder";
 
 export type LiveTalkState = "idle" | "listening" | "transcribing" | "thinking" | "speaking";
@@ -20,6 +21,8 @@ interface EngineCallbacks {
   setVolume: (volume: number) => void;
   setLastUserText: (text: string | null) => void;
   setLastAssistantText: (text: string | null) => void;
+  setLastToolCalls: (toolCalls: ToolCall[] | null) => void;
+  setConversationId: (id: string | null) => void;
   setError: (message: string | null) => void;
   setMuted: (muted: boolean) => void;
 }
@@ -54,6 +57,7 @@ class LiveTalkEngine {
     this.callbacks.setError(null);
     this.callbacks.setLastUserText(null);
     this.callbacks.setLastAssistantText(null);
+    this.callbacks.setLastToolCalls(null);
     this.muted = false;
     this.callbacks.setMuted(false);
 
@@ -199,6 +203,7 @@ class LiveTalkEngine {
     // of every Live Talk conversation being stuck showing the boring, identical "Live Talk".
     const conversation = await chatApi.createConversation(null);
     this.conversationId = conversation.id;
+    this.callbacks.setConversationId(conversation.id);
     return conversation.id;
   }
 
@@ -223,9 +228,12 @@ class LiveTalkEngine {
       const conversationId = await this.ensureConversation();
       const reply = await chatApi.sendMessage(conversationId, text);
       this.callbacks.setLastAssistantText(reply.content);
+      this.callbacks.setLastToolCalls(reply.tool_calls);
 
       if (!this.sessionActive) return; // stopped while we were waiting for the reply
       this.callbacks.setState("speaking");
+      // reply.content is already scrubbed of internal URLs server-side (see
+      // orchestrator.py's _strip_internal_urls) - never read a raw API path aloud.
       await speakAndWait(reply.content);
     } catch (err) {
       this.callbacks.setError(err instanceof ApiError ? err.message : "Etwas ist schiefgelaufen.");
@@ -241,6 +249,8 @@ interface UseLiveTalkResult {
   volume: number; // 0..1, smoothed mic level while listening - drives the UI animation
   lastUserText: string | null;
   lastAssistantText: string | null;
+  lastToolCalls: ToolCall[] | null;
+  conversationId: string | null;
   error: string | null;
   isSupported: boolean;
   muted: boolean;
@@ -256,6 +266,8 @@ export function useLiveTalk(): UseLiveTalkResult {
   const [volume, setVolume] = useState(0);
   const [lastUserText, setLastUserText] = useState<string | null>(null);
   const [lastAssistantText, setLastAssistantText] = useState<string | null>(null);
+  const [lastToolCalls, setLastToolCalls] = useState<ToolCall[] | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
 
@@ -266,6 +278,8 @@ export function useLiveTalk(): UseLiveTalkResult {
       setVolume,
       setLastUserText,
       setLastAssistantText,
+      setLastToolCalls,
+      setConversationId,
       setError,
       setMuted,
     });
@@ -287,6 +301,8 @@ export function useLiveTalk(): UseLiveTalkResult {
     volume,
     lastUserText,
     lastAssistantText,
+    lastToolCalls,
+    conversationId,
     error,
     isSupported,
     muted,

@@ -72,7 +72,25 @@ the `{"error":{"code","message"}}` envelope).
   **Not verified against a real microphone/room** in this environment (no browser with
   mic access here) — the VAD silence/volume thresholds in `useLiveTalk.ts` are a
   reasonable starting point, not tuned; if turns cut off too early or drag on, that's
-  the first thing to adjust.
+  the first thing to adjust. `useLiveTalk` also exposes `lastToolCalls`/`conversationId`
+  now (not just `lastAssistantText`) so Voice can show a file/code Artifact Panel button
+  for a `create_file` result or a fenced code block in the reply instead of leaving a raw
+  technical path in the displayed/spoken text — a real bug a user hit in practice (the
+  reply mentioned an internal `/api/v1/...` download URL out loud). The backend now also
+  strips such paths from the reply as a hard guarantee (see backend/README.md's
+  `_strip_internal_urls`), so this is defense in depth, not the only fix.
+- **Artifact Panel** (`src/lib/artifactPanel.tsx` + `src/components/ArtifactPanel.tsx`): a
+  Claude-style right-side drawer, provided once at the root layout (`src/app/layout.tsx`), not
+  in `AppShell` — a page-level component that calls `useArtifactPanel()` in its own top-level
+  body (Voice does) must have the provider as an ANCESTOR of the whole page, and `AppShell` is
+  rendered *inside* the page's returned JSX, not around it, so putting the provider there was a
+  real bug caught by `next build`'s prerender step (`useArtifactPanel must be used within
+  ArtifactPanelProvider`) before it ever reached a browser. Generated files (`create_file` tool
+  results) and code blocks now "open" here — a file shows an icon/name/size + Download button,
+  code shows the language + Ausführen button + output — instead of a raw link/URL dumped into
+  the conversation text. Used from both Chat (file chip buttons on tool_calls, an expand icon on
+  `CodeBlock`) and Voice (see below). Verified live: seeded a message with both a file and a
+  code block, opened each in the panel, downloaded the file via a real browser download event.
 - **Chat** (`/chat`): conversation sidebar (`GET /chat/conversations`,
   create via `POST /chat/conversations`), message thread
   (`GET .../messages`), and a synchronous send flow (`POST .../messages`)

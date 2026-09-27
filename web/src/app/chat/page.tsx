@@ -7,8 +7,8 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
 import { ApiError } from "@/lib/api-client";
 import * as chatApi from "@/lib/api/chat";
-import * as filesApi from "@/lib/api/files";
 import * as visionApi from "@/lib/api/vision";
+import { useArtifactPanel } from "@/lib/artifactPanel";
 import { parseMessageContent } from "@/lib/parseMessageContent";
 import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message, Skill } from "@/lib/types";
@@ -103,20 +103,6 @@ function ImageUploadIcon() {
   );
 }
 
-/** Triggers a browser download of a conversation file created by the create_file tool. */
-async function downloadGeneratedFile(conversationId: string, fileId: string, filename: string) {
-  try {
-    const blob = await filesApi.downloadConversationFile(conversationId, fileId);
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  } catch {
-    // best-effort - a failed download here isn't worth its own error UI
-  }
-}
 
 function ConversationSidebar({
   conversations,
@@ -224,6 +210,7 @@ function ConversationSidebar({
 function MessageBubble({ message, conversationId }: { message: Message; conversationId: string }) {
   const isUser = message.role === "user";
   const segments = parseMessageContent(message.content);
+  const { openArtifact } = useArtifactPanel();
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
@@ -257,15 +244,24 @@ function MessageBubble({ message, conversationId }: { message: Message; conversa
             {message.tool_calls.map((tc, i) => {
               const fileId = tc.tool === "create_file" ? tc.result.id : undefined;
               const filename = tc.tool === "create_file" ? tc.result.filename : undefined;
+              const sizeBytes = tc.tool === "create_file" ? tc.result.size_bytes : undefined;
               if (typeof fileId === "string" && typeof filename === "string") {
                 return (
                   <button
                     key={i}
                     type="button"
-                    onClick={() => downloadGeneratedFile(conversationId, fileId, filename)}
-                    className="flex items-center gap-1 underline decoration-dotted hover:text-zinc-900 dark:hover:text-zinc-100"
+                    onClick={() =>
+                      openArtifact({
+                        type: "file",
+                        conversationId,
+                        fileId,
+                        filename,
+                        sizeBytes: typeof sizeBytes === "number" ? sizeBytes : undefined,
+                      })
+                    }
+                    className="flex items-center gap-1.5 rounded-md border border-black/10 bg-white/50 px-2 py-1 font-medium text-zinc-700 opacity-100 transition-colors hover:bg-white dark:border-white/10 dark:bg-black/20 dark:text-zinc-200 dark:hover:bg-black/30"
                   >
-                    <FileDownloadIcon /> {filename} herunterladen
+                    <FileDownloadIcon /> {filename}
                   </button>
                 );
               }

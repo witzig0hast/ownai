@@ -5,6 +5,8 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
 import * as chatApi from "@/lib/api/chat";
+import { useArtifactPanel } from "@/lib/artifactPanel";
+import { parseMessageContent } from "@/lib/parseMessageContent";
 import { unlockSpeech } from "@/lib/tts";
 import { useLiveTalk, type LiveTalkState } from "@/lib/useLiveTalk";
 
@@ -43,14 +45,64 @@ function MuteIcon() {
   );
 }
 
+function FileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+      <path
+        d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CodeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+      <path d="m8 8-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function VoicePage() {
-  const { state, volume, lastUserText, lastAssistantText, error, isSupported, muted, start, stop, toggleMute, interrupt } =
-    useLiveTalk();
+  const {
+    state,
+    volume,
+    lastUserText,
+    lastAssistantText,
+    lastToolCalls,
+    conversationId,
+    error,
+    isSupported,
+    muted,
+    start,
+    stop,
+    toggleMute,
+    interrupt,
+  } = useLiveTalk();
+  const { openArtifact } = useArtifactPanel();
 
   const isActive = state !== "idle";
   // Ring grows a bit with mic volume while actively listening, otherwise pulses gently.
   const scale = state === "listening" ? 1 + Math.min(volume, 1) * 0.35 : 1;
   const stateLabel = muted && state === "listening" ? "Stummgeschaltet" : STATE_LABEL[state];
+
+  // Voice has no message thread to render code blocks/download links inline in (unlike Chat) -
+  // strip fenced code from the displayed text (still spoken in full by tts, code isn't useful
+  // read aloud anyway) and surface it plus any generated file as Artifact Panel buttons instead.
+  const segments = lastAssistantText ? parseMessageContent(lastAssistantText) : [];
+  const displayAssistantText = segments
+    .filter((s) => s.type === "text")
+    .map((s) => s.value)
+    .join(" ")
+    .trim();
+  const codeSegment = segments.find((s) => s.type === "code");
+  const fileToolCalls = (lastToolCalls || []).filter(
+    (tc) => tc.tool === "create_file" && typeof tc.result.id === "string" && typeof tc.result.filename === "string",
+  );
 
   // Loads the model into Ollama ahead of time, so the first reply in this session doesn't pay
   // for the load - best-effort, a failure here shouldn't surface as a user-facing error.
@@ -141,10 +193,47 @@ export default function VoicePage() {
                     <span className="font-medium text-zinc-700 dark:text-zinc-300">Du:</span> {lastUserText}
                   </p>
                 ) : null}
-                {lastAssistantText ? (
+                {displayAssistantText ? (
                   <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    <span className="font-medium">OwnAI:</span> {lastAssistantText}
+                    <span className="font-medium">OwnAI:</span> {displayAssistantText}
                   </p>
+                ) : null}
+                {fileToolCalls.length > 0 || codeSegment ? (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {conversationId
+                      ? fileToolCalls.map((tc, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() =>
+                              openArtifact({
+                                type: "file",
+                                conversationId,
+                                fileId: tc.result.id as string,
+                                filename: tc.result.filename as string,
+                                sizeBytes:
+                                  typeof tc.result.size_bytes === "number" ? tc.result.size_bytes : undefined,
+                              })
+                            }
+                            className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          >
+                            <FileIcon /> {tc.result.filename as string}
+                          </button>
+                        ))
+                      : null}
+                    {codeSegment && codeSegment.type === "code" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          codeSegment.type === "code" &&
+                          openArtifact({ type: "code", language: codeSegment.language, code: codeSegment.value })
+                        }
+                        className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        <CodeIcon /> Code anzeigen
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             )}
