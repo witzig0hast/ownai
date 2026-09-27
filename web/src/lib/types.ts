@@ -69,6 +69,14 @@ export interface AppSettings {
   system_paused_message: string | null;
 }
 
+export interface GeneratedFile {
+  id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 export type SuggestionKind = "calendar_event" | "reply_draft";
 export type SuggestionStatus = "open" | "applied" | "dismissed";
 

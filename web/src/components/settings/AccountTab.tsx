@@ -27,8 +27,7 @@ export function AccountTab() {
         </dl>
       </div>
       <p className="mt-3 text-xs text-zinc-400">
-        Weitere Einstellungen (z.B. eine eigene E-Mail-Adresse für den Assistenten) landen hier, sobald sie
-        gebaut sind.
+        Eine eigene E-Mail-Adresse für den Assistenten kannst du im Tab &quot;E-Mail&quot; hinterlegen.
       </p>
     </div>
   );

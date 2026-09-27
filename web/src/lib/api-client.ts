@@ -125,3 +125,38 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   }
   return (await res.json()) as T;
 }
+
+/**
+ * Like apiFetch, but for endpoints that return a raw file body (e.g. a generated PDF) rather
+ * than JSON — GET-only, since that's the only case we need this for.
+ */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const buildInit = (accessToken: string | null): RequestInit => {
+    const headers = new Headers();
+    if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+    return { headers };
+  };
+
+  const tokens = getTokens();
+  let res = await fetch(`${API_BASE_URL}${path}`, buildInit(tokens?.accessToken ?? null));
+
+  if (res.status === 401) {
+    if (!inFlightRefresh) {
+      inFlightRefresh = refreshAccessToken().finally(() => {
+        inFlightRefresh = null;
+      });
+    }
+    const newAccessToken = await inFlightRefresh;
+    if (!newAccessToken) {
+      clearTokens();
+      throw new ApiError("unauthorized", "Session expired. Please log in again.", 401);
+    }
+    res = await fetch(`${API_BASE_URL}${path}`, buildInit(newAccessToken));
+  }
+
+  if (!res.ok) {
+    const { code, message } = await parseErrorBody(res);
+    throw new ApiError(code, message, res.status);
+  }
+  return await res.blob();
+}

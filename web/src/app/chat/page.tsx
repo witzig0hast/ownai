@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
 import { ApiError } from "@/lib/api-client";
 import * as chatApi from "@/lib/api/chat";
+import * as filesApi from "@/lib/api/files";
+import * as visionApi from "@/lib/api/vision";
 import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
@@ -73,6 +75,45 @@ function TrashIcon() {
       />
     </svg>
   );
+}
+
+function FileDownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+      <path
+        d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <path d="M12 10v7m0 0-2.5-2.5M12 17l2.5-2.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ImageUploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth={2} />
+      <circle cx="8.5" cy="9.5" r="1.5" stroke="currentColor" strokeWidth={2} />
+      <path d="m5 18 5-5 3 3 4-4 3 3" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Triggers a browser download of a conversation file created by the create_file tool. */
+async function downloadGeneratedFile(conversationId: string, fileId: string, filename: string) {
+  try {
+    const blob = await filesApi.downloadConversationFile(conversationId, fileId);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    // best-effort - a failed download here isn't worth its own error UI
+  }
 }
 
 function ConversationSidebar({
@@ -178,7 +219,7 @@ function ConversationSidebar({
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, conversationId }: { message: Message; conversationId: string }) {
   const isUser = message.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -202,9 +243,23 @@ function MessageBubble({ message }: { message: Message }) {
         ) : null}
         {message.tool_calls && message.tool_calls.length > 0 ? (
           <div className="mt-2 space-y-1 border-t border-black/10 pt-2 text-xs opacity-70 dark:border-white/10">
-            {message.tool_calls.map((tc, i) => (
-              <div key={i}>tool: {tc.tool}</div>
-            ))}
+            {message.tool_calls.map((tc, i) => {
+              const fileId = tc.tool === "create_file" ? tc.result.id : undefined;
+              const filename = tc.tool === "create_file" ? tc.result.filename : undefined;
+              if (typeof fileId === "string" && typeof filename === "string") {
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => downloadGeneratedFile(conversationId, fileId, filename)}
+                    className="flex items-center gap-1 underline decoration-dotted hover:text-zinc-900 dark:hover:text-zinc-100"
+                  >
+                    <FileDownloadIcon /> {filename} herunterladen
+                  </button>
+                );
+              }
+              return <div key={i}>tool: {tc.tool}</div>;
+            })}
           </div>
         ) : null}
       </div>
@@ -239,6 +294,8 @@ export default function ChatPage() {
     }
   });
   const voiceRecorder = useVoiceRecorder();
+  const [describingImage, setDescribingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -266,6 +323,32 @@ export default function ChatPage() {
       await voiceRecorder.startRecording();
     }
   }, [voiceRecorder]);
+
+  // Mirrors the voice-transcription UX above: pick an image, run OCR/description on it, and
+  // insert the result into the message draft rather than sending it automatically - the user
+  // decides what (if anything) to send.
+  const handleImageSelected = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setSendError(null);
+    setDescribingImage(true);
+    try {
+      const result = await visionApi.describeImage(file);
+      const parts = [result.description, result.ocr_text ? `Text im Bild: "${result.ocr_text}"` : null].filter(
+        (p): p is string => Boolean(p),
+      );
+      if (parts.length > 0) {
+        const addition = parts.join("\n");
+        setInput((prev) => (prev.trim() ? `${prev.trim()}\n${addition}` : addition));
+      }
+    } catch (err) {
+      setSendError(err instanceof ApiError ? err.message : "Bilderkennung fehlgeschlagen.");
+    } finally {
+      setDescribingImage(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -475,7 +558,7 @@ export default function ChatPage() {
                   <ErrorMessage message={messagesError} />
                 )}
                 {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} />
+                  <MessageBubble key={m.id} message={m} conversationId={selectedId} />
                 ))}
                 {sending ? (
                   <div className="flex justify-start">
@@ -503,6 +586,22 @@ export default function ChatPage() {
                 {voiceRecorder.error ? <ErrorMessage message={voiceRecorder.error} /> : null}
               </div>
               <form onSubmit={handleSend} className="flex items-end gap-2 p-3">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelected}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={describingImage || sending}
+                  title="Bild hochladen (Texterkennung/Beschreibung)"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <ImageUploadIcon />
+                </button>
                 {typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function" ? (
                   <button
                     type="button"
@@ -532,7 +631,9 @@ export default function ChatPage() {
                       ? "Transkribiere..."
                       : voiceRecorder.isRecording
                         ? "Aufnahme läuft..."
-                        : "Message OwnAI..."
+                        : describingImage
+                          ? "Analysiere Bild..."
+                          : "Message OwnAI..."
                   }
                   rows={2}
                   disabled={sending}

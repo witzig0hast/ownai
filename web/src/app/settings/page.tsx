@@ -4,12 +4,14 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { AccountTab } from "@/components/settings/AccountTab";
+import { EmailTab } from "@/components/settings/EmailTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 
-type SettingsTab = "integrations" | "account";
+type SettingsTab = "integrations" | "email" | "account";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "integrations", label: "Integrations" },
+  { key: "email", label: "E-Mail" },
   { key: "account", label: "Konto" },
 ];
 
@@ -38,7 +40,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {tab === "integrations" ? <IntegrationsTab /> : <AccountTab />}
+        {tab === "integrations" ? <IntegrationsTab /> : tab === "email" ? <EmailTab /> : <AccountTab />}
       </div>
     </AppShell>
   );
