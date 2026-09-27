@@ -4,20 +4,13 @@ Konkrete Checkliste, um OwnAI von hier aus zum Laufen zu bringen. Reihenfolge ei
 
 ## 1. Server vorbereiten (Linux-Maschine mit der Tesla P40)
 
+Da du schon eine laufende Ollama-Instanz hast, braucht OwnAI selbst **keinen** GPU-Zugriff von Docker aus — nur Docker + Compose für Backend/Web/Postgres/Redis/Caddy:
+
 ```bash
-# Docker + Compose (falls noch nicht drauf)
 curl -fsSL https://get.docker.com | sh
-
-# Nvidia Container Toolkit, damit Docker die P40 ansprechen kann
-distribution=$(. /etc/os-release; echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
-sudo systemctl restart docker
-
-# Testen, ob Docker die GPU sieht:
-docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
+
+(Das Nvidia Container Toolkit brauchst du nur, falls deine Ollama-Instanz selbst in Docker läuft und noch keinen GPU-Zugriff hat — dann hast du das aber vermutlich schon eingerichtet, sonst würde sie nicht auf der P40 laufen.)
 
 Der letzte Befehl muss deine P40 auflisten. Wenn nicht: Nvidia-Treiber auf dem Host prüfen (`nvidia-smi` außerhalb von Docker muss schon funktionieren), bevor du weitermachst.
 
@@ -36,15 +29,24 @@ cp .env.example .env
 - `POSTGRES_PASSWORD`: ein beliebiges starkes Passwort
 - `DOMAIN`: fürs Erste reicht `localhost` oder die IP deines Servers im lokalen Netz — echte Domain erst bei Schritt 6 nötig
 
-## 3. Backend + Ollama starten
+## 3. Backend starten (nutzt deine vorhandene Ollama-Instanz)
+
+Da du schon Ollama auf dem Server laufen hast: einfach das nötige Modell dort pullen (falls noch nicht vorhanden) und `OLLAMA_BASE_URL` in `.env` unangetastet lassen — der Default `http://host.docker.internal:11434` erreicht deine bestehende Instanz automatisch:
 
 ```bash
-docker compose up -d postgres redis ollama
-docker exec -it ownai-ollama ollama pull hermes3:8b
-docker exec -it ownai-ollama ollama pull nomic-embed-text
+ollama pull hermes3:8b
+ollama pull nomic-embed-text
 
+# Kurzer Check: lauscht dein Ollama auf mehr als nur 127.0.0.1?
+# (nötig, damit der Docker-Container vom Host aus rankommt — Details und Fix
+#  falls nicht: infra/ollama/README.md, "Bereits vorhandene Ollama-Instanz nutzen")
+curl http://localhost:11434/api/tags
+
+docker compose up -d postgres redis
 docker compose up -d backend
 ```
+
+Hast du **kein** eigenes Ollama (Alternative, hier nicht dein Fall): `docker compose --profile bundled-ollama up -d ollama` und `OLLAMA_BASE_URL=http://ollama:11434` in `.env` setzen — siehe `infra/ollama/README.md`.
 
 Prüfen, dass alles läuft:
 
@@ -122,10 +124,10 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 
 ## Kurz-Checkliste zum Abhaken
 
-- [ ] Docker + Nvidia Container Toolkit auf dem Server
+- [ ] Docker + Docker Compose auf dem Server (Nvidia Container Toolkit nur nötig, falls du Schritt 1 für eine *neue* GPU-Nutzung durchgehst — deine bestehende Ollama-Instanz hat das vermutlich schon)
 - [ ] `.env` ausgefüllt
-- [ ] `docker compose up -d postgres redis ollama`, Modelle gezogen
-- [ ] `docker compose up -d backend web caddy`, `/health` zeigt `"ollama":"ok"`
+- [ ] Modelle auf deiner bestehenden Ollama-Instanz gepullt, `curl localhost:11434/api/tags` erreichbar
+- [ ] `docker compose up -d postgres redis backend web caddy`, `/health` zeigt `"ollama":"ok"`
 - [ ] Web-App im Browser getestet (Registrierung, Chat)
 - [ ] CalDAV verbunden, Kalender-Tool im Chat getestet
 - [ ] Tailscale auf Server + allen Geräten

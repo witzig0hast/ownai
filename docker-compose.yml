@@ -1,5 +1,11 @@
 services:
+  # Optional — skipped by default. If you already have an Ollama instance running on
+  # this server (systemd install or your own container), leave this out entirely and
+  # point OLLAMA_BASE_URL in .env at it instead (see .env.example and
+  # infra/ollama/README.md, "Bereits vorhandene Ollama-Instanz nutzen"). Only start
+  # this bundled one with `docker compose --profile bundled-ollama up -d ollama`.
   ollama:
+    profiles: ["bundled-ollama"]
     image: ollama/ollama:latest
     container_name: ownai-ollama
     restart: unless-stopped
@@ -57,8 +63,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      ollama:
-        condition: service_healthy
+    # Lets OLLAMA_BASE_URL=http://host.docker.internal:11434 in .env reach an Ollama
+    # instance running directly on this host (native install or your own container
+    # publishing port 11434) — needed on Linux, where host.docker.internal isn't
+    # resolvable by default the way it is on Docker Desktop.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:8000:8000"
 
