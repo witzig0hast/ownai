@@ -16,7 +16,8 @@ export class ApiError extends Error {
 }
 
 export interface ApiFetchOptions extends Omit<RequestInit, "body"> {
-  /** JSON-serializable request body. Stringified automatically. */
+  /** JSON-serializable request body (stringified automatically), or a FormData instance for
+   * multipart/form-data uploads (sent as-is; the browser sets the correct Content-Type/boundary). */
   body?: unknown;
   /** Skip attaching the Authorization header and skip the refresh-on-401 flow (used for /auth/*). */
   skipAuth?: boolean;
@@ -69,16 +70,22 @@ async function parseErrorBody(res: Response): Promise<{ code: string; message: s
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { skipAuth, body, headers, ...rest } = options;
 
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const buildInit = (accessToken: string | null): RequestInit => {
     const finalHeaders = new Headers(headers);
-    finalHeaders.set("Content-Type", "application/json");
+    if (!isFormData) {
+      // For FormData, leave Content-Type unset — the browser fills in
+      // "multipart/form-data; boundary=..." itself, which we can't replicate manually.
+      finalHeaders.set("Content-Type", "application/json");
+    }
     if (accessToken && !skipAuth) {
       finalHeaders.set("Authorization", `Bearer ${accessToken}`);
     }
     return {
       ...rest,
       headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isFormData ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
     };
   };
 

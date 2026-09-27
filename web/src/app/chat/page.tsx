@@ -5,7 +5,43 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
 import * as chatApi from "@/lib/api/chat";
+import { isTtsSupported, speak, stopSpeaking } from "@/lib/tts";
 import type { Conversation, Message } from "@/lib/types";
+import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
+
+const AUTO_READ_STORAGE_KEY = "ownai.autoReadReplies";
+
+function MicIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+        stroke="currentColor"
+        strokeWidth={active ? 2.5 : 2}
+      />
+      <path
+        d="M19 11a7 7 0 0 1-14 0M12 18v3"
+        stroke="currentColor"
+        strokeWidth={active ? 2.5 : 2}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SpeakerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path
+        d="M4 9v6h4l5 4V5L8 9H4Z"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <path d="M16.5 9a4 4 0 0 1 0 6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function formatTime(iso: string): string {
   try {
@@ -80,13 +116,23 @@ function MessageBubble({ message }: { message: Message }) {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+        className={`group max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
           isUser
             ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
             : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
         }`}
       >
         {message.content}
+        {!isUser && isTtsSupported() ? (
+          <button
+            type="button"
+            onClick={() => speak(message.content)}
+            title="Antwort vorlesen"
+            className="ml-2 inline-flex align-middle text-zinc-400 opacity-0 transition-opacity hover:text-zinc-700 group-hover:opacity-100 dark:hover:text-zinc-200"
+          >
+            <SpeakerIcon />
+          </button>
+        ) : null}
         {message.tool_calls && message.tool_calls.length > 0 ? (
           <div className="mt-2 space-y-1 border-t border-black/10 pt-2 text-xs opacity-70 dark:border-white/10">
             {message.tool_calls.map((tc, i) => (
@@ -114,7 +160,43 @@ export default function ChatPage() {
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
+  // Per-viewer convenience, not shared state — read once via a lazy initializer (not an
+  // effect) so it's available on first render instead of causing an extra re-render.
+  const [autoRead, setAutoRead] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(AUTO_READ_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const voiceRecorder = useVoiceRecorder();
+
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleAutoRead = useCallback(() => {
+    setAutoRead((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(AUTO_READ_STORAGE_KEY, String(next));
+      } catch {
+        // best-effort only
+      }
+      if (!next) stopSpeaking();
+      return next;
+    });
+  }, []);
+
+  const handleMicClick = useCallback(async () => {
+    if (voiceRecorder.isRecording) {
+      const text = await voiceRecorder.stopRecording();
+      if (text) {
+        setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+      }
+    } else {
+      await voiceRecorder.startRecording();
+    }
+  }, [voiceRecorder]);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,13 +295,14 @@ export default function ChatPage() {
             )
             .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
         );
+        if (autoRead) speak(assistantMessage.content);
       } catch (err) {
         setSendError(err instanceof ApiError ? err.message : "Failed to send message.");
       } finally {
         setSending(false);
       }
     },
-    [input, selectedId, sending],
+    [input, selectedId, sending, autoRead],
   );
 
   return (
@@ -264,10 +347,33 @@ export default function ChatPage() {
                 ) : null}
                 <div ref={bottomRef} />
               </div>
-              <form
-                onSubmit={handleSend}
-                className="flex items-end gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800"
-              >
+              <div className="flex items-center justify-between border-t border-zinc-200 px-3 pt-2 dark:border-zinc-800">
+                {isTtsSupported() ? (
+                  <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                    <input type="checkbox" checked={autoRead} onChange={toggleAutoRead} className="h-3.5 w-3.5" />
+                    Antworten automatisch vorlesen
+                  </label>
+                ) : (
+                  <span />
+                )}
+                {voiceRecorder.error ? <ErrorMessage message={voiceRecorder.error} /> : null}
+              </div>
+              <form onSubmit={handleSend} className="flex items-end gap-2 p-3">
+                {typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function" ? (
+                  <button
+                    type="button"
+                    onClick={handleMicClick}
+                    disabled={voiceRecorder.isTranscribing || sending}
+                    title={voiceRecorder.isRecording ? "Aufnahme beenden" : "Spracheingabe starten"}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
+                      voiceRecorder.isRecording
+                        ? "animate-pulse border-red-500 bg-red-500 text-white"
+                        : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    <MicIcon active={voiceRecorder.isRecording} />
+                  </button>
+                ) : null}
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -277,7 +383,13 @@ export default function ChatPage() {
                       handleSend(e);
                     }
                   }}
-                  placeholder="Message OwnAI..."
+                  placeholder={
+                    voiceRecorder.isTranscribing
+                      ? "Transkribiere..."
+                      : voiceRecorder.isRecording
+                        ? "Aufnahme läuft..."
+                        : "Message OwnAI..."
+                  }
                   rows={2}
                   disabled={sending}
                   className="flex-1 resize-none rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"

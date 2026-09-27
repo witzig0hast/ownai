@@ -70,6 +70,19 @@ the `{"error":{"code","message"}}` envelope).
 - Shared nav (Chat / Calendar / Suggestions) + logout, route protection via
   a client-side `ProtectedRoute` guard that redirects unauthenticated users
   to `/login`.
+- **Voice** (in `/chat`): a mic button (`src/lib/useVoiceRecorder.ts`, browser
+  `MediaRecorder` API) records a clip, uploads it to `POST /voice/transcribe`
+  (multipart — see `API.md`), and fills the message input with the
+  transcript for you to review/edit before sending (never auto-sent, in case
+  the transcription is off). Only shown when the browser supports
+  `getUserMedia` — iPad/Windows/Android browsers all do; needs an HTTPS or
+  `localhost` origin (browsers block mic access on plain HTTP otherwise).
+  Text-to-speech (`src/lib/tts.ts`) reads assistant replies aloud via the
+  browser's native `speechSynthesis` — a speaker icon on each reply for a
+  one-off read, or a persistent "auto-read replies" checkbox (per-viewer
+  preference, stored in `localStorage`). Both run entirely client-side/
+  on-device: STT goes to your own self-hosted Whisper (see root
+  `DECISIONS.md`), TTS never leaves the browser at all.
 
 ## Installing as an app (PWA)
 
@@ -172,6 +185,13 @@ against a backend on the same machine. Either:
   expose a "get current connection status" endpoint to check.
 - No pagination for conversations/messages/events/suggestions lists — the
   API responses aren't documented as paginated, so none was added.
+- **Mic button needs a secure context.** `getUserMedia` is blocked by
+  browsers on plain `http://` origins other than `localhost` — on
+  `http://<server-ip>:<port>` (no Caddy/HTTPS yet) the mic button won't
+  appear at all (the code detects this and hides it rather than showing a
+  broken button, but the feature is simply unavailable until the app is
+  served over HTTPS or accessed as `localhost`). See root
+  `GETTING_STARTED.md` step 6 for the Caddy+HTTPS option.
 - Not tested end-to-end against a live backend (none was running in this
   environment); verified via `npm run build` + `npm run lint` plus a careful
   read of `API.md` for every request/response shape.
