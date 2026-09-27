@@ -167,9 +167,11 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "set_timer",
             "description": (
-                "Stellt einen Countdown-Timer. Rechne die gewünschte Dauer (z.B. '5 Minuten', "
-                "'eine halbe Stunde', '90 Sekunden') in Sekunden um. Der Timer läuft geräteübergreifend: "
-                "er wird angezeigt/benachrichtigt auf jedem Gerät, auf dem der Nutzer OwnAI offen hat."
+                "Stellt einen Countdown-Timer. Rechne die vom Nutzer genannte Dauer IMMER SELBST in Sekunden "
+                "um, ohne nachzufragen - der Nutzer soll nie selbst rechnen müssen. Beispiele: '5 Minuten' -> "
+                "duration_seconds=300, 'eine halbe Stunde' -> 1800, '10 Minuten' -> 600, '90 Sekunden' -> 90, "
+                "'2 Stunden' -> 7200. Der Timer läuft geräteübergreifend: er wird angezeigt/benachrichtigt auf "
+                "jedem Gerät, auf dem der Nutzer OwnAI offen hat."
             ),
             "parameters": {
                 "type": "object",
