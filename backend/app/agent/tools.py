@@ -104,6 +104,12 @@ async def _send_email(db: AsyncSession, user: User, _conversation: Conversation,
     return {"sent": True, "to": arguments["to"]}
 
 
+async def _spawn_subagent(db: AsyncSession, user: User, conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    from app.agent.subagent import run_subagent  # lazy: subagent.py imports TOOL_SCHEMAS/TOOL_HANDLERS from here
+
+    return await run_subagent(db, user, conversation, task=arguments["task"])
+
+
 def _parse_dt(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -284,6 +290,29 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "spawn_subagent",
+            "description": (
+                "Delegiert eine klar abgegrenzte Teilaufgabe an einen eigenständigen Sub-Agenten, der sie "
+                "mit denselben Werkzeugen selbstständig löst und nur das Endergebnis zurückgibt. Nutze das "
+                "für Aufgaben mit mehreren eigenen Zwischenschritten, die sich klar von der Hauptunterhaltung "
+                "abgrenzen lassen — nicht für einfache Ein-Schritt-Aufrufe, die du direkt selbst erledigen "
+                "kannst. Ein Sub-Agent kann selbst keine weiteren Sub-Agents starten."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "Klare, in sich abgeschlossene Beschreibung der Teilaufgabe",
+                    },
+                },
+                "required": ["task"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -296,4 +325,5 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "cancel_timer": _cancel_timer,
     "create_file": _create_file,
     "send_email": _send_email,
+    "spawn_subagent": _spawn_subagent,
 }
