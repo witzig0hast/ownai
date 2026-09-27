@@ -4,6 +4,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# postinstall (copy-pyodide-assets.mjs) needs this script present - `npm ci` runs it as part of
+# this same RUN, before the full source is copied in.
+COPY scripts ./scripts
 RUN npm ci
 
 # --- builder: build the Next.js app ---
