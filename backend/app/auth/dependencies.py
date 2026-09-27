@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.security import TokenError, decode_token, hash_device_api_key
 from app.db.models import Device, User
 from app.db.session import get_db
-from app.errors import InvalidDeviceKey, NotAuthenticated
+from app.errors import InvalidDeviceKey, NotAdmin, NotAuthenticated, SystemPaused
+from app.services import admin_service
 
 
 async def get_current_user(
@@ -25,6 +26,23 @@ async def get_current_user(
     user = await db.get(User, payload["sub"])
     if user is None:
         raise NotAuthenticated()
+    return user
+
+
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise NotAdmin()
+    return user
+
+
+async def require_not_paused(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> User:
+    """Gate for the actual LLM/resource-heavy endpoints (chat messages) only - never applied to
+    auth, or the admin endpoints themselves, so a paused system can always still be unpaused."""
+    settings = await admin_service.get_settings(db)
+    if settings.system_paused:
+        raise SystemPaused(settings.system_paused_message or "Das System ist aktuell pausiert.")
     return user
 
 

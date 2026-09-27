@@ -15,6 +15,7 @@ class UserOut(BaseModel):
     id: str
     email: EmailStr
     display_name: str
+    is_admin: bool
     created_at: UtcDatetime
 
 

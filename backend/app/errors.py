@@ -46,3 +46,18 @@ class CalendarNotConnected(APIError):
 class NotImplementedYet(APIError):
     def __init__(self, message: str = "Noch nicht implementiert."):
         super().__init__(501, "not_implemented", message)
+
+
+class NotAdmin(APIError):
+    def __init__(self, message: str = "Nur für Administratoren."):
+        super().__init__(403, "not_admin", message)
+
+
+class RegistrationClosed(APIError):
+    def __init__(self, message: str = "Registrierung ist aktuell geschlossen."):
+        super().__init__(403, "registration_closed", message)
+
+
+class SystemPaused(APIError):
+    def __init__(self, message: str = "Das System ist aktuell pausiert."):
+        super().__init__(503, "system_paused", message)

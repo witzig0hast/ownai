@@ -22,6 +22,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_admin: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     devices: Mapped[list["Device"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -138,6 +139,20 @@ class Timer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="timers")
+
+
+class AppSettings(Base):
+    """Single-row table (always id="singleton") holding system-wide admin settings. Created
+    lazily on first access (see app/services/admin_service.py) rather than via a data
+    migration, so a fresh install doesn't need a seed step."""
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default="singleton")
+    registration_open: Mapped[bool] = mapped_column(default=True)
+    system_paused: Mapped[bool] = mapped_column(default=False)
+    system_paused_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
 class NotificationRaw(Base):

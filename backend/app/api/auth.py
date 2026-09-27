@@ -16,8 +16,9 @@ from app.auth.security import (
 from app.config import get_settings
 from app.db.models import RefreshToken, User
 from app.db.session import get_db
-from app.errors import EmailTaken, InvalidCredentials, InvalidRefreshToken
+from app.errors import EmailTaken, InvalidCredentials, InvalidRefreshToken, RegistrationClosed
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair, UserOut
+from app.services import admin_service
 from app.utils import ensure_utc
 
 router = APIRouter(tags=["auth"])
@@ -42,10 +43,17 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     if existing.scalar_one_or_none() is not None:
         raise EmailTaken()
 
+    is_first_user = await admin_service.user_count(db) == 0
+    if not is_first_user:
+        settings = await admin_service.get_settings(db)
+        if not settings.registration_open:
+            raise RegistrationClosed()
+
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
+        is_admin=is_first_user,  # first-ever registration bootstraps the admin account
     )
     db.add(user)
     await db.commit()

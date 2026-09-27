@@ -16,8 +16,8 @@ Verbindliche Schnittstelle zwischen `backend/` und den drei Clients (`web/`, `mo
 
 ### `POST /auth/register`
 Request: `{ "email": string, "password": string (>=8 Zeichen), "display_name": string }`
-Response `201`: `{ "id": uuid, "email": string, "display_name": string, "created_at": datetime }`
-Fehler: `409 email_taken`
+Response `201`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "created_at": datetime }`
+Fehler: `409 email_taken`, `403 registration_closed` (Admin hat Registrierung geschlossen — betrifft nie den allerersten Nutzer überhaupt, der bootstrapt sich immer und wird automatisch `is_admin: true`)
 
 ### `POST /auth/login`
 Request: `{ "email": string, "password": string }`
@@ -32,7 +32,7 @@ Response `200`: gleiche Form wie `/auth/login`
 Fehler: `401 invalid_refresh_token`
 
 ### `GET /users/me`  *(Bearer)*
-Response `200`: `{ "id": uuid, "email": string, "display_name": string, "created_at": datetime }`
+Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "created_at": datetime }`
 
 ## Geräte
 
@@ -70,6 +70,7 @@ Response `200`: `{ "messages": [ Message ] }`
 ### `POST /chat/conversations/{id}/messages`  *(Bearer)*
 Request: `{ "content": string }`
 Response `200`: `{ "message": Message }` — **synchron**, d. h. der Request blockiert bis die Antwort (inkl. aller Tool-Aufrufe) fertig ist. Kein Streaming in v1 (siehe `CONCEPT.md`, bewusst zurückgestellt — SSE-Streaming ist als v2-Erweiterung vorgesehen, ohne Breaking Change an diesem Contract: es kommt ein zusätzlicher `stream=true` Query-Param, der aktuell `501 not_implemented` liefert, falls gesetzt).
+Fehler: `503 system_paused` (Admin hat das System pausiert — `message` enthält ggf. einen vom Admin gesetzten Grund, siehe Admin-Sektion).
 
 ## Kalender
 
@@ -165,6 +166,24 @@ Response `200`: `{ "text": string }`
 Fehler: `400 empty_audio`, `413 audio_too_large`, `502 whisper_unavailable` (Whisper-Server nicht erreichbar/kein Transkript).
 
 Reiner Speech-to-Text-Endpunkt — liefert nur den transkribierten Text zurück. Client schickt den Text danach ganz normal über `POST /chat/conversations/{id}/messages`. Text-to-Speech (Antworten vorlesen) läuft **client-seitig** über die jeweilige Plattform-API (Web: `speechSynthesis`, Android: `TextToSpeech`) — dafür gibt es keinen Backend-Endpunkt, da On-Device-TTS kostenlos, privat und ohne Server-Rundtrip funktioniert.
+
+## Admin
+
+Nur für Nutzer mit `is_admin: true` (siehe `/auth/register` — der allererste registrierte Nutzer überhaupt wird automatisch Admin, danach ist es eine feste Eigenschaft des Nutzers). Alle Endpunkte hier: `403 not_admin` für nicht-Admin-Nutzer.
+
+Diese Endpunkte selbst sind **nie** vom `system_paused`-Zustand betroffen — sonst könnte ein pausiertes System von niemandem mehr entpausiert werden. Ebenso bleiben `/auth/login` und `/auth/refresh` immer erreichbar, auch pausiert.
+
+### `GET /admin/settings`  *(Bearer, Admin)*
+Response `200`: `{ "registration_open": bool, "system_paused": bool, "system_paused_message": string | null }`
+
+### `PATCH /admin/settings`  *(Bearer, Admin)*
+Request: `{ "registration_open": bool | null, "system_paused": bool | null, "system_paused_message": string | null }` — nur gesetzte Felder werden geändert.
+Response `200`: wie `GET /admin/settings`
+
+`system_paused: true` blockiert `POST /chat/conversations/{id}/messages` (der eigentliche Ollama/LLM-Traffic) mit `503 system_paused` für alle Nutzer — alle anderen Endpunkte (Kalender, Home Assistant, Timer, Login, ...) bleiben normal nutzbar.
+
+### `GET /admin/users`  *(Bearer, Admin)*
+Response `200`: `{ "users": [ { "id": uuid, "email": string, "display_name": string, "is_admin": bool, "created_at": datetime } ] }`
 
 ## Health
 

@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, calendar, chat, devices, health, home_assistant, notifications, timer, voice
+from app.api import admin, auth, calendar, chat, devices, health, home_assistant, notifications, timer, voice
 from app.config import get_settings
 from app.errors import APIError
 
@@ -50,6 +50,7 @@ api_v1_routers = (
     voice.router,
     home_assistant.router,
     timer.router,
+    admin.router,
     health.router,
 )
 for router in api_v1_routers:

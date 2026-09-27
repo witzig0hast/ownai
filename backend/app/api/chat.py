@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.orchestrator import run_turn
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_not_paused
 from app.db.models import Conversation, Message, User
 from app.db.session import get_db
 from app.errors import APIError, NotFound
@@ -67,7 +67,7 @@ async def post_message(
     conversation_id: str,
     payload: MessageCreateRequest,
     stream: bool = Query(default=False),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_not_paused),
     db: AsyncSession = Depends(get_db),
 ) -> MessageCreateResponse:
     if stream:
