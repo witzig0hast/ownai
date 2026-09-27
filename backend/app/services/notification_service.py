@@ -73,11 +73,27 @@ async def classify_and_create_suggestion(db: AsyncSession, notification: Notific
             ]
         )
     except ollama_client.OllamaError:
-        logger.exception("Notification classification failed to reach Ollama")
+        logger.exception(
+            "Notification classification failed to reach Ollama (notification_id=%s)", notification.id
+        )
         return None
 
-    parsed = _parse_classification(response.get("content", ""))
-    if not parsed or not parsed.get("relevant") or not parsed.get("kind"):
+    raw_content = response.get("content", "")
+    parsed = _parse_classification(raw_content)
+    if parsed is None:
+        # The model didn't return anything we could parse as JSON at all - almost always means
+        # it ignored the "reply with ONLY JSON" instruction (added a preamble, wrapped it in a
+        # ```json code fence with unbalanced braces, etc.). Logged at warning (not silently
+        # dropped) with the raw text, since this is otherwise invisible - the notification just
+        # never turns into a suggestion and nothing else says why.
+        logger.warning(
+            "Notification classification returned unparseable content (notification_id=%s): %r",
+            notification.id,
+            raw_content,
+        )
+        return None
+    if not parsed.get("relevant") or not parsed.get("kind"):
+        logger.debug("Notification classified as not relevant (notification_id=%s)", notification.id)
         return None
 
     suggestion = NotificationSuggestion(

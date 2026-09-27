@@ -92,6 +92,42 @@ async def test_irrelevant_notification_produces_no_suggestion(client: AsyncClien
     assert suggestions.json()["suggestions"] == []
 
 
+async def test_unparseable_classification_produces_no_suggestion_and_is_logged(
+    client: AsyncClient, auth_headers: dict, monkeypatch, caplog
+):
+    """Local LLMs sometimes ignore the 'reply with ONLY JSON' instruction (preamble text, a
+    ```json code fence, ...) - this must degrade to "no suggestion", not a 500, and must be
+    logged (not silently swallowed) so it's diagnosable without guessing why nothing showed up.
+    """
+    device_key = await _register_device(client, auth_headers)
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        return {"role": "assistant", "content": "Sicher, hier ist meine Analyse: nichts Relevantes."}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.services.notification_service"):
+        ingested = await client.post(
+            "/notifications/ingest",
+            json={
+                "package_name": "com.whatsapp",
+                "app_label": "WhatsApp",
+                "title": "Anna",
+                "text": "Bist du da?",
+                "posted_at": "2026-09-25T18:02:00Z",
+                "category": "msg",
+            },
+            headers={"X-Device-Key": device_key},
+        )
+    assert ingested.status_code == 202
+
+    suggestions = await client.get("/notifications/suggestions", headers=auth_headers)
+    assert suggestions.json()["suggestions"] == []
+    assert any("unparseable" in record.message for record in caplog.records)
+
+
 async def test_dismiss_suggestion(client: AsyncClient, auth_headers: dict, monkeypatch):
     device_key = await _register_device(client, auth_headers)
 
