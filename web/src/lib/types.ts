@@ -76,6 +76,30 @@ export interface AppSettings {
   system_paused_message: string | null;
 }
 
+export interface AgentIdentity {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+export type AgentMessageKind = "text" | "task";
+export type AgentMessageStatus = "sent" | "pending" | "in_progress" | "completed" | "failed";
+
+export interface AgentMessage {
+  id: string;
+  from_label: string;
+  to_label: string;
+  kind: AgentMessageKind;
+  content: string | null;
+  task_type: string | null;
+  payload: Record<string, unknown> | null;
+  status: AgentMessageStatus;
+  result: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GeneratedFile {
   id: string;
   filename: string;

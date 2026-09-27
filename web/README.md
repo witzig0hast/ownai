@@ -103,7 +103,7 @@ the `{"error":{"code","message"}}` envelope).
   on success.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently three tabs (Integrations, E-Mail, Konto):
+  einstellen können" in one place). Currently four tabs (Integrations, E-Mail, Agent Bus, Konto):
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
     connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
@@ -119,6 +119,16 @@ the `{"error":{"code","message"}}` envelope).
     popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
     that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI
     assistant as regular chat, just kept out of the normal history.
+  - **E-Mail** tab (`src/components/settings/EmailTab.tsx`): connect a personal SMTP account
+    (`POST /integrations/email`) for the `send_email` tool to use instead of the system-wide
+    default — same form/status-probe pattern as the Integrations tab.
+  - **Agent Bus** tab (`src/components/settings/AgentBusTab.tsx`): register/remove external
+    agents (`GET/POST/DELETE /agent-bus/agents`) — the API key is shown exactly once right
+    after registration, in a dismissable callout, then never again (only its hash is stored
+    server-side). Below that, a full message log (`GET /agent-bus/messages`) shows every
+    exchange (from/to/kind/content/status/time) across all of the account's agents. Verified
+    live: registered an agent, sent a real message through its API key via `curl`, confirmed
+    it showed up in the log table.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker
