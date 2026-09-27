@@ -99,7 +99,11 @@ function ConversationSidebar({
   onDelete: (conversation: Conversation) => void;
 }) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800">
+    <aside
+      className={`w-full shrink-0 flex-col border-r border-zinc-200 md:flex md:w-72 dark:border-zinc-800 ${
+        selectedId ? "hidden md:flex" : "flex"
+      }`}
+    >
       <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
         <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Conversations</h2>
         <button
@@ -441,7 +445,7 @@ export default function ChatPage() {
           onArchiveToggle={handleArchiveToggle}
           onDelete={handleDeleteConversation}
         />
-        <section className="flex flex-1 flex-col overflow-hidden">
+        <section className={`flex-1 flex-col overflow-hidden ${selectedId ? "flex" : "hidden md:flex"}`}>
           {listError ? (
             <div className="p-3">
               <ErrorMessage message={listError} />
@@ -454,6 +458,16 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                className="flex items-center gap-1 border-b border-zinc-200 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-300 md:hidden"
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                  <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Conversations
+              </button>
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {messagesLoading ? (
                   <p className="text-sm text-zinc-500">Loading messages...</p>

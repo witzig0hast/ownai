@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PageHeader } from "@/components/PageHeader";
 import { AccountTab } from "@/components/settings/AccountTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 
@@ -18,9 +19,9 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto p-4">
-        <h1 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Settings</h1>
+        <PageHeader title="Settings" />
 
-        <div className="mt-3 mb-5 flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="mb-5 flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
           {TABS.map((t) => (
             <button
               key={t.key}

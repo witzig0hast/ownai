@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -16,9 +16,11 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!isLoading && isAuthenticated) {
-    router.replace("/voice");
-  }
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/voice");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

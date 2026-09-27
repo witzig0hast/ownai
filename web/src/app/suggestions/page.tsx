@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { PageHeader } from "@/components/PageHeader";
 import { ApiError } from "@/lib/api-client";
 import * as suggestionsApi from "@/lib/api/suggestions";
 import type { Suggestion } from "@/lib/types";
@@ -124,13 +125,15 @@ export default function SuggestionsPage() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto p-4">
-        <h1 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Vorschläge</h1>
-        <p className="mb-4 text-sm text-zinc-500">
-          Wenn die Android-App eine Benachrichtigung (z. B. WhatsApp) liest und OwnAI darin etwas
-          Sinnvolles erkennt — einen Termin oder eine passende Antwort — taucht hier ein Vorschlag
-          auf. &bdquo;Übernehmen&ldquo; führt die Aktion aus (legt z. B. den Termin im Kalender an),
-          &bdquo;Verwerfen&ldquo; entfernt ihn ohne etwas zu tun.
-        </p>
+        <PageHeader
+          title="Vorschläge"
+          subtitle={
+            'Wenn die Android-App eine Benachrichtigung (z. B. WhatsApp) liest und OwnAI darin etwas ' +
+            'Sinnvolles erkennt — einen Termin oder eine passende Antwort — taucht hier ein Vorschlag ' +
+            'auf. „Übernehmen“ führt die Aktion aus (legt z. B. den Termin im Kalender an), ' +
+            '„Verwerfen“ entfernt ihn ohne etwas zu tun.'
+          }
+        />
 
         <ErrorMessage message={listError} />
         <div className="mb-3">

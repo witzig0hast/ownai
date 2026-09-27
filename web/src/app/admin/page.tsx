@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { PageHeader } from "@/components/PageHeader";
 import { ApiError } from "@/lib/api-client";
 import * as adminApi from "@/lib/api/admin";
 import { useAuth } from "@/lib/auth-context";
@@ -165,7 +166,7 @@ export default function AdminPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto p-4">
-        <h1 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Admin</h1>
+        <PageHeader title="Admin" />
         {isLoading || !user ? (
           <p className="text-sm text-zinc-500">Lade...</p>
         ) : !user.is_admin ? null : (
