@@ -87,20 +87,36 @@ the `{"error":{"code","message"}}` envelope).
   (`GET /notifications/suggestions?status=open`), with Apply/Dismiss buttons
   (`POST .../{id}/apply` / `.../dismiss`) that remove the item from the list
   on success.
-- **Integrations** (`/integrations`): a small grid of tiles (icon, name, status dot),
-  one per connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
-  Assistant (`POST /integrations/home-assistant`) — matching the "Add Integration" card
-  style of tools like Home Assistant itself, rather than always-expanded forms. Tapping a
-  tile opens its connect form in a popup (`src/components/Modal.tsx`). Status (Verbunden /
-  Nicht verbunden / Fehler) is inferred by probing the corresponding list endpoint and
-  checking for the `..._not_connected` error code, since neither integration has a
-  dedicated status endpoint — see `API.md`. Home Assistant devices themselves aren't
-  managed here beyond connecting: controlling them (lights, switches, ...) happens
-  conversationally through Chat/Voice via the backend's LLM tools. Also has a floating
-  chat button that opens `SetupHelperChat` (`src/components/SetupHelperChat.tsx`) in a
-  popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
-  that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI
-  assistant as regular chat, just kept out of the normal history.
+- **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
+  as more per-user configuration gets added (the user explicitly asked for "alles
+  einstellen können" in one place). Currently two tabs:
+  - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
+    `/integrations` page): a small grid of tiles (icon, name, status dot), one per
+    connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
+    Assistant (`POST /integrations/home-assistant`) — matching the "Add Integration" card
+    style of tools like Home Assistant itself, rather than always-expanded forms. Tapping a
+    tile opens its connect form in a popup (`src/components/Modal.tsx`). Status (Verbunden /
+    Nicht verbunden / Fehler) is inferred by probing the corresponding list endpoint and
+    checking for the `..._not_connected` error code, since neither integration has a
+    dedicated status endpoint — see `API.md`. Home Assistant devices themselves aren't
+    managed here beyond connecting: controlling them (lights, switches, ...) happens
+    conversationally through Chat/Voice via the backend's LLM tools. Also has a floating
+    chat button that opens `SetupHelperChat` (`src/components/SetupHelperChat.tsx`) in a
+    popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
+    that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI
+    assistant as regular chat, just kept out of the normal history.
+  - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info for
+    now (name, email, admin badge) — a placeholder for account-level settings landing here
+    as they're built (e.g. a personal email address for the assistant to use).
+- **Admin** (`/admin`, only shown/reachable for `user.is_admin`): the first user ever to
+  register becomes admin automatically (see `API.md`'s Admin section) and gets a toggle
+  for open registration (`PATCH /admin/settings`), a global "pause the system" switch with
+  an optional reason shown to users (blocks only `POST .../messages`, i.e. actual LLM
+  traffic — login, calendar, Home Assistant, timers etc. stay usable, including for the
+  admin themself, so a paused system can never lock out its own admin), and a read-only
+  user list (`GET /admin/users`). Client-side redirects a logged-in non-admin straight to
+  `/voice` if they somehow land on the URL — the backend's `require_admin` dependency is
+  the actual enforcement, this is just UX.
 - **Timers** (`src/components/TimerBadge.tsx`, shown in the nav bar on every page — "oben
   rechts in der Ecke"): timers themselves are set/cancelled by the LLM through chat/voice
   (`set_timer`/`cancel_timer` tool calls, see `API.md`) — this badge's job is just to show
@@ -111,8 +127,8 @@ the `{"error":{"code","message"}}` envelope).
   by design — only fires while the tab is open; see `mobile/android/README.md`'s
   `alarm/` section for how Android covers the "app isn't open" case via a local
   `AlarmManager` alarm instead.
-- Shared nav (Voice / Chat / Calendar / Suggestions / Integrations) + logout,
-  route protection via a client-side `ProtectedRoute` guard that redirects
+- Shared nav (Voice / Chat / Calendar / Suggestions / Settings, plus Admin for admins) +
+  logout, route protection via a client-side `ProtectedRoute` guard that redirects
   unauthenticated users to `/login`.
 - **Push-to-talk in Chat** (`/chat`, separate from the Live Talk screen above): a mic
   button (`src/lib/useVoiceRecorder.ts`, browser
@@ -240,9 +256,9 @@ against a backend on the same machine. Either:
   bounced to `/login`.
 - Calendar event editing/deleting isn't in `API.md` yet, so it isn't in the
   UI either (only list + create).
-- Integration status badges on `/integrations` are inferred by probing the
+- Integration status badges on `/settings`'s Integrations tab are inferred by probing the
   corresponding list endpoint rather than a dedicated status endpoint (see
-  the "Integrations" bullet above) — accurate, but means an extra request on
+  the "Settings" bullet above) — accurate, but means an extra request on
   page load.
 - No way to disconnect/remove a Home Assistant or CalDAV connection from the
   UI once set — only connect/reconnect. Neither `API.md` nor the backend

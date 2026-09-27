@@ -10,7 +10,7 @@ const LINKS = [
   { href: "/chat", label: "Chat" },
   { href: "/calendar", label: "Calendar" },
   { href: "/suggestions", label: "Suggestions" },
-  { href: "/integrations", label: "Integrations" },
+  { href: "/settings", label: "Settings" },
 ];
 
 function Logo() {
@@ -27,6 +27,8 @@ export function NavBar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
+  const links = user?.is_admin ? [...LINKS, { href: "/admin", label: "Admin" }] : LINKS;
+
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white/80 px-5 py-3 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/80">
       <div className="flex items-center gap-7">
@@ -37,7 +39,7 @@ export function NavBar() {
           </span>
         </Link>
         <nav className="flex items-center gap-1">
-          {LINKS.map((link) => {
+          {links.map((link) => {
             const active = pathname === link.href || pathname?.startsWith(`${link.href}/`);
             return (
               <Link

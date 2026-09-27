@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Modal } from "@/components/Modal";
 import { SetupHelperChat } from "@/components/SetupHelperChat";
@@ -232,7 +231,7 @@ function ChatFab({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   );
 }
 
-export default function IntegrationsPage() {
+export function IntegrationsTab() {
   const [caldavStatus, setCaldavStatus] = useState<ConnectionStatus>("checking");
   const [haStatus, setHaStatus] = useState<ConnectionStatus>("checking");
   const [openModal, setOpenModal] = useState<IntegrationKey | null>(null);
@@ -269,29 +268,26 @@ export default function IntegrationsPage() {
   }, [checkCaldav, checkHomeAssistant]);
 
   return (
-    <AppShell>
-      <div className="flex-1 overflow-y-auto p-4">
-        <h1 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Integrations</h1>
-        <p className="mb-4 text-sm text-zinc-500">
-          Verbinde deine eigenen Dienste — auf eine Karte tippen, um sie einzurichten.
-        </p>
+    <div>
+      <p className="mb-4 text-sm text-zinc-500">
+        Verbinde deine eigenen Dienste — auf eine Karte tippen, um sie einzurichten.
+      </p>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <IntegrationTile
-            icon={<CalendarIcon />}
-            name="Kalender"
-            description="CalDAV"
-            status={caldavStatus}
-            onClick={() => setOpenModal("caldav")}
-          />
-          <IntegrationTile
-            icon={<HomeIcon />}
-            name="Home Assistant"
-            description="Smart Home"
-            status={haStatus}
-            onClick={() => setOpenModal("home-assistant")}
-          />
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <IntegrationTile
+          icon={<CalendarIcon />}
+          name="Kalender"
+          description="CalDAV"
+          status={caldavStatus}
+          onClick={() => setOpenModal("caldav")}
+        />
+        <IntegrationTile
+          icon={<HomeIcon />}
+          name="Home Assistant"
+          description="Smart Home"
+          status={haStatus}
+          onClick={() => setOpenModal("home-assistant")}
+        />
       </div>
 
       {openModal === "caldav" ? (
@@ -322,6 +318,6 @@ export default function IntegrationsPage() {
           <SetupHelperChat />
         </div>
       ) : null}
-    </AppShell>
+    </div>
   );
 }

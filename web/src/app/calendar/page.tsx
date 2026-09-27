@@ -171,8 +171,8 @@ export default function CalendarPage() {
             {notConnected ? (
               <p className="text-sm text-zinc-500">
                 Kein Kalender verbunden.{" "}
-                <Link href="/integrations" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                  Jetzt unter Integrationen verbinden.
+                <Link href="/settings" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                  Jetzt unter Settings verbinden.
                 </Link>
               </p>
             ) : eventsLoading ? (

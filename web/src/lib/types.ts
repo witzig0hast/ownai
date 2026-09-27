@@ -12,6 +12,7 @@ export interface User {
   id: string;
   email: string;
   display_name: string;
+  is_admin: boolean;
   created_at: string;
 }
 
@@ -59,6 +60,12 @@ export interface Timer {
   id: string;
   label: string | null;
   ends_at: string;
+}
+
+export interface AppSettings {
+  registration_open: boolean;
+  system_paused: boolean;
+  system_paused_message: string | null;
 }
 
 export type SuggestionKind = "calendar_event" | "reply_draft";
