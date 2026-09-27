@@ -72,6 +72,9 @@ class Conversation(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     archived: Mapped[bool] = mapped_column(default=False)
+    # Which Skill (see app/agent/skills.py) this conversation uses - narrows the system prompt
+    # focus and, for some skills, which tools the model is even offered.
+    skill: Mapped[str] = mapped_column(String(32), default="general")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 

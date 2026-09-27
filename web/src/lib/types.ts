@@ -27,7 +27,14 @@ export interface Conversation {
   id: string;
   title: string | null;
   archived: boolean;
+  skill: string;
   updated_at: string;
+}
+
+export interface Skill {
+  key: string;
+  name: string;
+  description: string;
 }
 
 export interface ToolCall {

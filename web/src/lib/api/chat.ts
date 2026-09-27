@@ -1,5 +1,5 @@
 import { apiFetch } from "../api-client";
-import type { Conversation, Message } from "../types";
+import type { Conversation, Message, Skill } from "../types";
 
 export async function listConversations(includeArchived = false): Promise<Conversation[]> {
   const query = includeArchived ? "?include_archived=true" : "";
@@ -16,12 +16,17 @@ export function createConversation(title: string | null): Promise<Conversation> 
 
 export function updateConversation(
   conversationId: string,
-  patch: { title?: string; archived?: boolean },
+  patch: { title?: string; archived?: boolean; skill?: string },
 ): Promise<Conversation> {
   return apiFetch<Conversation>(`/chat/conversations/${conversationId}`, {
     method: "PATCH",
     body: patch,
   });
+}
+
+export async function listSkills(): Promise<Skill[]> {
+  const data = await apiFetch<{ skills: Skill[] }>("/chat/skills");
+  return data.skills;
 }
 
 export function deleteConversation(conversationId: string): Promise<void> {

@@ -11,6 +11,7 @@ class ConversationOut(BaseModel):
     id: str
     title: str | None
     archived: bool
+    skill: str
     updated_at: UtcDatetime
 
 
@@ -28,6 +29,17 @@ class ConversationUpdateRequest(BaseModel):
 
     title: str | None = Field(default=None, min_length=1, max_length=255)
     archived: bool | None = None
+    skill: str | None = None
+
+
+class SkillOut(BaseModel):
+    key: str
+    name: str
+    description: str
+
+
+class SkillsListOut(BaseModel):
+    skills: list[SkillOut]
 
 
 class ToolCallOut(BaseModel):

@@ -9,7 +9,7 @@ import * as chatApi from "@/lib/api/chat";
 import * as filesApi from "@/lib/api/files";
 import * as visionApi from "@/lib/api/vision";
 import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
-import type { Conversation, Message } from "@/lib/types";
+import type { Conversation, Message, Skill } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
 
 const AUTO_READ_STORAGE_KEY = "ownai.autoReadReplies";
@@ -273,6 +273,8 @@ export default function ChatPage() {
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillUpdating, setSkillUpdating] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -380,6 +382,25 @@ export default function ChatPage() {
   useEffect(() => {
     chatApi.warmup().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    chatApi.listSkills().then(setSkills).catch(() => {});
+  }, []);
+
+  const handleSkillChange = useCallback(
+    async (conversation: Conversation, skill: string) => {
+      setSkillUpdating(true);
+      try {
+        const updated = await chatApi.updateConversation(conversation.id, { skill });
+        setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      } catch (err) {
+        setListError(err instanceof ApiError ? err.message : "Failed to switch skill.");
+      } finally {
+        setSkillUpdating(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -551,6 +572,29 @@ export default function ChatPage() {
                 </svg>
                 Conversations
               </button>
+              {skills.length > 0 ? (
+                <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+                  <label htmlFor="skill-picker" className="text-xs font-medium text-zinc-500">
+                    Skill
+                  </label>
+                  <select
+                    id="skill-picker"
+                    value={conversations.find((c) => c.id === selectedId)?.skill ?? "general"}
+                    disabled={skillUpdating}
+                    onChange={(e) => {
+                      const conversation = conversations.find((c) => c.id === selectedId);
+                      if (conversation) handleSkillChange(conversation, e.target.value);
+                    }}
+                    className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                  >
+                    {skills.map((s) => (
+                      <option key={s.key} value={s.key} title={s.description}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {messagesLoading ? (
                   <p className="text-sm text-zinc-500">Loading messages...</p>

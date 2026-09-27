@@ -45,17 +45,23 @@ Response `201`: `{ "id": uuid, "platform": string, "device_api_key": string, "la
 ## Chat
 
 ### `GET /chat/conversations?include_archived={bool}`  *(Bearer)*
-Response `200`: `{ "conversations": [ { "id": uuid, "title": string | null, "archived": bool, "updated_at": datetime } ] }`
+Response `200`: `{ "conversations": [ { "id": uuid, "title": string | null, "archived": bool, "skill": string, "updated_at": datetime } ] }`
 
 `title` is `null` until the conversation is explicitly named or auto-titled (see below). `include_archived` defaults to `false` — archived conversations are hidden from the default list.
 
 ### `POST /chat/conversations`  *(Bearer)*
 Request: `{ "title": string | null }`
-Response `201`: `{ "id": uuid, "title": string | null, "archived": bool, "updated_at": datetime }`
+Response `201`: `{ "id": uuid, "title": string | null, "archived": bool, "skill": string, "updated_at": datetime }` — `skill` startet immer als `"general"`.
 
 ### `PATCH /chat/conversations/{id}`  *(Bearer)*
-Request: `{ "title": string | null, "archived": bool | null }` — nur gesetzte Felder werden geändert. `title` kann per API nicht auf `null` zurückgesetzt werden (min. 1 Zeichen), nur umbenannt.
+Request: `{ "title": string | null, "archived": bool | null, "skill": string | null }` — nur gesetzte Felder werden geändert. `title` kann per API nicht auf `null` zurückgesetzt werden (min. 1 Zeichen), nur umbenannt.
 Response `200`: wie oben
+Fehler: `422 invalid_skill` (unbekannter `skill`-Wert — siehe `GET /chat/skills` für die gültigen Werte).
+
+### `GET /chat/skills`  *(Bearer)*
+Response `200`: `{ "skills": [ { "key": string, "name": string, "description": string } ] }`
+
+Ein **Skill** (siehe `app/agent/skills.py`) ist ein benannter Fokus pro Unterhaltung — er verändert den System-Prompt und schränkt bei manchen Skills zusätzlich ein, welche Tools dem Modell überhaupt angeboten werden (z. B. `"home"`: nur Home-Assistant/Timer-Tools, kein Kalender/E-Mail/Dateien). Ruft das Modell trotzdem ein Tool außerhalb des aktiven Skills auf, wird das serverseitig verweigert (`{ "error": "..." }` als Tool-Ergebnis), nicht ausgeführt — der Client bietet also nur an, was zum Skill passt, verlässt sich aber nicht allein darauf.
 
 ### `DELETE /chat/conversations/{id}`  *(Bearer)*
 Response `204`. Löscht die Unterhaltung inkl. aller Nachrichten endgültig (kein Soft-Delete — dafür gibt es `archived`).

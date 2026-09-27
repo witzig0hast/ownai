@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.orchestrator import run_turn
+from app.agent.skills import SKILLS, is_valid_skill_key
 from app.auth.dependencies import get_current_user, require_not_paused
 from app.db.models import Conversation, Message, User
 from app.db.session import get_db
@@ -16,6 +17,8 @@ from app.schemas.chat import (
     MessageCreateRequest,
     MessageCreateResponse,
     MessagesListOut,
+    SkillOut,
+    SkillsListOut,
 )
 from app.schemas.files import GeneratedFilesListOut
 from app.services import file_service, ollama_client
@@ -76,9 +79,20 @@ async def update_conversation(
         conversation.title = payload.title
     if payload.archived is not None:
         conversation.archived = payload.archived
+    if payload.skill is not None:
+        if not is_valid_skill_key(payload.skill):
+            raise APIError(422, "invalid_skill", f"Unbekannter Skill: {payload.skill!r}.")
+        conversation.skill = payload.skill
     await db.commit()
     await db.refresh(conversation)
     return conversation
+
+
+@router.get("/skills", response_model=SkillsListOut)
+async def list_skills(_user: User = Depends(get_current_user)) -> SkillsListOut:
+    return SkillsListOut(
+        skills=[SkillOut(key=s.key, name=s.name, description=s.description) for s in SKILLS.values()]
+    )
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)
