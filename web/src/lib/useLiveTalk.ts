@@ -21,6 +21,7 @@ interface EngineCallbacks {
   setLastUserText: (text: string | null) => void;
   setLastAssistantText: (text: string | null) => void;
   setError: (message: string | null) => void;
+  setMuted: (muted: boolean) => void;
 }
 
 /**
@@ -45,6 +46,7 @@ class LiveTalkEngine {
   private silenceStart: number | null = null;
   private hasSpoken = false;
   private frameCount = 0;
+  private muted = false;
 
   constructor(private callbacks: EngineCallbacks) {}
 
@@ -52,6 +54,8 @@ class LiveTalkEngine {
     this.callbacks.setError(null);
     this.callbacks.setLastUserText(null);
     this.callbacks.setLastAssistantText(null);
+    this.muted = false;
+    this.callbacks.setMuted(false);
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       this.callbacks.setError("Live Talk wird von diesem Browser nicht unterstützt.");
@@ -103,6 +107,26 @@ class LiveTalkEngine {
 
     this.callbacks.setVolume(0);
     this.callbacks.setState("idle");
+  }
+
+  /** Mutes/unmutes the mic without ending the session - the audio track is simply disabled,
+   * so voice-activity detection just sees silence and never ends a turn while muted, rather
+   * than needing to pause/resume the whole recording+VAD state machine. */
+  toggleMute(): void {
+    this.muted = !this.muted;
+    this.stream?.getAudioTracks().forEach((track) => {
+      track.enabled = !this.muted;
+    });
+    this.callbacks.setMuted(this.muted);
+  }
+
+  /** Cuts off the assistant mid-reply and goes straight back to listening, instead of the
+   * only previous option (end the whole session). speakAndWait's promise resolves on either
+   * onend or onerror, and cancelling speech synthesis fires one of those either way, so
+   * handleTurnRecorded's awaited speakAndWait call unblocks on its own and its `finally`
+   * naturally starts the next turn - no extra state juggling needed here. */
+  interrupt(): void {
+    stopSpeaking();
   }
 
   private beginTurn(): void {
@@ -170,7 +194,10 @@ class LiveTalkEngine {
 
   private async ensureConversation(): Promise<string> {
     if (this.conversationId) return this.conversationId;
-    const conversation = await chatApi.createConversation(`Live Talk – ${new Date().toLocaleString()}`);
+    // No title here (unlike earlier versions of this code): leaving it null lets the backend's
+    // auto-titling generate a real title from the first exchange, same as typed chats, instead
+    // of every Live Talk conversation being stuck showing the boring, identical "Live Talk".
+    const conversation = await chatApi.createConversation(null);
     this.conversationId = conversation.id;
     return conversation.id;
   }
@@ -216,8 +243,11 @@ interface UseLiveTalkResult {
   lastAssistantText: string | null;
   error: string | null;
   isSupported: boolean;
+  muted: boolean;
   start: () => Promise<void>;
   stop: () => void;
+  toggleMute: () => void;
+  interrupt: () => void;
 }
 
 /** React-facing wrapper around {@link LiveTalkEngine} - see the /voice screen for the UI this drives. */
@@ -227,6 +257,7 @@ export function useLiveTalk(): UseLiveTalkResult {
   const [lastUserText, setLastUserText] = useState<string | null>(null);
   const [lastAssistantText, setLastAssistantText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
 
   const engineRef = useRef<LiveTalkEngine | null>(null);
   if (engineRef.current === null) {
@@ -236,6 +267,7 @@ export function useLiveTalk(): UseLiveTalkResult {
       setLastUserText,
       setLastAssistantText,
       setError,
+      setMuted,
     });
   }
 
@@ -257,7 +289,10 @@ export function useLiveTalk(): UseLiveTalkResult {
     lastAssistantText,
     error,
     isSupported,
+    muted,
     start: () => engineRef.current!.start(),
     stop: () => engineRef.current!.stop(),
+    toggleMute: () => engineRef.current!.toggleMute(),
+    interrupt: () => engineRef.current!.interrupt(),
   };
 }
