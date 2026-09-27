@@ -5,7 +5,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
-from app.services import calendar_service, home_assistant_service
+from app.services import calendar_service, home_assistant_service, timer_service
+from app.utils import ensure_utc
 
 ToolHandler = Callable[[AsyncSession, User, dict[str, Any]], Awaitable[Any]]
 
@@ -39,6 +40,32 @@ async def _home_assistant_call_service(db: AsyncSession, user: User, arguments: 
         service=arguments["service"],
         data=arguments.get("data"),
     )
+
+
+async def _set_timer(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+    timer = await timer_service.create_timer(
+        db, user, duration_seconds=int(arguments["duration_seconds"]), label=arguments.get("label")
+    )
+    return {"id": timer.id, "label": timer.label, "ends_at": ensure_utc(timer.ends_at).isoformat()}
+
+
+async def _list_timers(db: AsyncSession, user: User, _arguments: dict[str, Any]) -> Any:
+    now = datetime.now(timezone.utc)
+    timers = await timer_service.list_active_timers(db, user)
+    return [
+        {
+            "id": t.id,
+            "label": t.label,
+            "ends_at": ensure_utc(t.ends_at).isoformat(),
+            "remaining_seconds": max(0, int((ensure_utc(t.ends_at) - now).total_seconds())),
+        }
+        for t in timers
+    ]
+
+
+async def _cancel_timer(db: AsyncSession, user: User, arguments: dict[str, Any]) -> Any:
+    timer = await timer_service.cancel_timer(db, user, arguments["timer_id"])
+    return {"id": timer.id, "cancelled": True}
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -135,6 +162,47 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_timer",
+            "description": (
+                "Stellt einen Countdown-Timer. Rechne die gewünschte Dauer (z.B. '5 Minuten', "
+                "'eine halbe Stunde', '90 Sekunden') in Sekunden um. Der Timer läuft geräteübergreifend: "
+                "er wird angezeigt/benachrichtigt auf jedem Gerät, auf dem der Nutzer OwnAI offen hat."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "duration_seconds": {"type": "integer", "description": "Dauer in Sekunden, z.B. 300 für 5 Minuten"},
+                    "label": {"type": "string", "description": "Kurze Beschreibung, z.B. 'Nudeln', 'Eier kochen' (optional)"},
+                },
+                "required": ["duration_seconds"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_timers",
+            "description": "Listet alle laufenden Timer des Nutzers auf, mit verbleibender Zeit in Sekunden.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cancel_timer",
+            "description": "Bricht einen laufenden Timer ab. timer_id vorher über list_timers herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "timer_id": {"type": "string", "description": "ID des Timers (aus list_timers)"},
+                },
+                "required": ["timer_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -142,4 +210,7 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "calendar_create_event": _calendar_create_event,
     "home_assistant_list_entities": _home_assistant_list_entities,
     "home_assistant_call_service": _home_assistant_call_service,
+    "set_timer": _set_timer,
+    "list_timers": _list_timers,
+    "cancel_timer": _cancel_timer,
 }

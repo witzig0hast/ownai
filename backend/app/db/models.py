@@ -32,6 +32,7 @@ class User(Base):
     home_assistant_account: Mapped["HomeAssistantAccount | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
+    timers: Mapped[list["Timer"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -119,6 +120,24 @@ class HomeAssistantAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="home_assistant_account")
+
+
+class Timer(Base):
+    """A simple countdown timer ("stell mir einen Timer auf 5 Minuten"), settable/cancelable via the
+    chat/voice agent. Expiry is derived by clients comparing `ends_at` to now rather than tracked
+    server-side — no scheduler needed here; each client (web tab, Android app) is responsible for
+    noticing an active timer and surfacing it (see web's TimerBadge, Android's local AlarmManager)."""
+
+    __tablename__ = "timers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    cancelled: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="timers")
 
 
 class NotificationRaw(Base):

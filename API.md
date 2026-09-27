@@ -104,6 +104,16 @@ Fehler: `409 home_assistant_not_connected` (kein HA verbunden), `502 home_assist
 
 Steuern von Geräten (z. B. Licht an/aus) läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür die Tools `home_assistant_list_entities`/`home_assistant_call_service` auf (siehe `app/agent/tools.py`). Aus Sicherheitsgründen sind nur unkritische Domains erlaubt (`light`, `switch`, `climate`, `cover`, `fan`, `lock`, `media_player`, `scene`, `script`, `vacuum`, `humidifier`, `water_heater`, `input_boolean`) — administrative HA-Domains (`homeassistant.*`, `shell_command`, `python_script`) sind für das LLM gesperrt.
 
+## Timer
+
+Countdown-Timer ("stell mir einen Timer auf 5 Minuten"), settable/cancelable über den Chat/Voice-Agenten (Tools `set_timer`/`list_timers`/`cancel_timer`, siehe `app/agent/tools.py`) — es gibt keinen eigenen REST-Endpunkt zum *Anlegen*. Die beiden Endpunkte hier dienen Clients dazu, aktive Timer zu **anzeigen/abzubrechen** (z. B. eine Ecke der Web-App, die geräteübergreifend einen Countdown zeigt und beim Ablaufen benachrichtigt).
+
+### `GET /timers`  *(Bearer)*
+Response `200`: `{ "timers": [ { "id": string, "label": string | null, "ends_at": datetime } ] }` — alle nicht abgebrochenen Timer, **inklusive bereits abgelaufener** (`ends_at` in der Vergangenheit). Ob/wie ein abgelaufener Timer angezeigt wird, entscheidet der Client (`ends_at` mit der aktuellen Zeit vergleichen); der Server trackt keinen "expired"-Status.
+
+### `POST /timers/{id}/cancel`  *(Bearer)*
+Response `200`: Timer-Objekt wie oben. Fehler: `404 timer_not_found`.
+
 ## Notifications (Android → Backend)
 
 ### `POST /notifications/ingest`  *(X-Device-Key)*
