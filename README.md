@@ -3,9 +3,10 @@
 Persönlicher, selbst gehosteter KI-Assistent: eigenes Backend, eigene Apps (iPad, Android, Web), Inferenz über Ollama auf einer Nvidia Tesla P40.
 
 **Lies zuerst:**
-1. [`CONCEPT.md`](./CONCEPT.md) — Architektur, Begründungen, Trade-offs
-2. [`DECISIONS.md`](./DECISIONS.md) — getroffene Entscheidungen zu den offenen Fragen aus dem Konzept
-3. [`API.md`](./API.md) — verbindlicher Schnittstellenvertrag zwischen Backend und den drei Clients
+1. [`GETTING_STARTED.md`](./GETTING_STARTED.md) — konkrete Schritt-für-Schritt-Anleitung, um alles zum Laufen zu bringen
+2. [`CONCEPT.md`](./CONCEPT.md) — Architektur, Begründungen, Trade-offs
+3. [`DECISIONS.md`](./DECISIONS.md) — getroffene Entscheidungen zu den offenen Fragen aus dem Konzept
+4. [`API.md`](./API.md) — verbindlicher Schnittstellenvertrag zwischen Backend und den drei Clients
 
 ## Struktur
 
