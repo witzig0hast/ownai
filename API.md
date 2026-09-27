@@ -91,6 +91,8 @@ Fehler: `503 system_paused` (Admin hat das System pausiert — `message` enthäl
 
 **Auto-Titel**: ist die Unterhaltung beim ersten Austausch (erste Nutzernachricht) noch unbenannt (`title: null`), generiert das Backend nach der Antwort automatisch einen kurzen Titel (per LLM, best-effort — schlägt die Generierung fehl, bleibt die Unterhaltung unbenannt, kein Fehler nach außen). Eine bereits explizit gesetzte `title` wird dadurch nie überschrieben.
 
+**Code Interpreter**: kein eigener Endpunkt — das LLM schreibt einfach einen ` ```python ` -Codeblock in seine normale Textantwort (System-Prompt weist es dazu an). Das Web-Frontend erkennt solche Blöcke clientseitig und führt sie auf Wunsch **komplett im Browser** aus (Pyodide/WASM, siehe `web/README.md`) — der Code erreicht den Server nie, egal was er tut.
+
 **Sub-Agents**: das Tool `spawn_subagent` (siehe `app/agent/tools.py`/`app/agent/subagent.py`) delegiert eine abgegrenzte Teilaufgabe an einen eigenständigen, kleinen Tool-Loop (max. 3 Runden, eigener System-Prompt). Sein Tool-Ergebnis ist `{ "answer": string, "steps": [ { "tool", "arguments", "result" } ] }`. **Maximal eine Verschachtelungsebene**: `spawn_subagent` wird dem Sub-Agenten-Loop selbst nie als Werkzeug angeboten, er kann also keine weiteren Sub-Agents starten. Der Sub-Agent bekommt dieselbe Skill-Einschränkung wie die Unterhaltung (siehe unten) — in einer `"home"`- oder `"organize"`-Unterhaltung sieht er also nur deren Werkzeuge, nie mehr als die Hauptunterhaltung selbst.
 
 ### Dateien

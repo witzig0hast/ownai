@@ -79,6 +79,20 @@ the `{"error":{"code","message"}}` envelope).
   with a "Thinking..." loading state, since v1 has no streaming. The user's
   own message is rendered optimistically (the API only returns the new
   assistant message, per `API.md`).
+  - **Code Interpreter**: a message's content is split into text/code segments
+    (`src/lib/parseMessageContent.ts`, looks for ```` ```lang\n...\n``` ```` fences) and a
+    Python code block gets an "Ausführen" button (`src/components/CodeBlock.tsx`). Execution
+    runs entirely in-browser via Pyodide (WASM Python) inside a dedicated module Web Worker
+    (`public/pyodide-worker.js` + `src/lib/pyodideRunner.ts`) — no server round-trip, no
+    filesystem/network access beyond the WASM sandbox itself, so nothing the code does can
+    touch the host in any way. The Pyodide runtime is vendored into `public/pyodide/` at
+    install/build time (`scripts/copy-pyodide-assets.mjs`, from the pinned `pyodide` npm
+    package) rather than fetched from a CDN, keeping this fully self-hosted. **Must be loaded
+    as a module worker** (`new Worker(url, { type: "module" })`) — newer Pyodide releases
+    dropped classic-worker/`importScripts` support, which was a real bug found and fixed
+    while verifying this live (a classic worker threw `"Classic web workers are not
+    supported"`). Verified live end-to-end: seeded an assistant message with a
+    ```` ```python ```` block, clicked "Ausführen", got the correct `stdout` back.
 - **Calendar** (`/calendar`): upcoming events for a date range
   (`GET /calendar/events?start&end`) and a "New event" form
   (`POST /calendar/events`). If no CalDAV account is connected, shows a link
@@ -89,7 +103,7 @@ the `{"error":{"code","message"}}` envelope).
   on success.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently two tabs:
+  einstellen können" in one place). Currently three tabs (Integrations, E-Mail, Konto):
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
     connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
@@ -105,9 +119,12 @@ the `{"error":{"code","message"}}` envelope).
     popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
     that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI
     assistant as regular chat, just kept out of the normal history.
-  - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info for
-    now (name, email, admin badge) — a placeholder for account-level settings landing here
-    as they're built (e.g. a personal email address for the assistant to use).
+  - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
+    email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
+    (`src/lib/push.ts`) — requests notification permission, registers the Service Worker
+    (`public/sw.js`), subscribes via the Push API and registers the subscription with the
+    backend (`POST /push/subscribe`). States the iOS "must be installed to Home Screen"
+    caveat directly in the UI.
 - **Admin** (`/admin`, only shown/reachable for `user.is_admin`): the first user ever to
   register becomes admin automatically (see `API.md`'s Admin section) and gets a toggle
   for open registration (`PATCH /admin/settings`), a global "pause the system" switch with

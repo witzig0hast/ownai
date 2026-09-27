@@ -12,6 +12,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# `npm ci`'s postinstall already ran this in the deps stage, but COPY . . above just replaced
+# public/ with the host's copy (which doesn't have these generated assets, see .gitignore) -
+# run it again now so the Code Interpreter's Pyodide runtime actually ships in the image.
+RUN node scripts/copy-pyodide-assets.mjs
+
 # NEXT_PUBLIC_* vars are inlined into the client bundle at build time.
 # Pass a real backend URL via --build-arg if it differs from the default
 # (see web/README.md for why docker-compose.yml's `environment:` on the

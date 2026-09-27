@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { AppShell } from "@/components/AppShell";
+import { CodeBlock } from "@/components/CodeBlock";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
 import { ApiError } from "@/lib/api-client";
 import * as chatApi from "@/lib/api/chat";
 import * as filesApi from "@/lib/api/files";
 import * as visionApi from "@/lib/api/vision";
+import { parseMessageContent } from "@/lib/parseMessageContent";
 import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message, Skill } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
@@ -221,16 +223,25 @@ function ConversationSidebar({
 
 function MessageBubble({ message, conversationId }: { message: Message; conversationId: string }) {
   const isUser = message.role === "user";
+  const segments = parseMessageContent(message.content);
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`group max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+        className={`group max-w-[75%] rounded-lg px-3 py-2 text-sm ${
           isUser
             ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
             : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
         }`}
       >
-        {message.content}
+        {segments.map((segment, i) =>
+          segment.type === "code" ? (
+            <CodeBlock key={i} language={segment.language} code={segment.value} />
+          ) : (
+            <span key={i} className="whitespace-pre-wrap">
+              {segment.value}
+            </span>
+          ),
+        )}
         {!isUser && isTtsSupported() ? (
           <button
             type="button"

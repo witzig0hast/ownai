@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated Pyodide runtime assets (scripts/copy-pyodide-assets.mjs) - minified/bundled
+    // vendor code, not ours to lint.
+    "public/pyodide/**",
   ]),
 ]);
 
