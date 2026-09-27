@@ -21,7 +21,7 @@ class ViewModelFactory(private val container: AppContainer) : ViewModelProvider.
                 AuthViewModel(container.authRepository, container.deviceRepository) as T
 
             modelClass.isAssignableFrom(ChatViewModel::class.java) ->
-                ChatViewModel(container.chatRepository) as T
+                ChatViewModel(container.chatRepository, container.voiceRepository) as T
 
             modelClass.isAssignableFrom(CalendarViewModel::class.java) ->
                 CalendarViewModel(container.calendarRepository) as T

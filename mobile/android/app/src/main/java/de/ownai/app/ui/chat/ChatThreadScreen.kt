@@ -1,5 +1,9 @@
 package de.ownai.app.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,10 +22,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -29,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,12 +45,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.ownai.app.data.model.Message
 import de.ownai.app.ui.ViewModelFactory
 import de.ownai.app.ui.common.LoadingIndicator
+import de.ownai.app.voice.SpeechReader
+import de.ownai.app.voice.VoiceRecorder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,13 +68,70 @@ fun ChatThreadScreen(
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isLoadingMessages by viewModel.isLoadingMessages.collectAsStateWithLifecycle()
     val isSending by viewModel.isSending.collectAsStateWithLifecycle()
+    val isTranscribing by viewModel.isTranscribing.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorEvent.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    val context = LocalContext.current
+    val voiceRecorder = remember { VoiceRecorder(context) }
+    val speechReader = remember { SpeechReader(context) }
+    var isRecording by remember { mutableStateOf(false) }
+    var autoRead by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceRecorder.cancel()
+            speechReader.shutdown()
+        }
+    }
+
+    fun stopRecordingAndTranscribe() {
+        isRecording = false
+        val file = voiceRecorder.stop() ?: return
+        viewModel.transcribeVoice(file, voiceRecorder.mimeType) { text ->
+            draft = if (draft.isBlank()) text else "$draft $text"
+        }
+    }
+
+    val requestAudioPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) isRecording = voiceRecorder.start()
+    }
+
+    fun onMicClick() {
+        if (isRecording) {
+            stopRecordingAndTranscribe()
+            return
+        }
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            isRecording = voiceRecorder.start()
+        } else {
+            requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     LaunchedEffect(conversationId) { viewModel.loadMessages(conversationId) }
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    }
+
+    // Reads the newest assistant reply aloud, but only for replies that arrive *after* the
+    // screen is already open (the isSending true->false edge from a just-completed send) -
+    // never for history already in the conversation when it's first opened.
+    var wasSending by remember { mutableStateOf(false) }
+    LaunchedEffect(isSending) {
+        if (wasSending && !isSending && autoRead) {
+            messages.lastOrNull()?.let { last ->
+                if (last.role == "assistant") speechReader.speak(last.content)
+            }
+        }
+        wasSending = isSending
     }
 
     Scaffold(
@@ -70,6 +141,18 @@ fun ChatThreadScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Vorlesen", style = MaterialTheme.typography.labelSmall)
+                        Checkbox(
+                            checked = autoRead,
+                            onCheckedChange = { checked ->
+                                autoRead = checked
+                                if (!checked) speechReader.stop()
+                            }
+                        )
                     }
                 }
             )
@@ -82,11 +165,29 @@ fun ChatThreadScreen(
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = { onMicClick() },
+                        enabled = !isSending && !isTranscribing
+                    ) {
+                        Icon(
+                            Icons.Filled.Mic,
+                            contentDescription = if (isRecording) "Aufnahme beenden" else "Spracheingabe starten",
+                            tint = if (isRecording) Color.Red else LocalContentColor.current
+                        )
+                    }
                     OutlinedTextField(
                         value = draft,
                         onValueChange = { draft = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Message OwnAI…") },
+                        placeholder = {
+                            Text(
+                                when {
+                                    isTranscribing -> "Transkribiere…"
+                                    isRecording -> "Aufnahme läuft…"
+                                    else -> "Message OwnAI…"
+                                }
+                            )
+                        },
                         maxLines = 4,
                         enabled = !isSending
                     )
@@ -115,7 +216,7 @@ fun ChatThreadScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages, key = { it.id }) { message ->
-                        MessageBubble(message)
+                        MessageBubble(message, onSpeak = { speechReader.speak(message.content) })
                     }
                     if (isSending) {
                         item(key = "sending-indicator") {
@@ -147,7 +248,7 @@ fun ChatThreadScreen(
 }
 
 @Composable
-private fun MessageBubble(message: Message) {
+private fun MessageBubble(message: Message, onSpeak: () -> Unit) {
     val isUser = message.role == "user"
     val bubbleColor = if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
@@ -160,10 +261,22 @@ private fun MessageBubble(message: Message) {
                 .padding(10.dp)
         ) {
             if (!isUser) {
-                Text(
-                    text = if (message.role == "tool") "Tool" else "Assistant",
-                    style = MaterialTheme.typography.labelLarge
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (message.role == "tool") "Tool" else "Assistant",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (message.role == "assistant") {
+                        IconButton(onClick = onSpeak, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                Icons.Filled.VolumeUp,
+                                contentDescription = "Vorlesen",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
             }
             Text(text = message.content, style = MaterialTheme.typography.bodyLarge)
         }

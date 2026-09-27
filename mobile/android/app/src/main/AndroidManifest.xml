@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Voice input: recording a clip for POST /voice/transcribe. Requested at runtime
+         (see ChatThreadScreen) when the mic button is first tapped, not on app start. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Required on API 33+ for the app to post its own notifications.
          OwnAI does not currently post any local notifications itself, but this
          is requested up front (see NotificationAccessScreen) so it is available
@@ -15,6 +19,12 @@
          requested here. See README.md ("SMS nuance") for why raw SMS capture
          is out of scope for v1 and what it would take to add later. -->
 
+    <!-- android:usesCleartextTraffic="true" below: apps targeting API 28+ block plain
+         http:// by default. This is a personal app talking only to your own self-hosted
+         backend (no arbitrary third-party traffic), and the base URL is a plain IP/
+         Tailscale hostname without TLS until Caddy is set up (see root GETTING_STARTED.md
+         step 6) - without this the app cannot reach the backend at all. -->
+
     <application
         android:name=".OwnAiApplication"
         android:allowBackup="true"
@@ -24,7 +34,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.OwnAI">
+        android:theme="@style/Theme.OwnAI"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"

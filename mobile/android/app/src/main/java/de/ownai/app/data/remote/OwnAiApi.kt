@@ -24,10 +24,14 @@ import de.ownai.app.data.model.Suggestion
 import de.ownai.app.data.model.SuggestionsResponse
 import de.ownai.app.data.model.TokenResponse
 import de.ownai.app.data.model.UserResponse
+import de.ownai.app.data.model.VoiceTranscribeResponse
+import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -112,4 +116,11 @@ interface OwnAiApi {
 
     @POST("notifications/suggestions/{id}/dismiss")
     suspend fun dismissSuggestion(@Path("id") suggestionId: String): DismissResponse
+
+    // --- Voice ---
+
+    /** Recorded clip, decoded server-side via ffmpeg - any container format works (see API.md). */
+    @Multipart
+    @POST("voice/transcribe")
+    suspend fun transcribeVoice(@Part audio: MultipartBody.Part): VoiceTranscribeResponse
 }

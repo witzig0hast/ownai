@@ -44,6 +44,17 @@ spots most worth a second look if the build fails.
   (`POST /notifications/suggestions/{id}/apply` / `/dismiss`), matching `API.md`.
 - **Notification listener** (`notification/NotificationForwardingService.kt`) - the
   core Android-specific feature, see below.
+- **Voice** (`voice/VoiceRecorder.kt`, `voice/SpeechReader.kt`, wired into
+  `ui/chat/ChatThreadScreen.kt`): a mic button records a clip via `MediaRecorder`
+  (AAC-in-MP4, works on every Android version back to API 26), uploads it to
+  `POST /voice/transcribe` (multipart - see `API.md`), and appends the transcript
+  to the draft text box for you to review/edit before sending (never auto-sent).
+  Requests `RECORD_AUDIO` at runtime on first tap, not on app start. Replies are
+  read aloud via Android's on-device `TextToSpeech` - a speaker icon on each
+  assistant message for a one-off read, or an "auto-read" checkbox in the chat
+  top bar for hands-free use. Both directions are free and match the project's
+  self-hosted-only stance: speech-to-text goes to your own Whisper instance
+  (see root `DECISIONS.md`), text-to-speech never leaves the device.
 - Bottom navigation across the four screens (Chat / Calendar / Suggestions /
   Notification access), with a logout action in each screen's top bar.
 
@@ -204,6 +215,21 @@ No DI framework (Hilt/Dagger) - the app is small enough that a hand-rolled conta
 - Chat has no message editing/deletion, and no streaming (matching `API.md` v1 - the
   backend's send-message call is synchronous by design; SSE streaming is called out
   there as a planned, non-breaking v2 addition).
+- The "auto-read replies" toggle is per-screen-visit state only (not persisted) - closing
+  and reopening a conversation resets it to off. Fine for v1; would need a small
+  SharedPreferences-backed store to persist, same idea as `SecurePrefs` but for a
+  non-sensitive UI preference.
+- No visual waveform/level meter while recording, just a red mic icon - fine for short
+  voice messages, would matter more for longer dictation.
+
+## Networking: cleartext HTTP is allowed
+
+`AndroidManifest.xml` sets `android:usesCleartextTraffic="true"`. Apps targeting API 28+
+block plain `http://` by default - without this, the app could not reach a backend
+served over `http://<ip>:<port>` (the setup before Caddy/HTTPS is in place, see root
+`GETTING_STARTED.md`). This is scoped to this app talking only to your own self-hosted
+backend, not arbitrary third-party traffic. If/when the backend is only ever reached over
+HTTPS (Caddy + a real domain or Tailscale HTTPS), this can be removed for defense in depth.
 
 ## Things I'm not 100% sure about
 
@@ -236,10 +262,11 @@ Flagged honestly, per the brief, since nothing here has been compiled:
   behaves as expected under this app's real event loop.
 - Icons: everything is drawn from `androidx.compose.material:material-icons-extended`
   (e.g. `Icons.Filled.Chat`, `Icons.Filled.CalendarMonth`, `Icons.Filled.Lightbulb`,
-  `Icons.AutoMirrored.Filled.ArrowBack`/`Send`). These are standard, long-established
-  icon names, but this is the one area where a typo would only surface as an unresolved
-  reference at build time rather than a logic bug - if the build complains about a
-  specific icon, swapping it for any other icon in the same package is a trivial fix.
+  `Icons.AutoMirrored.Filled.ArrowBack`/`Send`, and for voice: `Icons.Filled.Mic`,
+  `Icons.Filled.VolumeUp`). These are standard, long-established icon names, but this is
+  the one area where a typo would only surface as an unresolved reference at build time
+  rather than a logic bug - if the build complains about a specific icon, swapping it for
+  any other icon in the same package is a trivial fix.
 - The app icon (`res/mipmap-anydpi-v26/ic_launcher.xml` + `drawable/ic_launcher_foreground.xml`)
   is a plain adaptive icon built from vector paths (a simple two-circle mark), not a
   designed asset - purely functional placeholder art.

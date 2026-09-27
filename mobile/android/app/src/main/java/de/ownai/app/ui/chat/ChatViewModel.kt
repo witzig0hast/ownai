@@ -6,10 +6,12 @@ import de.ownai.app.data.model.Conversation
 import de.ownai.app.data.model.Message
 import de.ownai.app.data.remote.ApiResult
 import de.ownai.app.data.repository.ChatRepository
+import de.ownai.app.data.repository.VoiceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 
@@ -24,7 +26,10 @@ sealed interface ChatListUiState {
  * screen gets its own instance (scoped to its own NavBackStackEntry), so
  * there is no shared-state concern between different open threads.
  */
-class ChatViewModel(private val chatRepository: ChatRepository) : ViewModel() {
+class ChatViewModel(
+    private val chatRepository: ChatRepository,
+    private val voiceRepository: VoiceRepository
+) : ViewModel() {
 
     private val _listState = MutableStateFlow<ChatListUiState>(ChatListUiState.Loading)
     val listState: StateFlow<ChatListUiState> = _listState.asStateFlow()
@@ -37,6 +42,9 @@ class ChatViewModel(private val chatRepository: ChatRepository) : ViewModel() {
 
     private val _isSending = MutableStateFlow(false)
     val isSending: StateFlow<Boolean> = _isSending.asStateFlow()
+
+    private val _isTranscribing = MutableStateFlow(false)
+    val isTranscribing: StateFlow<Boolean> = _isTranscribing.asStateFlow()
 
     private val _errorEvent = MutableStateFlow<String?>(null)
     val errorEvent: StateFlow<String?> = _errorEvent.asStateFlow()
@@ -99,6 +107,24 @@ class ChatViewModel(private val chatRepository: ChatRepository) : ViewModel() {
                 is ApiResult.Failure -> _errorEvent.value = result.message
             }
             _isSending.value = false
+        }
+    }
+
+    /**
+     * Uploads a recorded voice clip (see [de.ownai.app.voice.VoiceRecorder]) and hands the
+     * transcript to [onTranscribed] once ready - the screen appends it to the draft text
+     * rather than sending it straight away, so a garbled transcription can be corrected
+     * before it goes anywhere.
+     */
+    fun transcribeVoice(audioFile: File, mimeType: String, onTranscribed: (String) -> Unit) {
+        viewModelScope.launch {
+            _isTranscribing.value = true
+            when (val result = voiceRepository.transcribe(audioFile, mimeType)) {
+                is ApiResult.Success -> onTranscribed(result.data)
+                is ApiResult.Failure -> _errorEvent.value = result.message
+            }
+            _isTranscribing.value = false
+            audioFile.delete()
         }
     }
 
