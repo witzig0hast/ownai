@@ -71,6 +71,25 @@ the `{"error":{"code","message"}}` envelope).
   a client-side `ProtectedRoute` guard that redirects unauthenticated users
   to `/login`.
 
+## Installing as an app (PWA)
+
+This is the primary client for iPad and Windows PC (see root `DECISIONS.md`,
+decisions #3/#7/#8: no Mac available for a native iPad build, no
+publication/App Store wanted). `public/manifest.webmanifest` plus the
+`metadata`/`viewport` exports in `src/app/layout.tsx` make it installable as
+a standalone app instead of a browser tab:
+
+- **iPad (Safari)**: open the site, tap Share → "Add to Home Screen". Launches
+  full-screen with the OwnAI icon, no address bar.
+- **Windows (Edge or Chrome)**: open the site, click the install icon in the
+  address bar (or menu → "Apps" / "Install OwnAI"). Runs in its own window
+  with a taskbar icon, like a native app.
+
+Icons are placeholder art generated for this pass
+(`public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png`,
+`public/favicon-32.png`) — swap them for real branding whenever you want,
+same filenames.
+
 ## Auth storage: localStorage vs. httpOnly-cookie proxy
 
 **Chosen: localStorage**, for both the access and refresh token

@@ -1,5 +1,13 @@
 # OwnAI — iPad Client
 
+> **Status: not the active path.** Building this requires Xcode, which only
+> runs on macOS — and the current setup is a Windows PC + iPad, with no Mac
+> access (see root `DECISIONS.md`, decision #7). The iPad is served by the
+> **web app** (`../../web/`) instead, installed as a PWA via Safari's "Add to
+> Home Screen" — no Mac, Xcode, or Apple Developer account needed. This
+> SwiftUI app is kept here, fully written and reviewed, for if/when a Mac
+> becomes available and a native app is worth revisiting.
+
 A SwiftUI (iOS/iPadOS 17+) client for the OwnAI backend. It's a pure client
 surface: chat with the assistant, view/manage a CalDAV-backed calendar, and
 review AI-generated suggestions that originate from your Android phone's

@@ -152,6 +152,26 @@ ownaiApiBaseUrl=https://ownai.example.internal/api/v1/
 `"auth/login"`, no leading slash - see `data/remote/OwnAiApi.kt`) relative to this base
 URL, so a missing trailing slash silently drops the last path segment.
 
+## Installing on your S25 Ultra (no Play Store)
+
+This is private, personal use only (root `DECISIONS.md`, decision #8) - no Play Store
+listing, no Play Console signing config needed. A debug-signed APK installs and runs
+fine indefinitely; it's just never distributable through the Play Store, which is
+irrelevant here.
+
+1. In Android Studio: `Build > Build Bundle(s) / APK(s) > Build APK(s)`, or from a
+   terminal: `./gradlew assembleDebug -PownaiApiBaseUrl="https://your-server/api/v1/"`.
+   The APK lands at `app/build/outputs/apk/debug/app-debug.apk`.
+2. Enable USB debugging on the S25 Ultra (Settings → About phone → tap "Build number"
+   7x → Developer options → USB debugging), connect it via USB.
+3. `adb install app/build/outputs/apk/debug/app-debug.apk` (or drag the APK onto the
+   phone and open it - Android will prompt to allow installs from that source once).
+4. Open the app, log in, then grant "Notification access" when prompted
+   (`NotificationAccessScreen` deep-links straight to the right settings page).
+
+To update later: rebuild and re-run `adb install` (or the drag-and-open step) - no
+uninstall needed as long as the package name/signing stays the same.
+
 ## Architecture / libraries
 
 No DI framework (Hilt/Dagger) - the app is small enough that a hand-rolled container
