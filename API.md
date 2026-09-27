@@ -203,6 +203,29 @@ Führt die Aktion aus (z. B. Kalendereintrag anlegen) und setzt `status=applied`
 ### `POST /notifications/suggestions/{id}/dismiss`  *(Bearer)*
 Response `200`: `{ "status": "dismissed" }`
 
+## Push-Benachrichtigungen
+
+Web Push (VAPID) — die Grundlage für proaktiven Kontakt: der Assistent meldet sich hier von sich aus, statt nur auf Anfragen zu reagieren. Ohne konfigurierte `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (siehe `.env.example`) ist das komplett deaktiviert — still, kein Fehler, alles andere funktioniert normal weiter.
+
+### `GET /push/vapid-public-key`
+Response `200`: `{ "public_key": string | null, "configured": bool }` — kein Auth nötig, der Client braucht den Schlüssel schon vor dem Login-Flow für `PushManager.subscribe()`.
+
+### `POST /push/subscribe`  *(Bearer)*
+Request: die rohe Ausgabe von `PushSubscription.toJSON()` im Browser: `{ "endpoint": string, "keys": { "p256dh": string, "auth": string } }`.
+Response `204`. Ein erneutes Abonnieren desselben `endpoint` aktualisiert den bestehenden Eintrag (Upsert), legt keinen Duplikat-Eintrag an.
+
+### `POST /push/unsubscribe`  *(Bearer)*
+Request: `{ "endpoint": string }`
+Response `204`.
+
+**Proaktive Ereignisse, die aktuell einen Push auslösen** (siehe `app/services/push_service.py`, `app/services/scheduler.py`):
+- Ein **Timer läuft ab** — ein im Hintergrund laufender Poll (alle 15s, `app/services/scheduler.py`) prüft auf abgelaufene, noch nicht benachrichtigte Timer und pusht einmalig pro Timer (`Timer.notified`-Flag verhindert Doppel-Push).
+- Eine **neue Notification-Suggestion** wird erkannt (siehe oben) — direkt nach dem Anlegen.
+
+Ein fehlgeschlagener/abgelaufener Push (Browser antwortet `404`/`410`) entfernt die betroffene Subscription automatisch — best-effort, nie ein harter Fehler für den auslösenden Vorgang (Timer-Ablauf, Suggestion-Erstellung schlagen dadurch nie fehl).
+
+**iOS-Einschränkung**: Web Push liefert auf iPhone/iPad nur an eine Seite, die über "Zum Home-Bildschirm hinzufügen" installiert wurde — ein offener Safari-Tab im Hintergrund bekommt grundsätzlich keine Push-Events, das ist eine Plattform-Einschränkung von iOS/Safari, keine Einstellungssache dieser App.
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

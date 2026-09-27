@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,16 +16,28 @@ from app.api import (
     health,
     home_assistant,
     notifications,
+    push,
     timer,
     vision,
     voice,
 )
 from app.config import get_settings
 from app.errors import APIError
+from app.services.scheduler import start_scheduler, stop_scheduler
 
 settings = get_settings()
 
-app = FastAPI(title="OwnAI Backend", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    start_scheduler()
+    try:
+        yield
+    finally:
+        stop_scheduler()
+
+
+app = FastAPI(title="OwnAI Backend", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -66,6 +81,7 @@ api_v1_routers = (
     admin.router,
     email.router,
     vision.router,
+    push.router,
     health.router,
 )
 for router in api_v1_routers:

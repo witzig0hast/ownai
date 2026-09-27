@@ -3,9 +3,9 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Device, NotificationRaw, NotificationSuggestion
+from app.db.models import Device, NotificationRaw, NotificationSuggestion, User
 from app.schemas.notifications import NotificationIngestRequest
-from app.services import ollama_client
+from app.services import ollama_client, push_service
 
 logger = logging.getLogger(__name__)
 
@@ -107,4 +107,15 @@ async def classify_and_create_suggestion(db: AsyncSession, notification: Notific
     db.add(suggestion)
     await db.commit()
     await db.refresh(suggestion)
+
+    # Proactive contact: the assistant reaches out on its own here rather than only reacting to
+    # a request - the second such event besides an expired timer (see scheduler.py). Best-effort
+    # and never allowed to fail the suggestion itself (which is already committed above).
+    try:
+        user = await db.get(User, notification.user_id)
+        if user is not None:
+            await push_service.send_push(db, user, title="Neuer Vorschlag", body=suggestion.summary)
+    except Exception:  # noqa: BLE001 - a failed push must never undo/fail an already-saved suggestion
+        logger.exception("Failed to send push for suggestion %s", suggestion.id)
+
     return suggestion

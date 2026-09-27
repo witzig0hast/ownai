@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     system_smtp_from_address: str | None = None
     system_smtp_use_tls: bool = True
 
+    # Web Push (VAPID). Generate a key pair once with `vapid --gen` (py-vapid, already a
+    # dependency) and paste the resulting private/public keys here - both are required for
+    # push to work at all; unset means push is silently unavailable (see push_service.py).
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    # Contact address the push service can reach you at if it flags your usage - required by
+    # the Web Push protocol, has to be a "mailto:" or "https:" URI.
+    vapid_subject: str = "mailto:admin@example.com"
+
     cors_origins: str = "http://localhost:3000"
 
     @property

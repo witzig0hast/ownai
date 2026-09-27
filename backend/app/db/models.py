@@ -37,6 +37,9 @@ class User(Base):
     email_account: Mapped["EmailAccount | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
+    push_subscriptions: Mapped[list["PushSubscription"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class RefreshToken(Base):
@@ -146,9 +149,29 @@ class Timer(Base):
     label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     cancelled: Mapped[bool] = mapped_column(default=False)
+    # Set by the proactive-notification scheduler (app/services/scheduler.py) once it has sent a
+    # push for this timer's expiry, so it never notifies the same timer twice across polls.
+    notified: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="timers")
+
+
+class PushSubscription(Base):
+    """A single browser/device's Web Push subscription (endpoint URL + encryption keys, as
+    returned by the browser's PushSubscription.toJSON()). A user can have several - one per
+    browser/device they've enabled push on. See app/services/push_service.py for sending."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    endpoint: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    p256dh: Mapped[str] = mapped_column(String(255), nullable=False)
+    auth: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="push_subscriptions")
 
 
 class GeneratedFile(Base):
