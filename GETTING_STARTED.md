@@ -53,19 +53,21 @@ curl http://localhost:8000/api/v1/health
 # erwartete Antwort: {"status":"ok","ollama":"ok"}
 ```
 
-Steht `"ollama":"unreachable"` da: `docker compose logs ollama` checken, meist braucht das erste Modell-Laden noch ein paar Sekunden — kurz erneut versuchen.
+Steht `"ollama":"unreachable"` da: `docker compose logs backend` checken, meist braucht das erste Modell-Laden noch ein paar Sekunden — kurz erneut versuchen.
 
 Details/Hintergrund zur Modellwahl und VRAM-Begrenzung: [`infra/ollama/README.md`](./infra/ollama/README.md).
 
 ## 4. Web-App starten und im Browser testen
 
+Erstmal **ohne Caddy**, direkt per IP:Port — reicht völlig zum Testen im eigenen Netz (Caddy/Domain/TLS kommt in Schritt 6/7 dazu, falls gewünscht):
+
 ```bash
-docker compose up -d web caddy
+docker compose up -d web
 ```
 
-Im Browser auf dem Server (oder per SSH-Portweiterleitung `ssh -L 3000:localhost:3000 user@server`): `http://localhost:3000` öffnen, registrieren, einloggen, eine Chat-Nachricht schicken. Das ist der erste echte End-to-End-Test des ganzen Systems.
+Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen, eine Chat-Nachricht schicken. Das ist der erste echte End-to-End-Test des ganzen Systems.
 
-Falls etwas schiefgeht: `docker compose logs backend` bzw. `docker compose logs web`.
+Falls etwas schiefgeht: `docker compose logs backend` bzw. `docker compose logs web`. Kommt beim Laden der Seite ein CORS-Fehler in der Browser-Konsole: `CORS_ORIGINS` in `.env` passt nicht zur URL, unter der du die Seite öffnest (siehe `.env.example`) — anpassen und `docker compose up -d backend` neu starten.
 
 ## 5. Kalender verbinden (optional, aber empfohlen zum Testen)
 
@@ -81,13 +83,28 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 ```
 
-Dann Tailscale auch auf iPad, Windows-PC und S25 Ultra installieren (App Store / Microsoft Store / Play Store — das ist keine „eigene App", sondern ein Standard-VPN-Client) und alle im selben Tailnet einloggen. Der Server ist danach unter seinem Tailscale-Hostnamen erreichbar, z. B. `http://ownai-server:3000`.
+Dann Tailscale auch auf iPad, Windows-PC und S25 Ultra installieren (App Store / Microsoft Store / Play Store — das ist keine „eigene App", sondern ein Standard-VPN-Client) und alle im selben Tailnet einloggen. `tailscale ip -4` auf dem Server zeigt dir seine Tailscale-IP (bzw. `tailscale status` den Hostnamen).
 
-Sobald das steht: `DOMAIN` in `.env` auf den Tailscale-Hostnamen setzen und `docker compose up -d --build web caddy` erneut laufen lassen (Web-App muss neu gebaut werden, siehe `web/README.md`, „NEXT_PUBLIC_API_BASE_URL gotcha").
+**Einfachster Weg (empfohlen für den Start):** Caddy komplett weglassen, einfach direkt per Tailscale-IP/-Hostname + `BACKEND_PORT`/`WEB_PORT` zugreifen — Tailscale verschlüsselt den Traffic bereits selbst (WireGuard), eine zusätzliche TLS-Schicht über Caddy ist optional:
+
+```bash
+# NEXT_PUBLIC_API_BASE_URL und CORS_ORIGINS in .env auf die Tailscale-Adresse setzen, z.B.:
+# NEXT_PUBLIC_API_BASE_URL=http://ownai-server:8000/api/v1
+# CORS_ORIGINS=http://ownai-server:3000
+docker compose up -d --build web   # Web-App neu bauen, da NEXT_PUBLIC_API_BASE_URL sich geändert hat
+```
+
+Web-App danach von jedem Gerät im Tailnet erreichbar: `http://ownai-server:3000` (Hostname/IP + `WEB_PORT` anpassen).
+
+**Optional später:** Caddy davorschalten für eine „echte" HTTPS-Domain statt IP:Port. Dann `DOMAIN` in `.env` auf deine Domain bzw. den Tailscale-Hostnamen setzen, `NEXT_PUBLIC_API_BASE_URL`/`CORS_ORIGINS` wieder auskommentieren (Default greift dann: `https://${DOMAIN}/api/v1`), und:
+
+```bash
+docker compose up -d --build web caddy
+```
 
 ## 7. Web-App als „App" auf iPad und PC installieren
 
-- **iPad**: Safari öffnen, zur `DOMAIN`-URL navigieren, Teilen-Button → „Zum Home-Bildschirm". Läuft danach im Vollbild mit eigenem Icon.
+- **iPad**: Safari öffnen, zur Web-App-URL aus Schritt 6 navigieren, Teilen-Button → „Zum Home-Bildschirm". Läuft danach im Vollbild mit eigenem Icon.
 - **Windows-PC**: Edge oder Chrome öffnen, zur URL navigieren, Install-Icon in der Adressleiste klicken (oder Menü → „Apps" → „OwnAI installieren").
 
 ## 8. Android-App bauen und aufs S25 Ultra bringen
@@ -125,10 +142,10 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 - [ ] Docker + Docker Compose auf dem Server (Nvidia Container Toolkit nur nötig, falls du Schritt 1 für eine *neue* GPU-Nutzung durchgehst — deine bestehende Ollama-Instanz hat das vermutlich schon)
 - [ ] `.env` ausgefüllt
 - [ ] Modelle auf deiner bestehenden Ollama-Instanz gepullt, `curl localhost:11434/api/tags` erreichbar
-- [ ] `docker compose up -d postgres redis backend web caddy`, `/health` zeigt `"ollama":"ok"`
-- [ ] Web-App im Browser getestet (Registrierung, Chat)
+- [ ] `docker compose up -d postgres redis backend`, `/health` zeigt `"ollama":"ok"`
+- [ ] `docker compose up -d web`, Web-App im Browser getestet (Registrierung, Chat)
 - [ ] CalDAV verbunden, Kalender-Tool im Chat getestet
-- [ ] Tailscale auf Server + allen Geräten
+- [ ] Tailscale auf Server + allen Geräten, `NEXT_PUBLIC_API_BASE_URL`/`CORS_ORIGINS` auf Tailscale-Adresse gesetzt, `web` neu gebaut
 - [ ] Web-App auf iPad und PC als App installiert
 - [ ] Android-App gebaut, per `adb install` aufs S25 Ultra, Notification-Zugriff gewährt, ein Vorschlag erfolgreich erzeugt
 
