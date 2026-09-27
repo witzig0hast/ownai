@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
@@ -42,17 +43,23 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [notConnected, setNotConnected] = useState(false);
 
   const loadEvents = useCallback((start: string, end: string) => {
     setEventsLoading(true);
     setEventsError(null);
+    setNotConnected(false);
     calendarApi
       .listEvents(dateInputToIsoRangeStart(start), dateInputToIsoRangeEnd(end))
       .then((list) => {
         setEvents([...list].sort((a, b) => (a.start < b.start ? -1 : 1)));
       })
       .catch((err) => {
-        setEventsError(err instanceof ApiError ? err.message : "Failed to load events.");
+        if (err instanceof ApiError && err.code === "calendar_not_connected") {
+          setNotConnected(true);
+        } else {
+          setEventsError(err instanceof ApiError ? err.message : "Failed to load events.");
+        }
       })
       .finally(() => setEventsLoading(false));
   }, []);
@@ -63,6 +70,7 @@ export default function CalendarPage() {
     (async () => {
       setEventsLoading(true);
       setEventsError(null);
+      setNotConnected(false);
       try {
         const list = await calendarApi.listEvents(
           dateInputToIsoRangeStart(initialRange.start),
@@ -71,7 +79,11 @@ export default function CalendarPage() {
         if (!cancelled) setEvents([...list].sort((a, b) => (a.start < b.start ? -1 : 1)));
       } catch (err) {
         if (!cancelled) {
-          setEventsError(err instanceof ApiError ? err.message : "Failed to load events.");
+          if (err instanceof ApiError && err.code === "calendar_not_connected") {
+            setNotConnected(true);
+          } else {
+            setEventsError(err instanceof ApiError ? err.message : "Failed to load events.");
+          }
         }
       } finally {
         if (!cancelled) setEventsLoading(false);
@@ -84,34 +96,6 @@ export default function CalendarPage() {
     // Only run once on mount; the "Apply" button re-triggers this explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // --- CalDAV connect form ---
-  const [caldavUrl, setCaldavUrl] = useState("");
-  const [caldavUsername, setCaldavUsername] = useState("");
-  const [caldavPassword, setCaldavPassword] = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
-  const [connected, setConnected] = useState(false);
-
-  async function handleConnectCaldav(e: FormEvent) {
-    e.preventDefault();
-    setConnectError(null);
-    setConnecting(true);
-    try {
-      await calendarApi.connectCaldav({
-        url: caldavUrl,
-        username: caldavUsername,
-        password: caldavPassword,
-      });
-      setConnected(true);
-      setCaldavPassword("");
-      loadEvents(rangeStart, rangeEnd);
-    } catch (err) {
-      setConnectError(err instanceof ApiError ? err.message : "Failed to connect to CalDAV.");
-    } finally {
-      setConnecting(false);
-    }
-  }
 
   // --- Create event form ---
   const [title, setTitle] = useState("");
@@ -184,7 +168,14 @@ export default function CalendarPage() {
               Upcoming events
             </h2>
             <ErrorMessage message={eventsError} />
-            {eventsLoading ? (
+            {notConnected ? (
+              <p className="text-sm text-zinc-500">
+                Kein Kalender verbunden.{" "}
+                <Link href="/integrations" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                  Jetzt unter Integrationen verbinden.
+                </Link>
+              </p>
+            ) : eventsLoading ? (
               <p className="text-sm text-zinc-500">Loading...</p>
             ) : events.length === 0 ? (
               <p className="text-sm text-zinc-500">No events in this range.</p>
@@ -208,49 +199,6 @@ export default function CalendarPage() {
         </section>
 
         <section className="flex w-full flex-col gap-6 lg:w-80">
-          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-              Connect CalDAV
-            </h2>
-            <form onSubmit={handleConnectCaldav} className="flex flex-col gap-3">
-              <input
-                type="url"
-                required
-                placeholder="CalDAV URL"
-                value={caldavUrl}
-                onChange={(e) => setCaldavUrl(e.target.value)}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-              <input
-                type="text"
-                required
-                placeholder="Username"
-                value={caldavUsername}
-                onChange={(e) => setCaldavUsername(e.target.value)}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-              <input
-                type="password"
-                required
-                placeholder="Password"
-                value={caldavPassword}
-                onChange={(e) => setCaldavPassword(e.target.value)}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-              <ErrorMessage message={connectError} />
-              {connected ? (
-                <p className="text-sm text-green-600 dark:text-green-400">Connected.</p>
-              ) : null}
-              <button
-                type="submit"
-                disabled={connecting}
-                className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-              >
-                {connecting ? "Connecting..." : "Connect"}
-              </button>
-            </form>
-          </div>
-
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
               New event

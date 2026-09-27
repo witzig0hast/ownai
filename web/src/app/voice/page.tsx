@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { VoicePicker } from "@/components/VoicePicker";
 import { useLiveTalk, type LiveTalkState } from "@/lib/useLiveTalk";
 
 const STATE_LABEL: Record<LiveTalkState, string> = {
@@ -62,9 +63,14 @@ export default function VoicePage() {
             <div className="text-center">
               <p className="text-lg font-medium text-zinc-900 dark:text-zinc-100">{STATE_LABEL[state]}</p>
               {!isActive ? (
-                <p className="mt-1 text-sm text-zinc-500">
-                  Ein Gespräch ohne Tippen — sprich, die Antwort kommt automatisch als Sprache zurück.
-                </p>
+                <>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Ein Gespräch ohne Tippen — sprich, die Antwort kommt automatisch als Sprache zurück.
+                  </p>
+                  <div className="mx-auto mt-4 max-w-xs">
+                    <VoicePicker />
+                  </div>
+                </>
               ) : (
                 <button
                   type="button"

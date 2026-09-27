@@ -1,7 +1,8 @@
 # OwnAI Web
 
 Next.js (App Router, TypeScript, Tailwind CSS) client for OwnAI — the PC-facing
-surface for chat, calendar and Android-notification suggestions. See the root
+surface for chat, voice, calendar, Home Assistant and Android-notification
+suggestions. See the root
 [`CONCEPT.md`](../CONCEPT.md), [`DECISIONS.md`](../DECISIONS.md) and, most
 importantly, [`API.md`](../API.md) (the binding contract this app was built
 against).
@@ -79,16 +80,29 @@ the `{"error":{"code","message"}}` envelope).
   own message is rendered optimistically (the API only returns the new
   assistant message, per `API.md`).
 - **Calendar** (`/calendar`): upcoming events for a date range
-  (`GET /calendar/events?start&end`), a "Connect CalDAV" form
-  (`POST /integrations/caldav`), and a "New event" form
-  (`POST /calendar/events`).
+  (`GET /calendar/events?start&end`) and a "New event" form
+  (`POST /calendar/events`). If no CalDAV account is connected, shows a link
+  to `/integrations` instead of an error (connecting itself now lives there).
 - **Suggestions** (`/suggestions`): open suggestions
   (`GET /notifications/suggestions?status=open`), with Apply/Dismiss buttons
   (`POST .../{id}/apply` / `.../dismiss`) that remove the item from the list
   on success.
-- Shared nav (Voice / Chat / Calendar / Suggestions) + logout, route protection via
-  a client-side `ProtectedRoute` guard that redirects unauthenticated users
-  to `/login`.
+- **Integrations** (`/integrations`): one page for every connectable service —
+  Calendar (CalDAV, `POST /integrations/caldav`) and Home Assistant
+  (`POST /integrations/home-assistant`), each as its own card with a
+  connect form and a status badge (Verbunden / Nicht verbunden / Fehler,
+  inferred by probing the corresponding list endpoint and checking for the
+  `..._not_connected` error code, since neither integration has a dedicated
+  status endpoint — see `API.md`). Home Assistant devices themselves aren't
+  managed here beyond connecting: controlling them (lights, switches, ...)
+  happens conversationally through Chat/Voice via the backend's LLM tools.
+  Also embeds `SetupHelperChat` (`src/components/SetupHelperChat.tsx`), a
+  small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
+  that answers setup questions ("wo finde ich meine CalDAV-URL?") using the
+  same OwnAI assistant as regular chat, just kept out of the normal history.
+- Shared nav (Voice / Chat / Calendar / Suggestions / Integrations) + logout,
+  route protection via a client-side `ProtectedRoute` guard that redirects
+  unauthenticated users to `/login`.
 - **Push-to-talk in Chat** (`/chat`, separate from the Live Talk screen above): a mic
   button (`src/lib/useVoiceRecorder.ts`, browser
   `MediaRecorder` API) records a clip, uploads it to `POST /voice/transcribe`
@@ -103,6 +117,15 @@ the `{"error":{"code","message"}}` envelope).
   preference, stored in `localStorage`). Both run entirely client-side/
   on-device: STT goes to your own self-hosted Whisper (see root
   `DECISIONS.md`), TTS never leaves the browser at all.
+- **Voice picker** (`src/components/VoicePicker.tsx`, shown on `/voice` and in
+  `/chat`'s toolbar): the browser/OS often ships several `speechSynthesis`
+  voices of wildly different quality (e.g. a low-quality offline
+  espeak/Piper-style voice alongside better ones) — this enumerates every
+  voice the platform reports (`src/lib/tts.ts`'s `getVoices()`, handling the
+  async `voiceschanged` event some browsers need), lets the user pick one,
+  persists the choice in `localStorage`, and plays a short sample on
+  selection. Applied automatically everywhere replies are read aloud
+  (`speak`/`speakAndWait`), including the Live Talk loop.
 
 ## Installing as an app (PWA)
 
@@ -206,9 +229,17 @@ against a backend on the same machine. Either:
   bounced to `/login`.
 - Calendar event editing/deleting isn't in `API.md` yet, so it isn't in the
   UI either (only list + create).
-- No CalDAV connection status indicator beyond a one-time "Connected."
-  message after a successful `POST /integrations/caldav` — the API doesn't
-  expose a "get current connection status" endpoint to check.
+- Integration status badges on `/integrations` are inferred by probing the
+  corresponding list endpoint rather than a dedicated status endpoint (see
+  the "Integrations" bullet above) — accurate, but means an extra request on
+  page load.
+- No way to disconnect/remove a Home Assistant or CalDAV connection from the
+  UI once set — only connect/reconnect. Neither `API.md` nor the backend
+  currently expose a delete endpoint for either.
+- Home Assistant device control has no dedicated UI beyond the connect form
+  on `/integrations` — using it (turning lights on/off, etc.) happens
+  conversationally through Chat/Voice via the backend's LLM tools, not
+  through a device list/toggle screen.
 - No pagination for conversations/messages/events/suggestions lists — the
   API responses aren't documented as paginated, so none was added.
 - **Mic button needs a secure context.** `getUserMedia` is blocked by

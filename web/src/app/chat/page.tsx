@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { VoicePicker } from "@/components/VoicePicker";
 import { ApiError } from "@/lib/api-client";
 import * as chatApi from "@/lib/api/chat";
 import { isTtsSupported, speak, stopSpeaking } from "@/lib/tts";
@@ -347,12 +348,17 @@ export default function ChatPage() {
                 ) : null}
                 <div ref={bottomRef} />
               </div>
-              <div className="flex items-center justify-between border-t border-zinc-200 px-3 pt-2 dark:border-zinc-800">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200 px-3 pt-2 dark:border-zinc-800">
                 {isTtsSupported() ? (
-                  <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                    <input type="checkbox" checked={autoRead} onChange={toggleAutoRead} className="h-3.5 w-3.5" />
-                    Antworten automatisch vorlesen
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                      <input type="checkbox" checked={autoRead} onChange={toggleAutoRead} className="h-3.5 w-3.5" />
+                      Antworten automatisch vorlesen
+                    </label>
+                    <div className="w-48">
+                      <VoicePicker />
+                    </div>
+                  </div>
                 ) : (
                   <span />
                 )}

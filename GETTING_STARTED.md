@@ -77,9 +77,14 @@ Live Talk (der Mikro-Kreis auf „Voice") braucht zusätzlich HTTPS oder `localh
 
 Falls etwas schiefgeht: `docker compose logs backend` bzw. `docker compose logs web`. Kommt beim Laden der Seite ein CORS-Fehler in der Browser-Konsole: `CORS_ORIGINS` in `.env` passt nicht zur URL, unter der du die Seite öffnest (siehe `.env.example`) — anpassen und `docker compose up -d backend` neu starten.
 
-## 5. Kalender verbinden (optional, aber empfohlen zum Testen)
+## 5. Kalender und Home Assistant verbinden (optional, aber empfohlen zum Testen)
 
-In der Web-App unter „Calendar" → „Connect CalDAV" deine echten Zugangsdaten eintragen (Apple/Google/Nextcloud-CalDAV-URL). Danach im Chat z. B. fragen: „Habe ich heute noch was vor?" — das testet den kompletten Tool-Calling-Pfad (LLM → Kalender-Tool → Antwort).
+In der Web-App unter „Integrations" — einer Seite für alle Integrationen — deine echten Zugangsdaten eintragen:
+
+- **Kalender**: CalDAV-URL, Benutzername, Passwort (Apple/Google/Nextcloud-CalDAV). Danach im Chat z. B. fragen: „Habe ich heute noch was vor?" — das testet den kompletten Tool-Calling-Pfad (LLM → Kalender-Tool → Antwort).
+- **Home Assistant**: URL deiner Home-Assistant-Instanz (z. B. `http://homeassistant.local:8123`) plus ein Long-Lived Access Token (in Home Assistant: Profil → unten „Long-Lived Access Tokens" → „Token erstellen"). Danach im Chat z. B. fragen: „Welche Geräte hab ich?" oder „Mach das Wohnzimmerlicht an" — testet den gleichen Tool-Calling-Pfad, nur mit den Home-Assistant-Tools. Wichtig: **jeder OwnAI-Nutzer verbindet seine eigene Home-Assistant-Instanz** — es gibt keine geteilte/globale Konfiguration.
+
+Falls du nicht weißt, wo du eine dieser Angaben findest, frag einfach den eingebauten Hilfe-Chat direkt auf der Integrations-Seite — der beantwortet genau solche Setup-Fragen.
 
 ## 6. Netzwerkzugriff für deine Geräte einrichten
 
@@ -147,6 +152,7 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 
 - **Android**: Mikrofon-Button im Chat antippen, „Notification access"-artige Berechtigungsabfrage für Mikrofon bestätigen (einmalig), kurz sprechen, Button erneut antippen — der erkannte Text landet im Eingabefeld zum Prüfen/Bearbeiten vor dem Senden. Antworten werden automatisch vorgelesen, wenn du „Vorlesen" oben rechts im Chat aktivierst (oder tippe das Lautsprecher-Symbol an einer einzelnen Antwort an).
 - **Web/PWA — „Voice" (Live Talk, vollautomatisch)**: der Mikro-Kreis-Screen, den du nach dem Login siehst. Einmal antippen zum Starten — danach läuft alles von selbst: sprechen, kurz Pause machen (~1,2s), die App transkribiert und schickt automatisch, die Antwort wird vorgelesen, danach hört sie automatisch wieder zu. Kein erneutes Antippen nötig, bis du auf „Beenden" tippst.
+- **Stimme auswählen**: klingt die Standardstimme deines Browsers/Betriebssystems schlecht (z. B. eine Piper/espeak-artige Offline-Stimme unter Linux), wähl unter „Stimme" auf dem Voice-Screen (oder im Chat-Fenster unten) eine andere aus der Liste — welche Stimmen zur Auswahl stehen, hängt vom Gerät/Browser ab. Auswahl wird gespeichert und danach überall angewendet, wo Antworten vorgelesen werden (Chat, Voice/Live Talk).
 - **Web/PWA — Push-to-Talk im „Chat"-Tab**: Mikro-Button antippen → sprechen → nochmal antippen zum Stoppen → Text erscheint zur Kontrolle im Eingabefeld vor dem Senden. Eher für kurze, gezielte Nachrichten als für ein Gespräch.
 - **Beides (Web) braucht HTTPS oder `localhost`** — Browser blockieren Mikrofonzugriff auf normalem `http://<ip>:<port>`. Du brauchst also entweder Schritt 6's Caddy-Option (echte Domain + HTTPS) oder Zugriff direkt über `http://localhost:<WEB_PORT>` (z. B. per SSH-Portweiterleitung vom PC aus). Ohne HTTPS ist das kein Bug, sondern eine Browser-Sicherheitsregel — der Rest der Web-App funktioniert trotzdem ganz normal, nur die Mikro-Funktionen bleiben ausgeblendet/inaktiv.
 - Die Erkennung, wann du aufhörst zu reden (Live Talk), ist noch nicht an ein echtes Mikrofon/deinen Raum angepasst — falls Turns zu früh oder zu spät abgeschnitten werden, sag Bescheid, das lässt sich in `web/src/lib/useLiveTalk.ts` fein einstellen.
@@ -160,7 +166,9 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 - [ ] Modelle auf deiner bestehenden Ollama-Instanz gepullt, `curl localhost:11434/api/tags` erreichbar
 - [ ] `docker compose up -d postgres redis backend`, `/health` zeigt `"ollama":"ok"`
 - [ ] `docker compose up -d web`, Web-App im Browser getestet (Registrierung, Chat)
-- [ ] CalDAV verbunden, Kalender-Tool im Chat getestet
+- [ ] CalDAV unter „Integrations" verbunden, Kalender-Tool im Chat getestet
+- [ ] Home Assistant unter „Integrations" verbunden (eigene Instanz + Long-Lived Token), Geräte-Tool im Chat getestet
+- [ ] Bessere Stimme unter „Stimme" ausgewählt, falls die Standardstimme schlecht klingt
 - [ ] Tailscale auf Server + allen Geräten, `NEXT_PUBLIC_API_BASE_URL`/`CORS_ORIGINS` auf Tailscale-Adresse gesetzt, `web` neu gebaut
 - [ ] Web-App auf iPad und PC als App installiert
 - [ ] Android-App gebaut, per `adb install` aufs S25 Ultra, Notification-Zugriff gewährt, ein Vorschlag erfolgreich erzeugt

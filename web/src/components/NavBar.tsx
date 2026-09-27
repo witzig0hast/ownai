@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/chat", label: "Chat" },
   { href: "/calendar", label: "Calendar" },
   { href: "/suggestions", label: "Suggestions" },
+  { href: "/integrations", label: "Integrations" },
 ];
 
 function Logo() {
