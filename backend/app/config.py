@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "hermes3:8b"
     ollama_embed_model: str = "nomic-embed-text"
+    # Optional separate (smaller/faster) model for conversation auto-titling; falls back to
+    # ollama_chat_model when unset - see ollama_client.generate_title.
+    ollama_title_model: str | None = None
+    # How long Ollama keeps the model loaded in (V)RAM after the last request. Applied to every
+    # chat call, not just the warmup one (see app/api/chat.py's /chat/warmup), so normal usage
+    # already keeps it warm between messages.
+    ollama_keep_alive: str = "30m"
 
     # Wyoming-protocol ASR (speech-to-text), e.g. an existing wyoming-whisper instance.
     whisper_host: str = "host.docker.internal"

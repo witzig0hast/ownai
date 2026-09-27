@@ -44,14 +44,25 @@ Response `201`: `{ "id": uuid, "platform": string, "device_api_key": string, "la
 
 ## Chat
 
-### `GET /chat/conversations`  *(Bearer)*
-Response `200`: `{ "conversations": [ { "id": uuid, "title": string | null, "updated_at": datetime } ] }`
+### `GET /chat/conversations?include_archived={bool}`  *(Bearer)*
+Response `200`: `{ "conversations": [ { "id": uuid, "title": string | null, "archived": bool, "updated_at": datetime } ] }`
 
-`title` is `null` until the conversation is explicitly named (a new conversation created without a title starts untitled — clients should render a fallback like "Untitled conversation").
+`title` is `null` until the conversation is explicitly named or auto-titled (see below). `include_archived` defaults to `false` — archived conversations are hidden from the default list.
 
 ### `POST /chat/conversations`  *(Bearer)*
 Request: `{ "title": string | null }`
-Response `201`: `{ "id": uuid, "title": string | null, "updated_at": datetime }`
+Response `201`: `{ "id": uuid, "title": string | null, "archived": bool, "updated_at": datetime }`
+
+### `PATCH /chat/conversations/{id}`  *(Bearer)*
+Request: `{ "title": string | null, "archived": bool | null }` — nur gesetzte Felder werden geändert. `title` kann per API nicht auf `null` zurückgesetzt werden (min. 1 Zeichen), nur umbenannt.
+Response `200`: wie oben
+
+### `DELETE /chat/conversations/{id}`  *(Bearer)*
+Response `204`. Löscht die Unterhaltung inkl. aller Nachrichten endgültig (kein Soft-Delete — dafür gibt es `archived`).
+
+### `POST /chat/warmup`  *(Bearer)*
+Response `204`. Lädt das LLM in Ollama vor (`keep_alive`), ohne eine echte Antwort zu erzeugen — Clients rufen das beim Betreten eines Screens auf, der gleich eine schnelle erste Antwort braucht (Voice, Chat), damit das Laden des Modells nicht die erste echte Nachricht verzögert. Fehler bei Ollama werden intern verschluckt (best-effort), der Endpunkt liefert trotzdem `204`.
+Fehler: `503 system_paused`.
 
 ### `GET /chat/conversations/{id}/messages`  *(Bearer)*
 Response `200`: `{ "messages": [ Message ] }`
@@ -71,6 +82,8 @@ Response `200`: `{ "messages": [ Message ] }`
 Request: `{ "content": string }`
 Response `200`: `{ "message": Message }` — **synchron**, d. h. der Request blockiert bis die Antwort (inkl. aller Tool-Aufrufe) fertig ist. Kein Streaming in v1 (siehe `CONCEPT.md`, bewusst zurückgestellt — SSE-Streaming ist als v2-Erweiterung vorgesehen, ohne Breaking Change an diesem Contract: es kommt ein zusätzlicher `stream=true` Query-Param, der aktuell `501 not_implemented` liefert, falls gesetzt).
 Fehler: `503 system_paused` (Admin hat das System pausiert — `message` enthält ggf. einen vom Admin gesetzten Grund, siehe Admin-Sektion).
+
+**Auto-Titel**: ist die Unterhaltung beim ersten Austausch (erste Nutzernachricht) noch unbenannt (`title: null`), generiert das Backend nach der Antwort automatisch einen kurzen Titel (per LLM, best-effort — schlägt die Generierung fehl, bleibt die Unterhaltung unbenannt, kein Fehler nach außen). Eine bereits explizit gesetzte `title` wird dadurch nie überschrieben.
 
 ## Kalender
 

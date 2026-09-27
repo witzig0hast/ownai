@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.orchestrator import run_turn
@@ -11,10 +11,12 @@ from app.schemas.chat import (
     ConversationCreateRequest,
     ConversationOut,
     ConversationsListOut,
+    ConversationUpdateRequest,
     MessageCreateRequest,
     MessageCreateResponse,
     MessagesListOut,
 )
+from app.services import ollama_client
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -26,13 +28,24 @@ async def _get_owned_conversation(db: AsyncSession, user: User, conversation_id:
     return conversation
 
 
+async def _message_count(db: AsyncSession, conversation_id: str) -> int:
+    result = await db.execute(
+        select(func.count()).select_from(Message).where(Message.conversation_id == conversation_id)
+    )
+    return result.scalar_one()
+
+
 @router.get("/conversations", response_model=ConversationsListOut)
 async def list_conversations(
-    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    include_archived: bool = Query(default=False),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> ConversationsListOut:
-    result = await db.execute(
-        select(Conversation).where(Conversation.user_id == user.id).order_by(Conversation.updated_at.desc())
-    )
+    query = select(Conversation).where(Conversation.user_id == user.id)
+    if not include_archived:
+        query = query.where(Conversation.archived.is_(False))
+    query = query.order_by(Conversation.updated_at.desc())
+    result = await db.execute(query)
     return ConversationsListOut(conversations=list(result.scalars().all()))
 
 
@@ -47,6 +60,42 @@ async def create_conversation(
     await db.commit()
     await db.refresh(conversation)
     return conversation
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationOut)
+async def update_conversation(
+    conversation_id: str,
+    payload: ConversationUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Conversation:
+    conversation = await _get_owned_conversation(db, user, conversation_id)
+    if payload.title is not None:
+        conversation.title = payload.title
+    if payload.archived is not None:
+        conversation.archived = payload.archived
+    await db.commit()
+    await db.refresh(conversation)
+    return conversation
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+async def delete_conversation(
+    conversation_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    conversation = await _get_owned_conversation(db, user, conversation_id)
+    await db.delete(conversation)
+    await db.commit()
+
+
+@router.post("/warmup", status_code=204)
+async def warmup(_user: User = Depends(require_not_paused)) -> None:
+    """Loads the LLM into memory ahead of time (see ollama_client.warmup) - clients call this
+    when entering a screen that's about to need a fast first reply (Voice, Chat), so the model
+    load doesn't happen on the critical path of the user's first message."""
+    await ollama_client.warmup()
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=MessagesListOut)
@@ -74,5 +123,14 @@ async def post_message(
         raise APIError(501, "not_implemented", "SSE-Streaming ist noch nicht implementiert (siehe API.md).")
 
     conversation = await _get_owned_conversation(db, user, conversation_id)
+    needs_title = conversation.title is None and await _message_count(db, conversation.id) == 0
+
     assistant_message = await run_turn(db, user, conversation, payload.content)
+
+    if needs_title:
+        title = await ollama_client.generate_title(payload.content, assistant_message.content)
+        if title:
+            conversation.title = title
+            await db.commit()
+
     return MessageCreateResponse(message=assistant_message)
