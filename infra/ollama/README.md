@@ -12,9 +12,9 @@ Die Tesla P40 (Pascal, `sm_61`) hat **keine Tensor Cores** und schwache natives 
 
 > Bewusst **nicht das volle VRAM ausschöpfen**: mit `hermes3:8b` liegt die Grundlast bei ca. 6–8 GB, das lässt reichlich Puffer für Embeddings, parallele Anfragen und späteres Whisper-STT (Phase 6) auf denselben 24 GB.
 
-## Bereits vorhandene Ollama-Instanz nutzen (Standardfall)
+## Eigene Ollama-Instanz einrichten
 
-`docker-compose.yml` startet standardmäßig **kein eigenes Ollama** — wenn auf dem Server schon eines läuft (systemd-Install oder eigener Container), wird das genutzt. Zwei Dinge dafür prüfen/einrichten:
+`docker-compose.yml` enthält **keinen eigenen Ollama-Container** — Ollama installierst/betreibst du selbst auf dem Server (systemd-Install oder eigener Container, z.B. per [ollama.com/download/linux](https://ollama.com/download/linux)), und OwnAI verbindet sich damit. Zwei Dinge dafür prüfen/einrichten:
 
 1. **Modell pullen**, auf deiner bestehenden Instanz:
    ```bash
@@ -47,29 +47,17 @@ curl http://localhost:8000/api/v1/health
 # erwartet: {"status":"ok","ollama":"ok"}
 ```
 
-## Alternative: den mitgelieferten Ollama-Service nutzen
-
-Nur nötig, wenn du **kein** eigenes Ollama hast:
-
-```bash
-docker compose --profile bundled-ollama up -d ollama
-docker exec -it ownai-ollama ollama pull hermes3:8b
-docker exec -it ownai-ollama ollama pull nomic-embed-text
-```
-
-Dann in `.env`: `OLLAMA_BASE_URL=http://ollama:11434` (auskommentierte Zeile in `.env.example` aktivieren).
-
 ## VRAM unter Kontrolle halten
 
-Nutzt du den mitgelieferten Service, in `.env` (siehe `.env.example`):
+Auf deiner Ollama-Instanz (z.B. als systemd-Environment für den `ollama`-Dienst, `sudo systemctl edit ollama`):
 
 ```
-OLLAMA_MAX_LOADED_MODELS=1   # nur 1 Modell gleichzeitig im VRAM
-OLLAMA_KEEP_ALIVE=10m        # entlädt Modell nach 10 Min. Inaktivität
+Environment="OLLAMA_MAX_LOADED_MODELS=1"   # nur 1 Modell gleichzeitig im VRAM
+Environment="OLLAMA_KEEP_ALIVE=10m"        # entlädt Modell nach 10 Min. Inaktivität
 ```
 
-Damit bleibt der Server im Ruhezustand VRAM-frei und lädt bei Bedarf nach (kostet die ersten ~1–3 Sekunden Ladezeit pro „kalter" Anfrage — akzeptabler Trade-off für einen persönlichen Assistenten, der nicht dauerhaft angefragt wird). Läuft dein eigenes Ollama bereits, stell das Äquivalent dort ein (z.B. `OLLAMA_MAX_LOADED_MODELS`/`OLLAMA_KEEP_ALIVE` als systemd-Environment-Variablen für den `ollama`-Dienst).
+Damit bleibt der Server im Ruhezustand VRAM-frei und lädt bei Bedarf nach (kostet die ersten ~1–3 Sekunden Ladezeit pro „kalter" Anfrage — akzeptabler Trade-off für einen persönlichen Assistenten, der nicht dauerhaft angefragt wird).
 
 ## Wechsel auf ein größeres Modell später
 
-Falls du später einen zweiten GPU-Slot oder mehr VRAM hast: einfach `OLLAMA_CHAT_MODEL` in `.env` ändern (z. B. auf ein 14B/32B-Modell) und `docker exec ownai-ollama ollama pull <modell>` — der Backend-Code (`backend/app/agent/`) ist modellunabhängig, solange das Modell Tool-Calling unterstützt (Ollama-Tool-Calling-kompatible Modelle, siehe [ollama.com/search?c=tools](https://ollama.com/search?c=tools)).
+Falls du später einen zweiten GPU-Slot oder mehr VRAM hast: einfach `OLLAMA_CHAT_MODEL` in `.env` ändern (z. B. auf ein 14B/32B-Modell) und `ollama pull <modell>` auf deiner Instanz — der Backend-Code (`backend/app/agent/`) ist modellunabhängig, solange das Modell Tool-Calling unterstützt (Ollama-Tool-Calling-kompatible Modelle, siehe [ollama.com/search?c=tools](https://ollama.com/search?c=tools)).

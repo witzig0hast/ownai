@@ -1,34 +1,4 @@
 services:
-  # Optional — skipped by default. If you already have an Ollama instance running on
-  # this server (systemd install or your own container), leave this out entirely and
-  # point OLLAMA_BASE_URL in .env at it instead (see .env.example and
-  # infra/ollama/README.md, "Bereits vorhandene Ollama-Instanz nutzen"). Only start
-  # this bundled one with `docker compose --profile bundled-ollama up -d ollama`.
-  ollama:
-    profiles: ["bundled-ollama"]
-    image: ollama/ollama:latest
-    container_name: ownai-ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-1}
-      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-10m}
-    ports:
-      - "127.0.0.1:11434:11434"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["0"]
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
   postgres:
     image: postgres:16-alpine
     container_name: ownai-postgres
@@ -105,7 +75,6 @@ services:
       - web
 
 volumes:
-  ollama_data:
   postgres_data:
   redis_data:
   caddy_data:

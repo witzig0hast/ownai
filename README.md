@@ -20,24 +20,26 @@ ownai/
 ├── infra/
 │   ├── caddy/          Reverse-Proxy-Config (TLS)
 │   └── ollama/          Ollama-Setup-Doku für die P40
-├── docker-compose.yml   Orchestriert ollama, postgres, redis, backend, web, caddy
+├── docker-compose.yml   Orchestriert postgres, redis, backend, web, caddy — Ollama läuft
+│                        separat auf deinem Server, siehe infra/ollama/README.md
 └── .env.example
 ```
 
 ## Schnellstart (Server)
 
+Setzt eine eigene, bereits laufende Ollama-Instanz auf dem Server voraus (siehe [`infra/ollama/README.md`](./infra/ollama/README.md), falls noch nicht vorhanden):
+
 ```bash
+ollama pull hermes3:8b
+ollama pull nomic-embed-text
+
 cp .env.example .env
 # .env ausfüllen: SECRET_KEY, POSTGRES_PASSWORD, DOMAIN
 
-docker compose up -d postgres redis ollama
-docker exec -it ownai-ollama ollama pull hermes3:8b
-docker exec -it ownai-ollama ollama pull nomic-embed-text
-
-docker compose up -d backend web caddy
+docker compose up -d postgres redis backend web caddy
 ```
 
-Details zur GPU/Modellwahl: [`infra/ollama/README.md`](./infra/ollama/README.md).
+Details zur GPU/Modellwahl und wie OwnAI deine Ollama-Instanz erreicht: [`infra/ollama/README.md`](./infra/ollama/README.md).
 Backend-Entwicklung/Tests lokal ohne Docker: [`backend/README.md`](./backend/README.md).
 
 ## Status dieses Durchgangs

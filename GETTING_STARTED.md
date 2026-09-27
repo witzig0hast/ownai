@@ -37,14 +37,12 @@ ollama pull nomic-embed-text
 
 # Kurzer Check: lauscht dein Ollama auf mehr als nur 127.0.0.1?
 # (nötig, damit der Docker-Container vom Host aus rankommt — Details und Fix
-#  falls nicht: infra/ollama/README.md, "Bereits vorhandene Ollama-Instanz nutzen")
+#  falls nicht: infra/ollama/README.md, "Eigene Ollama-Instanz einrichten")
 curl http://localhost:11434/api/tags
 
 docker compose up -d postgres redis
 docker compose up -d backend
 ```
-
-Hast du **kein** eigenes Ollama (Alternative, hier nicht dein Fall): `docker compose --profile bundled-ollama up -d ollama` und `OLLAMA_BASE_URL=http://ollama:11434` in `.env` setzen — siehe `infra/ollama/README.md`.
 
 Prüfen, dass alles läuft:
 
