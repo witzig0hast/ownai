@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
+import { unlockSpeech } from "@/lib/tts";
 import { useLiveTalk, type LiveTalkState } from "@/lib/useLiveTalk";
 
 const STATE_LABEL: Record<LiveTalkState, string> = {
@@ -46,7 +47,14 @@ export default function VoicePage() {
           <>
             <button
               type="button"
-              onClick={() => (isActive ? stop() : start())}
+              onClick={() => {
+                if (isActive) {
+                  stop();
+                } else {
+                  unlockSpeech(); // must run synchronously in this click handler - see tts.ts
+                  start();
+                }
+              }}
               className="relative flex h-40 w-40 items-center justify-center rounded-full transition-transform duration-150 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-300"
               style={{ transform: `scale(${scale})` }}
             >

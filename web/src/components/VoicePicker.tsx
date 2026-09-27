@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPreferredVoiceURI, getVoices, isTtsSupported, setPreferredVoiceURI, speak } from "@/lib/tts";
+import { getPreferredVoiceURI, getVoices, isTtsSupported, setPreferredVoiceURI, speak, unlockSpeech } from "@/lib/tts";
 
 /**
  * Lets the user pick which browser/OS voice reads replies aloud. Some devices default to
@@ -36,11 +36,19 @@ export function VoicePicker() {
     return aDe - bDe || a.name.localeCompare(b.name);
   });
 
+  const speakSample = (voiceURI: string) => {
+    // Native <select> "change" events aren't a reliably "trusted" gesture on every
+    // platform (notably iOS Safari, where the picker is a system sheet) - unlock
+    // defensively here too, even though it's a no-op after the first real call.
+    unlockSpeech();
+    const voice = voices.find((v) => v.voiceURI === voiceURI);
+    speak(voice ? `Hallo, ich bin ${voice.name}.` : "Hallo, das ist die Standardstimme.");
+  };
+
   const handleChange = (voiceURI: string) => {
     setSelected(voiceURI);
     setPreferredVoiceURI(voiceURI || null);
-    const voice = voices.find((v) => v.voiceURI === voiceURI);
-    speak(voice ? `Hallo, ich bin ${voice.name}.` : "Hallo, das ist die Standardstimme.");
+    speakSample(voiceURI);
   };
 
   return (
@@ -61,6 +69,14 @@ export function VoicePicker() {
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        onClick={() => speakSample(selected)}
+        title="Stimme testen"
+        className="shrink-0 rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      >
+        Testen
+      </button>
     </div>
   );
 }

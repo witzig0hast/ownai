@@ -6,7 +6,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
 import { ApiError } from "@/lib/api-client";
 import * as chatApi from "@/lib/api/chat";
-import { isTtsSupported, speak, stopSpeaking } from "@/lib/tts";
+import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
 
@@ -176,6 +176,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const toggleAutoRead = useCallback(() => {
+    unlockSpeech(); // must run synchronously in this click handler - see tts.ts
     setAutoRead((prev) => {
       const next = !prev;
       try {
@@ -275,6 +276,7 @@ export default function ChatPage() {
       const content = input.trim();
       if (!content || !selectedId || sending) return;
 
+      unlockSpeech(); // must run synchronously in this submit handler, before the awaits below - see tts.ts
       setSendError(null);
       const optimisticMessage: Message = {
         id: `local-${Date.now()}`,
