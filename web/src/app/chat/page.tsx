@@ -52,6 +52,29 @@ function formatTime(iso: string): string {
   }
 }
 
+function ArchiveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M4 7h16M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7M10 11h4" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 4h18v3H3z" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path
+        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0v13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ConversationSidebar({
   conversations,
   selectedId,
@@ -59,6 +82,10 @@ function ConversationSidebar({
   onCreate,
   creating,
   loading,
+  showArchived,
+  onToggleShowArchived,
+  onArchiveToggle,
+  onDelete,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
@@ -66,6 +93,10 @@ function ConversationSidebar({
   onCreate: () => void;
   creating: boolean;
   loading: boolean;
+  showArchived: boolean;
+  onToggleShowArchived: () => void;
+  onArchiveToggle: (conversation: Conversation) => void;
+  onDelete: (conversation: Conversation) => void;
 }) {
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800">
@@ -80,6 +111,10 @@ function ConversationSidebar({
           {creating ? "Creating..." : "+ New chat"}
         </button>
       </div>
+      <label className="flex items-center gap-1.5 border-b border-zinc-200 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
+        <input type="checkbox" checked={showArchived} onChange={onToggleShowArchived} className="h-3 w-3" />
+        Archivierte anzeigen
+      </label>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <p className="p-3 text-sm text-zinc-500">Loading...</p>
@@ -88,21 +123,48 @@ function ConversationSidebar({
         ) : (
           <ul>
             {conversations.map((c) => (
-              <li key={c.id}>
+              <li key={c.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => onSelect(c.id)}
-                  className={`block w-full truncate px-3 py-2.5 text-left text-sm transition-colors ${
+                  className={`block w-full truncate px-3 py-2.5 pr-16 text-left text-sm transition-colors ${
                     c.id === selectedId
                       ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-900"
                   }`}
                 >
-                  <span className="block truncate">{c.title || "Untitled conversation"}</span>
+                  <span className="block truncate">
+                    {c.title || "Untitled conversation"}
+                    {c.archived ? " (archiviert)" : ""}
+                  </span>
                   <span className="block truncate text-xs text-zinc-400">
                     {formatTime(c.updated_at)}
                   </span>
                 </button>
+                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onArchiveToggle(c);
+                    }}
+                    title={c.archived ? "Wiederherstellen" : "Archivieren"}
+                    className="rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                  >
+                    <ArchiveIcon />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(c);
+                    }}
+                    title="Löschen"
+                    className="rounded p-1 text-zinc-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -151,6 +213,7 @@ export default function ChatPage() {
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -206,10 +269,10 @@ export default function ChatPage() {
     (async () => {
       setConversationsLoading(true);
       try {
-        const list = await chatApi.listConversations();
+        const list = await chatApi.listConversations(showArchived);
         if (cancelled) return;
         setConversations(list);
-        if (list.length > 0) {
+        if (!showArchived && list.length > 0) {
           setSelectedId((current) => current ?? list[0].id);
         }
       } catch (err) {
@@ -223,6 +286,12 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
+  }, [showArchived]);
+
+  // Loads the model into Ollama ahead of time, so the first real reply on this screen doesn't
+  // pay for the load - best-effort, a failure here shouldn't surface as a user-facing error.
+  useEffect(() => {
+    chatApi.warmup().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -270,6 +339,45 @@ export default function ChatPage() {
     }
   }, []);
 
+  const handleArchiveToggle = useCallback(
+    async (conversation: Conversation) => {
+      setListError(null);
+      try {
+        const updated = await chatApi.updateConversation(conversation.id, { archived: !conversation.archived });
+        setConversations((prev) => {
+          const next = prev.map((c) => (c.id === updated.id ? updated : c));
+          // Hide it immediately if it no longer matches the current filter, rather than
+          // waiting for the next full reload.
+          return showArchived ? next : next.filter((c) => !c.archived);
+        });
+        if (updated.archived && selectedId === updated.id) {
+          setSelectedId(null);
+        }
+      } catch (err) {
+        setListError(err instanceof ApiError ? err.message : "Failed to update conversation.");
+      }
+    },
+    [showArchived, selectedId],
+  );
+
+  const handleDeleteConversation = useCallback(
+    async (conversation: Conversation) => {
+      const label = conversation.title || "diese Unterhaltung";
+      if (!window.confirm(`${label} unwiderruflich löschen?`)) return;
+      setListError(null);
+      try {
+        await chatApi.deleteConversation(conversation.id);
+        setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+        if (selectedId === conversation.id) {
+          setSelectedId(null);
+        }
+      } catch (err) {
+        setListError(err instanceof ApiError ? err.message : "Failed to delete conversation.");
+      }
+    },
+    [selectedId],
+  );
+
   const handleSend = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
@@ -285,6 +393,10 @@ export default function ChatPage() {
         tool_calls: null,
         created_at: new Date().toISOString(),
       };
+      // Untitled conversations get an auto-generated title from this exchange server-side
+      // (see API.md) - remember that so we know to refresh the title after the reply lands.
+      const wasUntitled = conversations.find((c) => c.id === selectedId)?.title == null;
+
       setMessages((prev) => [...prev, optimisticMessage]);
       setInput("");
       setSending(true);
@@ -298,6 +410,12 @@ export default function ChatPage() {
             )
             .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
         );
+        if (wasUntitled) {
+          chatApi
+            .listConversations(showArchived)
+            .then(setConversations)
+            .catch(() => {});
+        }
         if (autoRead) speak(assistantMessage.content);
       } catch (err) {
         setSendError(err instanceof ApiError ? err.message : "Failed to send message.");
@@ -305,7 +423,7 @@ export default function ChatPage() {
         setSending(false);
       }
     },
-    [input, selectedId, sending, autoRead],
+    [input, selectedId, sending, autoRead, conversations, showArchived],
   );
 
   return (
@@ -318,6 +436,10 @@ export default function ChatPage() {
           onCreate={handleCreateConversation}
           creating={creatingConversation}
           loading={conversationsLoading}
+          showArchived={showArchived}
+          onToggleShowArchived={() => setShowArchived((v) => !v)}
+          onArchiveToggle={handleArchiveToggle}
+          onDelete={handleDeleteConversation}
         />
         <section className="flex flex-1 flex-col overflow-hidden">
           {listError ? (

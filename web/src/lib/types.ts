@@ -26,6 +26,7 @@ export interface AuthTokens {
 export interface Conversation {
   id: string;
   title: string | null;
+  archived: boolean;
   updated_at: string;
 }
 

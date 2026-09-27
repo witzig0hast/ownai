@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
+import * as chatApi from "@/lib/api/chat";
 import { unlockSpeech } from "@/lib/tts";
 import { useLiveTalk, type LiveTalkState } from "@/lib/useLiveTalk";
 
@@ -37,6 +39,12 @@ export default function VoicePage() {
   const isActive = state !== "idle";
   // Ring grows a bit with mic volume while actively listening, otherwise pulses gently.
   const scale = state === "listening" ? 1 + Math.min(volume, 1) * 0.35 : 1;
+
+  // Loads the model into Ollama ahead of time, so the first reply in this session doesn't pay
+  // for the load - best-effort, a failure here shouldn't surface as a user-facing error.
+  useEffect(() => {
+    chatApi.warmup().catch(() => {});
+  }, []);
 
   return (
     <AppShell>
