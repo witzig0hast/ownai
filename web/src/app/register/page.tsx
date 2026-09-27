@@ -17,7 +17,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
-    router.replace("/chat");
+    router.replace("/voice");
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -32,7 +32,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password, displayName);
-      router.replace("/chat");
+      router.replace("/voice");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Registration failed. Please try again.");
     } finally {

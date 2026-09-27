@@ -16,7 +16,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
-    router.replace("/chat");
+    router.replace("/voice");
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -25,7 +25,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      router.replace("/chat");
+      router.replace("/voice");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed. Please try again.");
     } finally {
