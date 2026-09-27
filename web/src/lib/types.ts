@@ -100,6 +100,13 @@ export interface AgentMessage {
   updated_at: string;
 }
 
+export interface Device {
+  id: string;
+  platform: "android" | "ios" | "web";
+  label: string;
+  created_at: string;
+}
+
 export interface GeneratedFile {
   id: string;
   filename: string;

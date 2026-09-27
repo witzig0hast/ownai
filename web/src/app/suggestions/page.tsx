@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { PageHeader } from "@/components/PageHeader";
 import { ApiError } from "@/lib/api-client";
+import * as devicesApi from "@/lib/api/devices";
 import * as suggestionsApi from "@/lib/api/suggestions";
 import type { Suggestion } from "@/lib/types";
 
@@ -75,8 +76,28 @@ export default function SuggestionsPage() {
   const [listError, setListError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // Suggestions only ever come from the Android app's notification-forwarding pipeline - on a
+  // web-only account this page can never show anything useful, so it explains that instead of
+  // silently looking broken/empty (matches NavBar hiding the link entirely in that case too).
+  const [hasAndroidDevice, setHasAndroidDevice] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    devicesApi
+      .listDevices()
+      .then((devices) => {
+        if (!cancelled) setHasAndroidDevice(devices.some((d) => d.platform === "android"));
+      })
+      .catch(() => {
+        if (!cancelled) setHasAndroidDevice(true); // fail open - don't hide the page on a network hiccup
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hasAndroidDevice !== true) return;
     let cancelled = false;
     suggestionsApi
       .listSuggestions("open")
@@ -94,7 +115,7 @@ export default function SuggestionsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasAndroidDevice]);
 
   async function handleApply(id: string) {
     setActionError(null);
@@ -140,7 +161,18 @@ export default function SuggestionsPage() {
           <ErrorMessage message={actionError} />
         </div>
 
-        {loading ? (
+        {hasAndroidDevice === null ? (
+          <p className="text-sm text-zinc-500">Lade...</p>
+        ) : hasAndroidDevice === false ? (
+          <div className="rounded-lg border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
+            <p>Vorschläge brauchen die OwnAI-Android-App.</p>
+            <p className="mt-2">
+              Diese Funktion liest Benachrichtigungen auf deinem Android-Gerät (z. B. WhatsApp) und
+              schlägt daraus Termine oder Antworten vor — ohne Android-Gerät gibt es hier nichts zu
+              tun.
+            </p>
+          </div>
+        ) : loading ? (
           <p className="text-sm text-zinc-500">Lade...</p>
         ) : suggestions.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">

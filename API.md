@@ -42,6 +42,11 @@ Response `201`: `{ "id": uuid, "platform": string, "device_api_key": string, "la
 
 `device_api_key` wird **nur bei Erstellung** zurückgegeben (danach nicht mehr abrufbar) und ausschließlich vom Android-Notification-Listener für `/notifications/ingest` verwendet — getrennt vom User-JWT, damit ein kompromittierter Gerätetoken nicht vollen Kontozugriff gibt.
 
+### `GET /devices`  *(Bearer)*
+Response `200`: `{ "devices": [ { "id": uuid, "platform": string, "label": string, "created_at": datetime } ] }` (kein `device_api_key`).
+
+Genutzt vom Web-Frontend, um z. B. `/suggestions` (nutzlos ohne Android-App) nur anzuzeigen, wenn tatsächlich ein `"android"`-Gerät registriert ist.
+
 ## Chat
 
 ### `GET /chat/conversations?include_archived={bool}`  *(Bearer)*

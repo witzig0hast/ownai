@@ -111,17 +111,25 @@ the `{"error":{"code","message"}}` envelope).
     while verifying this live (a classic worker threw `"Classic web workers are not
     supported"`). Verified live end-to-end: seeded an assistant message with a
     ```` ```python ```` block, clicked "Ausführen", got the correct `stdout` back.
-- **Calendar** (`/calendar`): upcoming events for a date range
-  (`GET /calendar/events?start&end`) and a "New event" form
-  (`POST /calendar/events`). If no CalDAV account is connected, shows a link
-  to `/integrations` instead of an error (connecting itself now lives there).
+- **Calendar** — no longer a standalone top-level page. Moved into Settings →
+  Kalender (`src/components/settings/CalendarTab.tsx`) per user request, with an
+  on/off toggle (`ownai.calendarEnabled` in localStorage, per-viewer preference,
+  defaults on) above the same event list/create form the old `/calendar` page had
+  (`GET/POST /calendar/events`). Turning it off just hides the view - the CalDAV
+  connection itself is untouched.
 - **Suggestions** (`/suggestions`): open suggestions
   (`GET /notifications/suggestions?status=open`), with Apply/Dismiss buttons
   (`POST .../{id}/apply` / `.../dismiss`) that remove the item from the list
-  on success.
+  on success. Only useful with the Android app (it's the sole source of
+  suggestions), so both the NavBar link and the page's real content are gated
+  on `GET /devices` returning at least one `platform: "android"` device — a
+  web-only account sees neither the nav link nor a confusing "always empty"
+  page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently four tabs (Integrations, E-Mail, Agent Bus, Konto):
+  einstellen können" in one place). Currently five tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Konto) - the tab bar scrolls horizontally on narrow screens rather than wrapping, since
+  more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
     connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
@@ -137,6 +145,8 @@ the `{"error":{"code","message"}}` envelope).
     popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
     that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI
     assistant as regular chat, just kept out of the normal history.
+  - **Kalender** tab (`src/components/settings/CalendarTab.tsx`): the former `/calendar` page,
+    moved here per user request with an on/off toggle above it (see the Calendar bullet above).
   - **E-Mail** tab (`src/components/settings/EmailTab.tsx`): connect a personal SMTP account
     (`POST /integrations/email`) for the `send_email` tool to use instead of the system-wide
     default — same form/status-probe pattern as the Integrations tab.

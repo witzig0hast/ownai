@@ -1,13 +1,22 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
 from app.auth.security import generate_device_api_key
 from app.db.models import Device, User
 from app.db.session import get_db
-from app.schemas.devices import DeviceOut, DeviceRegisterRequest
+from app.schemas.devices import DeviceOut, DeviceRegisterRequest, DevicesListOut
 
 router = APIRouter(tags=["devices"])
+
+
+@router.get("/devices", response_model=DevicesListOut)
+async def list_devices(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> DevicesListOut:
+    result = await db.execute(select(Device).where(Device.user_id == user.id).order_by(Device.created_at))
+    return DevicesListOut(devices=list(result.scalars().all()))
 
 
 @router.post("/devices/register", response_model=DeviceOut, status_code=201)

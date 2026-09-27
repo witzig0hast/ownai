@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
-import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { PageHeader } from "@/components/PageHeader";
 import { ApiError } from "@/lib/api-client";
 import * as calendarApi from "@/lib/api/calendar";
 import type { CalendarEvent } from "@/lib/types";
+
+const CALENDAR_ENABLED_STORAGE_KEY = "ownai.calendarEnabled";
 
 function toDateInputValue(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -36,7 +35,33 @@ function defaultRange(): { start: string; end: string } {
   return { start: toDateInputValue(today), end: toDateInputValue(end) };
 }
 
-export default function CalendarPage() {
+function readEnabledPreference(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const stored = window.localStorage.getItem(CALENDAR_ENABLED_STORAGE_KEY);
+    return stored === null ? true : stored === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function CalendarTab() {
+  // Per-viewer preference, not shared state - same pattern as Chat's "auto-read replies"
+  // toggle (localStorage, read once via a lazy initializer).
+  const [enabled, setEnabled] = useState(readEnabledPreference);
+
+  function toggleEnabled() {
+    setEnabled((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(CALENDAR_ENABLED_STORAGE_KEY, String(next));
+      } catch {
+        // best-effort only
+      }
+      return next;
+    });
+  }
+
   const initialRange = defaultRange();
   const [rangeStart, setRangeStart] = useState(initialRange.start);
   const [rangeEnd, setRangeEnd] = useState(initialRange.end);
@@ -66,37 +91,13 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      setEventsLoading(true);
-      setEventsError(null);
-      setNotConnected(false);
-      try {
-        const list = await calendarApi.listEvents(
-          dateInputToIsoRangeStart(initialRange.start),
-          dateInputToIsoRangeEnd(initialRange.end),
-        );
-        if (!cancelled) setEvents([...list].sort((a, b) => (a.start < b.start ? -1 : 1)));
-      } catch (err) {
-        if (!cancelled) {
-          if (err instanceof ApiError && err.code === "calendar_not_connected") {
-            setNotConnected(true);
-          } else {
-            setEventsError(err instanceof ApiError ? err.message : "Failed to load events.");
-          }
-        }
-      } finally {
-        if (!cancelled) setEventsLoading(false);
-      }
+    if (!enabled) return;
+    void (async () => {
+      loadEvents(initialRange.start, initialRange.end);
     })();
-
-    return () => {
-      cancelled = true;
-    };
-    // Only run once on mount; the "Apply" button re-triggers this explicitly.
+    // Only run once on mount (and when re-enabled); the "Apply" button re-triggers explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [enabled]);
 
   // --- Create event form ---
   const [title, setTitle] = useState("");
@@ -134,9 +135,18 @@ export default function CalendarPage() {
   }
 
   return (
-    <AppShell>
-      <div className="flex-1 overflow-y-auto p-4">
-        <PageHeader title="Calendar" />
+    <div>
+      <label className="mb-4 flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <input type="checkbox" checked={enabled} onChange={toggleEnabled} className="h-4 w-4" />
+        Kalender aktivieren
+      </label>
+
+      {!enabled ? (
+        <p className="text-sm text-zinc-500">
+          Kalender ist deaktiviert. Deine CalDAV-Verbindung (falls vorhanden) bleibt bestehen, die
+          Termin-Ansicht ist nur ausgeblendet.
+        </p>
+      ) : (
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
           <section className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
             <div className="flex flex-wrap items-end gap-3 border-b border-zinc-200 p-3 dark:border-zinc-800">
@@ -173,10 +183,7 @@ export default function CalendarPage() {
               <ErrorMessage message={eventsError} />
               {notConnected ? (
                 <p className="text-sm text-zinc-500">
-                  Kein Kalender verbunden.{" "}
-                  <Link href="/settings" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                    Jetzt unter Settings verbinden.
-                  </Link>
+                  Kein Kalender verbunden. Verbinde ihn oben im Tab &quot;Integrations&quot;.
                 </p>
               ) : eventsLoading ? (
                 <p className="text-sm text-zinc-500">Loading...</p>
@@ -254,7 +261,7 @@ export default function CalendarPage() {
             </div>
           </section>
         </div>
-      </div>
-    </AppShell>
+      )}
+    </div>
   );
 }

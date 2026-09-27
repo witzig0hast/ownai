@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TimerBadge } from "@/components/TimerBadge";
+import * as devicesApi from "@/lib/api/devices";
 import { useAuth } from "@/lib/auth-context";
 
 const LINKS = [
   { href: "/voice", label: "Voice" },
   { href: "/chat", label: "Chat" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/suggestions", label: "Suggestions" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -40,8 +39,24 @@ export function NavBar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Suggestions is fed exclusively by the Android app's notification-forwarding pipeline - on a
+  // web-only account it would only ever show "keine Vorschläge", so it's hidden entirely unless
+  // an Android device is actually registered.
+  const [hasAndroidDevice, setHasAndroidDevice] = useState(false);
 
-  const links = user?.is_admin ? [...LINKS, { href: "/admin", label: "Admin" }] : LINKS;
+  useEffect(() => {
+    devicesApi
+      .listDevices()
+      .then((devices) => setHasAndroidDevice(devices.some((d) => d.platform === "android")))
+      .catch(() => {});
+  }, []);
+
+  const links = [
+    ...LINKS.slice(0, 2),
+    ...(hasAndroidDevice ? [{ href: "/suggestions", label: "Suggestions" }] : []),
+    ...LINKS.slice(2),
+    ...(user?.is_admin ? [{ href: "/admin", label: "Admin" }] : []),
+  ];
 
   return (
     <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/80">
