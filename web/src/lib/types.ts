@@ -55,6 +55,12 @@ export interface CalendarEvent {
   source: EventSource;
 }
 
+export interface Timer {
+  id: string;
+  label: string | null;
+  ends_at: string;
+}
+
 export type SuggestionKind = "calendar_event" | "reply_draft";
 export type SuggestionStatus = "open" | "applied" | "dismissed";
 

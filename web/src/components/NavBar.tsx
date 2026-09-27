@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { TimerBadge } from "@/components/TimerBadge";
 import { useAuth } from "@/lib/auth-context";
 
 const LINKS = [
@@ -55,6 +56,7 @@ export function NavBar() {
         </nav>
       </div>
       <div className="flex items-center gap-3">
+        <TimerBadge />
         {user ? (
           <span className="hidden text-sm text-zinc-500 sm:inline">{user.display_name}</span>
         ) : null}
