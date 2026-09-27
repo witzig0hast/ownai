@@ -9,11 +9,16 @@
          (see ChatThreadScreen) when the mic button is first tapped, not on app start. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Required on API 33+ for the app to post its own notifications.
-         OwnAI does not currently post any local notifications itself, but this
-         is requested up front (see NotificationAccessScreen) so it is available
-         if a future version adds e.g. "suggestion ready" heads-up notifications. -->
+    <!-- Required on API 33+ for the app to post its own notifications - used for the
+         "Timer abgelaufen" alert (see alarm/TimerAlarmReceiver.kt), requested up front on
+         NotificationAccessScreen. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Lets a set timer (see alarm/TimerAlarmScheduler.kt) fire at the exact moment it's due
+         rather than being deferred by Doze battery optimization. Falls back to an inexact alarm
+         if the OS doesn't grant this (canScheduleExactAlarms() check at schedule time) - a timer
+         still fires either way, just possibly a bit late without it. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- NOTE: android.permission.READ_SMS / RECEIVE_SMS are intentionally NOT
          requested here. See README.md ("SMS nuance") for why raw SMS capture
@@ -60,6 +65,12 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Fires the "Timer abgelaufen" notification when a scheduled timer expires (see
+             alarm/TimerAlarmScheduler.kt) - not exported, only this app schedules it. -->
+        <receiver
+            android:name=".alarm.TimerAlarmReceiver"
+            android:exported="false" />
 
     </application>
 

@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import de.ownai.app.alarm.syncTimerAlarmsFromMessages
 import de.ownai.app.data.model.Message
 import de.ownai.app.ui.ViewModelFactory
 import de.ownai.app.ui.common.LoadingIndicator
@@ -120,6 +121,9 @@ fun ChatThreadScreen(
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
+    // Schedules/cancels local alarms for any set_timer/cancel_timer tool calls in this
+    // conversation - see syncTimerAlarmsFromMessages, idempotent so safe on every change.
+    LaunchedEffect(messages) { syncTimerAlarmsFromMessages(context, messages) }
 
     // Reads the newest assistant reply aloud, but only for replies that arrive *after* the
     // screen is already open (the isSending true->false edge from a just-completed send) -

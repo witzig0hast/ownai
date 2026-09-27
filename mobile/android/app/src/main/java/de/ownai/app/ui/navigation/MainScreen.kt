@@ -12,9 +12,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,12 +26,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import de.ownai.app.alarm.TimerAlarmScheduler
 import de.ownai.app.ui.ViewModelFactory
 import de.ownai.app.ui.calendar.CalendarScreen
 import de.ownai.app.ui.chat.ChatThreadScreen
 import de.ownai.app.ui.chat.ConversationListScreen
 import de.ownai.app.ui.notifications.NotificationAccessScreen
 import de.ownai.app.ui.suggestions.SuggestionsScreen
+import de.ownai.app.ui.timer.TimerViewModel
 
 private data class BottomNavItem(val route: String, val label: String, val icon: ImageVector)
 
@@ -42,6 +48,19 @@ private val bottomNavItems = listOf(
 @Composable
 fun MainScreen(viewModelFactory: ViewModelFactory, onLogout: () -> Unit) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+
+    // Catches up on timers set from another device (e.g. the web app) so they also get a local
+    // alarm here - timers set through this device's own chat are handled directly in
+    // ChatThreadScreen from the tool-call result, no extra round trip needed there.
+    val timerViewModel: TimerViewModel = viewModel(factory = viewModelFactory)
+    val activeTimers by timerViewModel.timers.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { timerViewModel.syncActiveTimers() }
+    LaunchedEffect(activeTimers) {
+        activeTimers.forEach { timer ->
+            TimerAlarmScheduler.scheduleFromIso(context, timer.id, timer.label, timer.ends_at)
+        }
+    }
 
     Scaffold(
         bottomBar = {

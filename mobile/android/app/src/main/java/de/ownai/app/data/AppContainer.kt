@@ -11,6 +11,7 @@ import de.ownai.app.data.repository.CalendarRepository
 import de.ownai.app.data.repository.ChatRepository
 import de.ownai.app.data.repository.DeviceRepository
 import de.ownai.app.data.repository.NotificationRepository
+import de.ownai.app.data.repository.TimerRepository
 import de.ownai.app.data.repository.VoiceRepository
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -84,4 +85,5 @@ class AppContainer(context: Context) {
     val calendarRepository = CalendarRepository(api, json)
     val notificationRepository = NotificationRepository(api, securePrefs, json)
     val voiceRepository = VoiceRepository(api, json)
+    val timerRepository = TimerRepository(api, json)
 }

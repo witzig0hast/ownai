@@ -22,6 +22,8 @@ import de.ownai.app.data.model.SendMessageRequest
 import de.ownai.app.data.model.SendMessageResponse
 import de.ownai.app.data.model.Suggestion
 import de.ownai.app.data.model.SuggestionsResponse
+import de.ownai.app.data.model.TimerDto
+import de.ownai.app.data.model.TimersResponse
 import de.ownai.app.data.model.TokenResponse
 import de.ownai.app.data.model.UserResponse
 import de.ownai.app.data.model.VoiceTranscribeResponse
@@ -123,4 +125,14 @@ interface OwnAiApi {
     @Multipart
     @POST("voice/transcribe")
     suspend fun transcribeVoice(@Part audio: MultipartBody.Part): VoiceTranscribeResponse
+
+    // --- Timers ---
+
+    /** Timers are created/cancelled by the LLM (set_timer/cancel_timer tool calls, see API.md) -
+     * these two endpoints exist only so clients can display/dismiss active ones. */
+    @GET("timers")
+    suspend fun getTimers(): TimersResponse
+
+    @POST("timers/{id}/cancel")
+    suspend fun cancelTimer(@Path("id") timerId: String): TimerDto
 }

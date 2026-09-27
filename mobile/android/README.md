@@ -7,8 +7,13 @@ them to the backend (iOS does not allow any app to read other apps' notification
 
 ## ⚠️ This code has not been compiled
 
-The container this was written in has **no Android SDK** (see the repo root
-`DECISIONS.md`). Every file was written and re-read carefully, but nothing here has
+The container this was written in has **no Android SDK**, and outbound access to
+`dl.google.com` (needed to fetch the Android Gradle Plugin/SDK) is blocked by this
+environment's network policy (confirmed by actually trying `./gradlew compileDebugKotlin`
+this session - it got as far as downloading the real Gradle 8.9 distribution, then failed
+to resolve the AGP plugin). Every file was written and re-read carefully, including a
+manual brace-balance pass and (for the Timer feature specifically) catching a real
+`Instant.parse` vs `OffsetDateTime.parse` format mismatch by hand — but nothing here has
 actually gone through `javac`/`kotlinc`/AAPT. **Open this folder in Android Studio and
 build it once (`Build > Make Project` or `./gradlew assembleDebug`) before relying on
 it.** See "Things I'm not 100% sure about" at the end of this file for the specific
@@ -57,6 +62,17 @@ spots most worth a second look if the build fails.
   (see root `DECISIONS.md`), text-to-speech never leaves the device.
 - Bottom navigation across the four screens (Chat / Calendar / Suggestions /
   Notification access), with a logout action in each screen's top bar.
+- **Timer notifications** (`alarm/`): timers are set/cancelled by the LLM through chat/voice
+  (`set_timer`/`cancel_timer` tool calls, see `API.md`) - this app's job is just to notice and
+  alert. `alarm/TimerToolCallSync.kt` scans this device's own chat messages for those tool-call
+  results and schedules a local `AlarmManager` alarm (`alarm/TimerAlarmScheduler.kt`) for when
+  the timer ends; `ui/timer/TimerViewModel.kt` additionally polls `GET /timers` once when the
+  main app shell opens, so a timer set from *another* device (e.g. the web app) also gets an
+  alarm scheduled here. `alarm/TimerAlarmReceiver.kt` fires a "Timer abgelaufen" notification
+  when the alarm goes off - works even if the app isn't running, unlike the web app's corner
+  badge, which needs its tab open. Uses `setExactAndAllowWhileIdle` when the OS grants exact-alarm
+  scheduling, falling back to an inexact (Doze-deferrable) alarm otherwise - a timer still fires
+  either way, just possibly a little late without the exact permission.
 
 ## The notification listener
 
@@ -221,6 +237,15 @@ No DI framework (Hilt/Dagger) - the app is small enough that a hand-rolled conta
   non-sensitive UI preference.
 - No visual waveform/level meter while recording, just a red mic icon - fine for short
   voice messages, would matter more for longer dictation.
+- No in-app screen to list/cancel active timers (unlike the web app's corner badge) - you
+  can still ask the assistant to cancel one via chat/voice (it has a `cancel_timer` tool),
+  or just dismiss the notification when it fires. Worth adding a small timer list to the
+  bottom nav if this turns out to matter in practice.
+- `SCHEDULE_EXACT_ALARM` is a permission Android may or may not auto-grant depending on OS
+  version/OEM; there's no in-app UI prompting the user to enable it if it's missing (the
+  code just falls back to an inexact alarm, silently). Worth adding a settings-deep-link
+  prompt (`Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM`), same idea as the existing
+  notification-access prompt on `NotificationAccessScreen`, if timers are consistently late.
 
 ## Networking: cleartext HTTP is allowed
 
@@ -260,6 +285,13 @@ Flagged honestly, per the brief, since nothing here has been compiled:
   exercising the "access token expires mid-session" path by hand once (e.g. temporarily
   shortening the backend's access-token TTL) to confirm the refresh-and-retry flow
   behaves as expected under this app's real event loop.
+- **Timer date parsing** (`alarm/TimerAlarmScheduler.kt`): the backend sends `ends_at` as
+  Python's `datetime.isoformat()`, which produces a `+00:00` offset, not a `Z` suffix
+  (verified directly against the backend this session, not assumed) - so parsing uses
+  `OffsetDateTime.parse(...).toInstant()`, not `Instant.parse(...)` (which requires a
+  literal `Z` and would otherwise throw on every single timer, silently no-op the whole
+  feature via the surrounding `runCatching`, and never surface an error). Worth setting one
+  real timer end-to-end once the app builds, to confirm the notification actually fires.
 - Icons: everything is drawn from `androidx.compose.material:material-icons-extended`
   (e.g. `Icons.Filled.Chat`, `Icons.Filled.CalendarMonth`, `Icons.Filled.Lightbulb`,
   `Icons.AutoMirrored.Filled.ArrowBack`/`Send`, and for voice: `Icons.Filled.Mic`,

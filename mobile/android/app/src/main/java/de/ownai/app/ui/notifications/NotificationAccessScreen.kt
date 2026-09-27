@@ -62,7 +62,7 @@ fun NotificationAccessScreen(onLogout: () -> Unit) {
 
     val postNotificationsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* no-op: OwnAI does not post local notifications today, see manifest comment */ }
+    ) { /* no-op: TimerAlarmReceiver checks the permission itself at notify() time */ }
 
     Scaffold(
         topBar = {
@@ -118,8 +118,9 @@ fun NotificationAccessScreen(onLogout: () -> Unit) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Android 13+ also requires permission for OwnAI to show its own notifications " +
-                        "(not used yet, reserved for future features).",
+                    text = "Android 13+ also requires permission for OwnAI to show its own notifications - " +
+                        "used for the \"Timer abgelaufen\" alert when a timer you set (via chat or voice) " +
+                        "runs out.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Button(onClick = { postNotificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {

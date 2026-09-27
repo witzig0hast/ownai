@@ -7,6 +7,7 @@ import de.ownai.app.ui.auth.AuthViewModel
 import de.ownai.app.ui.calendar.CalendarViewModel
 import de.ownai.app.ui.chat.ChatViewModel
 import de.ownai.app.ui.suggestions.SuggestionsViewModel
+import de.ownai.app.ui.timer.TimerViewModel
 
 /**
  * Small hand-rolled ViewModelProvider.Factory matching [AppContainer]'s
@@ -28,6 +29,9 @@ class ViewModelFactory(private val container: AppContainer) : ViewModelProvider.
 
             modelClass.isAssignableFrom(SuggestionsViewModel::class.java) ->
                 SuggestionsViewModel(container.notificationRepository) as T
+
+            modelClass.isAssignableFrom(TimerViewModel::class.java) ->
+                TimerViewModel(container.timerRepository) as T
 
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

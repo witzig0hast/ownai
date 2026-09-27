@@ -157,6 +157,14 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 - **Beides (Web) braucht HTTPS oder `localhost`** — Browser blockieren Mikrofonzugriff auf normalem `http://<ip>:<port>`. Du brauchst also entweder Schritt 6's Caddy-Option (echte Domain + HTTPS) oder Zugriff direkt über `http://localhost:<WEB_PORT>` (z. B. per SSH-Portweiterleitung vom PC aus). Ohne HTTPS ist das kein Bug, sondern eine Browser-Sicherheitsregel — der Rest der Web-App funktioniert trotzdem ganz normal, nur die Mikro-Funktionen bleiben ausgeblendet/inaktiv.
 - Die Erkennung, wann du aufhörst zu reden (Live Talk), ist noch nicht an ein echtes Mikrofon/deinen Raum angepasst — falls Turns zu früh oder zu spät abgeschnitten werden, sag Bescheid, das lässt sich in `web/src/lib/useLiveTalk.ts` fein einstellen.
 
+## Timer testen
+
+Im Chat oder per Voice einfach fragen, z. B. „Stell mir einen Timer auf 2 Minuten" oder „Weck mich in 30 Sekunden". Was dann passiert:
+
+- **Web**: oben rechts in der Navigationsleiste erscheint ein kleines Countdown-Badge (auf jeder Seite, nicht nur im Chat). Bei Ablauf: ein kurzer Piepton plus Browser-Benachrichtigung, falls du das erlaubt hast — der Tab muss dafür offen sein.
+- **Android**: der Timer läuft auch im Hintergrund weiter und löst eine echte Systembenachrichtigung aus, wenn er abläuft — dafür muss einmal „Allow OwnAI notifications" auf dem „Notifications"-Tab erlaubt werden (siehe oben, Android-Setup).
+- Ein Timer, den du z. B. übers iPad gestellt hast, taucht nach kurzer Zeit auch auf deinem Handy auf (regelmäßiger Abgleich im Hintergrund) — du musst ihn nicht auf jedem Gerät einzeln stellen.
+
 ---
 
 ## Kurz-Checkliste zum Abhaken
@@ -173,5 +181,6 @@ Details: [`mobile/android/README.md`](./mobile/android/README.md).
 - [ ] Web-App auf iPad und PC als App installiert
 - [ ] Android-App gebaut, per `adb install` aufs S25 Ultra, Notification-Zugriff gewährt, ein Vorschlag erfolgreich erzeugt
 - [ ] Sprachsteuerung getestet: Android-Mikrofon-Button + Vorlesen; Web nur falls HTTPS/localhost verfügbar
+- [ ] Timer getestet: per Chat/Voice gestellt, Countdown-Badge im Web gesehen, Android-Benachrichtigung bei Ablauf bekommen
 
 Wenn du an einem Punkt hängen bleibst: einfach den Fehler/die Ausgabe hier reinkopieren, dann schauen wir's uns zusammen an.

@@ -87,19 +87,30 @@ the `{"error":{"code","message"}}` envelope).
   (`GET /notifications/suggestions?status=open`), with Apply/Dismiss buttons
   (`POST .../{id}/apply` / `.../dismiss`) that remove the item from the list
   on success.
-- **Integrations** (`/integrations`): one page for every connectable service —
-  Calendar (CalDAV, `POST /integrations/caldav`) and Home Assistant
-  (`POST /integrations/home-assistant`), each as its own card with a
-  connect form and a status badge (Verbunden / Nicht verbunden / Fehler,
-  inferred by probing the corresponding list endpoint and checking for the
-  `..._not_connected` error code, since neither integration has a dedicated
-  status endpoint — see `API.md`). Home Assistant devices themselves aren't
-  managed here beyond connecting: controlling them (lights, switches, ...)
-  happens conversationally through Chat/Voice via the backend's LLM tools.
-  Also embeds `SetupHelperChat` (`src/components/SetupHelperChat.tsx`), a
-  small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
-  that answers setup questions ("wo finde ich meine CalDAV-URL?") using the
-  same OwnAI assistant as regular chat, just kept out of the normal history.
+- **Integrations** (`/integrations`): a small grid of tiles (icon, name, status dot),
+  one per connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
+  Assistant (`POST /integrations/home-assistant`) — matching the "Add Integration" card
+  style of tools like Home Assistant itself, rather than always-expanded forms. Tapping a
+  tile opens its connect form in a popup (`src/components/Modal.tsx`). Status (Verbunden /
+  Nicht verbunden / Fehler) is inferred by probing the corresponding list endpoint and
+  checking for the `..._not_connected` error code, since neither integration has a
+  dedicated status endpoint — see `API.md`. Home Assistant devices themselves aren't
+  managed here beyond connecting: controlling them (lights, switches, ...) happens
+  conversationally through Chat/Voice via the backend's LLM tools. Also has a floating
+  chat button that opens `SetupHelperChat` (`src/components/SetupHelperChat.tsx`) in a
+  popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
+  that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI
+  assistant as regular chat, just kept out of the normal history.
+- **Timers** (`src/components/TimerBadge.tsx`, shown in the nav bar on every page — "oben
+  rechts in der Ecke"): timers themselves are set/cancelled by the LLM through chat/voice
+  (`set_timer`/`cancel_timer` tool calls, see `API.md`) — this badge's job is just to show
+  them. Polls `GET /timers` every 20s (picks up a timer set from any device/conversation)
+  and ticks the nearest one down locally every second; on expiry, a short synthesized beep,
+  a browser `Notification` if permitted, and a visible alert state with a dismiss button
+  (`POST /timers/{id}/cancel`). Hidden entirely when there are no active timers. Client-only
+  by design — only fires while the tab is open; see `mobile/android/README.md`'s
+  `alarm/` section for how Android covers the "app isn't open" case via a local
+  `AlarmManager` alarm instead.
 - Shared nav (Voice / Chat / Calendar / Suggestions / Integrations) + logout,
   route protection via a client-side `ProtectedRoute` guard that redirects
   unauthenticated users to `/login`.
