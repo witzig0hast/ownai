@@ -144,6 +144,23 @@ Fehler: `409 home_assistant_not_connected` (kein HA verbunden), `502 home_assist
 
 Steuern von Geräten (z. B. Licht an/aus) läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür die Tools `home_assistant_list_entities`/`home_assistant_call_service` auf (siehe `app/agent/tools.py`). Aus Sicherheitsgründen sind nur unkritische Domains erlaubt (`light`, `switch`, `climate`, `cover`, `fan`, `lock`, `media_player`, `scene`, `script`, `vacuum`, `humidifier`, `water_heater`, `input_boolean`) — administrative HA-Domains (`homeassistant.*`, `shell_command`, `python_script`) sind für das LLM gesperrt.
 
+## Web-Suche (SearXNG)
+
+Jeder Nutzer verbindet seine **eigene**, selbst gehostete [SearXNG](https://docs.searxng.org/)-Instanz — gleiches 1:1-Muster wie bei CalDAV/Home Assistant. Anders als dort braucht es keinen API-Key/Token, nur die URL — SearXNGs JSON-Such-API ist im eigenen Netzwerk typischerweise unauthentifiziert. In der SearXNG-Konfiguration muss `json` als erlaubtes `format` aktiviert sein (`search: formats: [html, json]` in `settings.yml`), sonst schlägt die Suche fehl.
+
+### `POST /integrations/searxng`  *(Bearer)*
+Request: `{ "url": string }` (z. B. `http://searxng.local:8080`).
+Response `200`: `{ "connected": true }`
+
+### `GET /integrations/searxng`  *(Bearer)*
+Response `200`: `{ "connected": bool, "url": string | null }` — reiner Status-Check ohne Seiteneffekt (löst keine echte Suche aus).
+
+### `GET /search?q={string}`  *(Bearer)*
+Response `200`: `{ "results": [ { "title": string, "url": string, "content": string | null } ] }` — die obersten 8 Treffer.
+Fehler: `409 searxng_not_connected` (keine Instanz verbunden), `502 searxng_error` (Instanz nicht erreichbar oder kein gültiges JSON — meist weil `format=json` in der SearXNG-Konfiguration nicht aktiviert ist).
+
+Auch als Tool `web_search` (siehe `app/agent/tools.py`) im Chat/Voice-Agenten nutzbar. **Nicht live gegen eine echte SearXNG-Instanz getestet** — kein Netzwerkzugriff in der Build-Sandbox dieser Session; die Verbinden-UI (Settings → Integrations → Web-Suche) wurde live bis zum Status "Verbunden" durchgeklickt, die eigentliche Such-Anfrage gegen eine echte Instanz aber nicht. Backend-seitig vollständig mit `httpx.MockTransport` getestet (`tests/test_searxng.py`). Vor Produktiveinsatz einmal mit einer echten SearXNG-Instanz durchklicken.
+
 ## E-Mail
 
 Es gibt eine **system-weite Standard-E-Mail** (`SYSTEM_SMTP_*`-Umgebungsvariablen), die der Assistent nutzt, falls ein Nutzer kein eigenes Konto verbunden hat. Verbindet ein Nutzer sein eigenes SMTP-Konto, hat das immer Vorrang — gleiches 1:1-Muster wie bei CalDAV/Home Assistant.

@@ -22,6 +22,7 @@ from app.services import (
     list_service,
     memory_service,
     reminder_service,
+    searxng_service,
     timer_service,
     weather_service,
 )
@@ -421,6 +422,10 @@ async def _get_weather(
     _db: AsyncSession, _user: User, _conversation: Conversation, arguments: dict[str, Any]
 ) -> Any:
     return await weather_service.weather_for_location(arguments["location"])
+
+
+async def _web_search(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    return await searxng_service.search(db, user, arguments["query"])
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -1087,6 +1092,23 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": (
+                "Durchsucht das Web über die selbst gehostete SearXNG-Instanz des Nutzers. Setzt voraus, "
+                "dass der Nutzer eine SearXNG-Instanz in Settings → Integrations verbunden hat."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Suchbegriff"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -1127,4 +1149,5 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "list_expenses": _list_expenses,
     "delete_expense": _delete_expense,
     "get_weather": _get_weather,
+    "web_search": _web_search,
 }

@@ -140,15 +140,18 @@ the `{"error":{"code","message"}}` envelope).
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
-    connectable service — Calendar (CalDAV, `POST /integrations/caldav`) and Home
-    Assistant (`POST /integrations/home-assistant`) — matching the "Add Integration" card
-    style of tools like Home Assistant itself, rather than always-expanded forms. Tapping a
-    tile opens its connect form in a popup (`src/components/Modal.tsx`). Status (Verbunden /
-    Nicht verbunden / Fehler) is inferred by probing the corresponding list endpoint and
-    checking for the `..._not_connected` error code, since neither integration has a
-    dedicated status endpoint — see `API.md`. Home Assistant devices themselves aren't
-    managed here beyond connecting: controlling them (lights, switches, ...) happens
-    conversationally through Chat/Voice via the backend's LLM tools. Also has a floating
+    connectable service — Calendar (CalDAV, `POST /integrations/caldav`), Home
+    Assistant (`POST /integrations/home-assistant`), and Web-Suche (SearXNG,
+    `POST /integrations/searxng`) — matching the "Add Integration" card style of tools like
+    Home Assistant itself, rather than always-expanded forms. Tapping a tile opens its connect
+    form in a popup (`src/components/Modal.tsx`). Status (Verbunden / Nicht verbunden / Fehler)
+    is inferred by probing the corresponding list endpoint and checking for the
+    `..._not_connected` error code for Calendar/Home Assistant (neither has a dedicated status
+    endpoint — see `API.md`); SearXNG instead calls its own `GET /integrations/searxng` status
+    endpoint directly (no side-effecting search triggered just to check connectivity). Home
+    Assistant devices themselves aren't managed here beyond connecting: controlling them
+    (lights, switches, ...) happens conversationally through Chat/Voice via the backend's LLM
+    tools; same for actually searching the web once SearXNG is connected. Also has a floating
     chat button that opens `SetupHelperChat` (`src/components/SetupHelperChat.tsx`) in a
     popup — a small chat scoped to its own dedicated conversation ("Integrations-Hilfe")
     that answers setup questions ("wo finde ich meine CalDAV-URL?") using the same OwnAI

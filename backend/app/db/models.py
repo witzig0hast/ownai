@@ -37,6 +37,9 @@ class User(Base):
     home_assistant_account: Mapped["HomeAssistantAccount | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
+    searxng_account: Mapped["SearxngAccount | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
     timers: Mapped[list["Timer"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     email_account: Mapped["EmailAccount | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
@@ -149,6 +152,23 @@ class HomeAssistantAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="home_assistant_account")
+
+
+class SearxngAccount(Base):
+    """One self-hosted SearXNG instance per user, for the web_search tool. No credentials field -
+    unlike CalDAV/HA, a SearXNG instance's JSON search API is typically unauthenticated on the
+    user's own network, so only the URL is stored."""
+
+    __tablename__ = "searxng_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="searxng_account")
 
 
 class Timer(Base):

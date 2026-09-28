@@ -7,9 +7,10 @@ import { SetupHelperChat } from "@/components/SetupHelperChat";
 import { ApiError } from "@/lib/api-client";
 import * as calendarApi from "@/lib/api/calendar";
 import * as homeAssistantApi from "@/lib/api/homeAssistant";
+import * as searxngApi from "@/lib/api/searxng";
 
 type ConnectionStatus = "checking" | "connected" | "not_connected" | "error";
-type IntegrationKey = "caldav" | "home-assistant";
+type IntegrationKey = "caldav" | "home-assistant" | "searxng";
 
 function StatusDot({ status }: { status: ConnectionStatus }) {
   const color =
@@ -49,6 +50,15 @@ function HomeIcon() {
         strokeLinejoin="round"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
+      <circle cx={11} cy={11} r={7} stroke="currentColor" strokeWidth={2} />
+      <path d="M20 20l-4.5-4.5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
     </svg>
   );
 }
@@ -205,6 +215,51 @@ function HomeAssistantForm({ onConnected }: { onConnected: () => void }) {
   );
 }
 
+function SearxngForm({ onConnected }: { onConnected: () => void }) {
+  const [url, setUrl] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  async function handleConnect(e: FormEvent) {
+    e.preventDefault();
+    setConnectError(null);
+    setConnecting(true);
+    try {
+      await searxngApi.connectSearxng(url);
+      onConnected();
+    } catch (err) {
+      setConnectError(err instanceof ApiError ? err.message : "Verbindung fehlgeschlagen.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleConnect} className="flex flex-col gap-3">
+      <p className="text-xs text-zinc-500">
+        Verbinde deine eigene SearXNG-Instanz, damit OwnAI im Web suchen kann — über Chat oder Voice.
+        Braucht keinen API-Key, nur die URL (JSON-Format muss in der SearXNG-Konfiguration aktiviert sein).
+      </p>
+      <input
+        type="url"
+        required
+        placeholder="URL (z.B. http://searxng.local:8080)"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+      />
+      <ErrorMessage message={connectError} />
+      <button
+        type="submit"
+        disabled={connecting}
+        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+      >
+        {connecting ? "Verbinde..." : "Verbinden"}
+      </button>
+    </form>
+  );
+}
+
 function ChatFab({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button
@@ -234,6 +289,7 @@ function ChatFab({ open, onToggle }: { open: boolean; onToggle: () => void }) {
 export function IntegrationsTab() {
   const [caldavStatus, setCaldavStatus] = useState<ConnectionStatus>("checking");
   const [haStatus, setHaStatus] = useState<ConnectionStatus>("checking");
+  const [searxngStatus, setSearxngStatus] = useState<ConnectionStatus>("checking");
   const [openModal, setOpenModal] = useState<IntegrationKey | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -260,12 +316,21 @@ export function IntegrationsTab() {
       });
   }, []);
 
+  const checkSearxng = useCallback(() => {
+    setSearxngStatus("checking");
+    searxngApi
+      .getSearxngStatus()
+      .then((status) => setSearxngStatus(status.connected ? "connected" : "not_connected"))
+      .catch(() => setSearxngStatus("error"));
+  }, []);
+
   useEffect(() => {
     void (async () => {
       checkCaldav();
       checkHomeAssistant();
+      checkSearxng();
     })();
-  }, [checkCaldav, checkHomeAssistant]);
+  }, [checkCaldav, checkHomeAssistant, checkSearxng]);
 
   return (
     <div>
@@ -288,6 +353,13 @@ export function IntegrationsTab() {
           status={haStatus}
           onClick={() => setOpenModal("home-assistant")}
         />
+        <IntegrationTile
+          icon={<SearchIcon />}
+          name="Web-Suche"
+          description="SearXNG"
+          status={searxngStatus}
+          onClick={() => setOpenModal("searxng")}
+        />
       </div>
 
       {openModal === "caldav" ? (
@@ -306,6 +378,17 @@ export function IntegrationsTab() {
           <HomeAssistantForm
             onConnected={() => {
               checkHomeAssistant();
+              setOpenModal(null);
+            }}
+          />
+        </Modal>
+      ) : null}
+
+      {openModal === "searxng" ? (
+        <Modal title="Web-Suche (SearXNG)" onClose={() => setOpenModal(null)}>
+          <SearxngForm
+            onConnected={() => {
+              checkSearxng();
               setOpenModal(null);
             }}
           />

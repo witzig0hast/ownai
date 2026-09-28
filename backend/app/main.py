@@ -24,6 +24,7 @@ from app.api import (
     notifications,
     push,
     reminders,
+    searxng,
     timer,
     vision,
     voice,
@@ -98,6 +99,7 @@ api_v1_routers = (
     lists.router,
     expenses.router,
     weather.router,
+    searxng.router,
     health.router,
 )
 for router in api_v1_routers:
