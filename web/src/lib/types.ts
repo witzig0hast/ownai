@@ -118,6 +118,21 @@ export interface Contact {
   created_at: string;
 }
 
+export type ReminderRecurrence = "daily" | "weekly" | "monthly";
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export interface Reminder {
+  id: string;
+  label: string;
+  recurrence: ReminderRecurrence;
+  hour: number;
+  minute: number;
+  weekday: Weekday | null;
+  day_of_month: number | null;
+  active: boolean;
+  created_at: string;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

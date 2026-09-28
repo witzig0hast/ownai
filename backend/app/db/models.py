@@ -45,6 +45,9 @@ class User(Base):
     )
     memories: Mapped[list["UserMemory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     contacts: Mapped[list["Contact"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    recurring_reminders: Mapped[list["RecurringReminder"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class RefreshToken(Base):
@@ -351,3 +354,29 @@ class Contact(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="contacts")
+
+
+class RecurringReminder(Base):
+    """A reminder that fires repeatedly at a time of day (unlike Timer, which is a one-off countdown).
+    `recurrence` picks which of weekday/day_of_month applies: "daily" uses neither, "weekly" needs
+    weekday (3-letter, e.g. "mon"), "monthly" needs day_of_month (1-31). Matched against "now" every
+    poll by the scheduler's _check_recurring_reminders job (app/services/scheduler.py) - the same
+    poll-and-mark-done approach as Timer/Contact's birthday check, not a persisted APScheduler job, so
+    it survives restarts without any re-registration step."""
+
+    __tablename__ = "recurring_reminders"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    recurrence: Mapped[str] = mapped_column(String(16), nullable=False)  # daily | weekly | monthly
+    hour: Mapped[int] = mapped_column(nullable=False)
+    minute: Mapped[int] = mapped_column(nullable=False)
+    weekday: Mapped[str | None] = mapped_column(String(3), nullable=True)  # mon..sun, only for weekly
+    day_of_month: Mapped[int | None] = mapped_column(nullable=True)  # 1-31, only for monthly
+    active: Mapped[bool] = mapped_column(default=True)
+    # Set to today's ISO date once fired today, so a minute-resolution poll never fires it twice.
+    last_triggered_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="recurring_reminders")

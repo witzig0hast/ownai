@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Conversation, User
 from app.schemas.contact import ContactCreateRequest, ContactUpdateRequest
+from app.schemas.reminder import ReminderCreateRequest, ReminderUpdateRequest
 from app.services import (
     agent_bus_service,
     calendar_service,
@@ -14,6 +15,7 @@ from app.services import (
     file_service,
     home_assistant_service,
     memory_service,
+    reminder_service,
     timer_service,
 )
 from app.utils import ensure_utc
@@ -214,6 +216,62 @@ async def _delete_contact(
     db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
 ) -> Any:
     await contact_service.delete_contact(db, user, arguments["contact_id"])
+    return {"deleted": True}
+
+
+def _reminder_dict(reminder: Any) -> dict[str, Any]:
+    return {
+        "id": reminder.id,
+        "label": reminder.label,
+        "recurrence": reminder.recurrence,
+        "hour": reminder.hour,
+        "minute": reminder.minute,
+        "weekday": reminder.weekday,
+        "day_of_month": reminder.day_of_month,
+        "active": reminder.active,
+    }
+
+
+async def _add_reminder(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    payload = ReminderCreateRequest(
+        label=arguments["label"],
+        recurrence=arguments["recurrence"],
+        hour=arguments["hour"],
+        minute=arguments["minute"],
+        weekday=arguments.get("weekday"),
+        day_of_month=arguments.get("day_of_month"),
+    )
+    reminder = await reminder_service.add_reminder(db, user, payload)
+    return _reminder_dict(reminder)
+
+
+async def _list_reminders(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    reminders = await reminder_service.list_reminders(db, user)
+    return [_reminder_dict(r) for r in reminders]
+
+
+async def _update_reminder(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = ReminderUpdateRequest(
+        label=arguments.get("label"),
+        recurrence=arguments.get("recurrence"),
+        hour=arguments.get("hour"),
+        minute=arguments.get("minute"),
+        weekday=arguments.get("weekday"),
+        day_of_month=arguments.get("day_of_month"),
+        active=arguments.get("active"),
+    )
+    reminder = await reminder_service.update_reminder(db, user, arguments["reminder_id"], payload)
+    return _reminder_dict(reminder)
+
+
+async def _delete_reminder(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    await reminder_service.delete_reminder(db, user, arguments["reminder_id"])
     return {"deleted": True}
 
 
@@ -576,6 +634,82 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_reminder",
+            "description": (
+                "Legt eine wiederkehrende Erinnerung an, die den Nutzer zu einer festen Uhrzeit "
+                "per Push benachrichtigt — täglich, wöchentlich an einem Wochentag, oder monatlich an "
+                "einem Tag des Monats. Für einmalige Countdowns stattdessen set_timer nutzen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string", "description": "Was die Erinnerung sagen soll"},
+                    "recurrence": {"type": "string", "enum": ["daily", "weekly", "monthly"]},
+                    "hour": {"type": "integer", "description": "Stunde (0-23)"},
+                    "minute": {"type": "integer", "description": "Minute (0-59)"},
+                    "weekday": {
+                        "type": "string",
+                        "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                        "description": "Nur bei recurrence='weekly' erforderlich",
+                    },
+                    "day_of_month": {
+                        "type": "integer",
+                        "description": "Tag des Monats (1-31), nur bei recurrence='monthly' erforderlich",
+                    },
+                },
+                "required": ["label", "recurrence", "hour", "minute"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_reminders",
+            "description": "Listet alle wiederkehrenden Erinnerungen des Nutzers auf (mit ihrer ID).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_reminder",
+            "description": (
+                "Ändert Felder einer bestehenden Erinnerung, z.B. um sie zu pausieren (active=false) "
+                "oder die Uhrzeit zu ändern. reminder_id vorher über list_reminders herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reminder_id": {"type": "string", "description": "ID der Erinnerung (aus list_reminders)"},
+                    "label": {"type": "string"},
+                    "recurrence": {"type": "string", "enum": ["daily", "weekly", "monthly"]},
+                    "hour": {"type": "integer"},
+                    "minute": {"type": "integer"},
+                    "weekday": {"type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]},
+                    "day_of_month": {"type": "integer"},
+                    "active": {"type": "boolean"},
+                },
+                "required": ["reminder_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_reminder",
+            "description": "Löscht eine Erinnerung endgültig. reminder_id vorher über list_reminders herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reminder_id": {"type": "string", "description": "ID der Erinnerung (aus list_reminders)"},
+                },
+                "required": ["reminder_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -598,4 +732,8 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "list_contacts": _list_contacts,
     "update_contact": _update_contact,
     "delete_contact": _delete_contact,
+    "add_reminder": _add_reminder,
+    "list_reminders": _list_reminders,
+    "update_reminder": _update_reminder,
+    "delete_reminder": _delete_reminder,
 }

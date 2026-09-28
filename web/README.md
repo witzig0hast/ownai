@@ -134,8 +134,8 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently seven tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  einstellen können" in one place). Currently eight tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Erinnerungen, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -178,6 +178,16 @@ the `{"error":{"code","message"}}` envelope).
     `add_contact`/`list_contacts`/`update_contact`/`delete_contact` tools. Verified live: added a
     contact with a full birthday through the form, confirmed it listed as "17. Mai 1990", deleted
     it, confirmed the empty state.
+  - **Erinnerungen** tab (`src/components/settings/RemindersTab.tsx`): CRUD UI for
+    `GET/POST/PATCH/DELETE /reminders` — unlike a Timer (a one-off countdown), these repeat
+    forever at a set time: daily, weekly on a weekday, or monthly on a day of the month (a
+    `<select>` for recurrence conditionally shows a weekday `<select>` or a day-of-month number
+    input, plus a native `<input type="time">`). Each row shows a human-readable description
+    ("Jeden Mittwoch um 09:15") and a Pausieren/Aktivieren toggle that PATCHes `active` without
+    deleting the reminder. Reminders are added here manually or by the assistant during chat via
+    the `add_reminder`/`list_reminders`/`update_reminder`/`delete_reminder` tools. Verified live:
+    added a weekly reminder, confirmed the description text, paused it (confirmed the toggle
+    label flipped to "Aktivieren"), deleted it, confirmed the empty state.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

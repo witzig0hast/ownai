@@ -10,8 +10,17 @@ import { ContactsTab } from "@/components/settings/ContactsTab";
 import { EmailTab } from "@/components/settings/EmailTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
+import { RemindersTab } from "@/components/settings/RemindersTab";
 
-type SettingsTab = "integrations" | "calendar" | "email" | "agent-bus" | "memory" | "contacts" | "account";
+type SettingsTab =
+  | "integrations"
+  | "calendar"
+  | "email"
+  | "agent-bus"
+  | "memory"
+  | "contacts"
+  | "reminders"
+  | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   integrations: IntegrationsTab,
@@ -20,6 +29,7 @@ const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   "agent-bus": AgentBusTab,
   memory: MemoryTab,
   contacts: ContactsTab,
+  reminders: RemindersTab,
   account: AccountTab,
 };
 
@@ -30,6 +40,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "agent-bus", label: "Agent Bus" },
   { key: "memory", label: "Gedächtnis" },
   { key: "contacts", label: "Kontakte" },
+  { key: "reminders", label: "Erinnerungen" },
   { key: "account", label: "Konto" },
 ];
 

@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.db.models import Timer, User
 from app.db.session import async_session_maker
-from app.services import contact_service, push_service
+from app.services import contact_service, push_service, reminder_service
 
 logger = logging.getLogger(__name__)
 
@@ -66,17 +66,43 @@ async def _check_birthdays() -> None:
         await db.commit()
 
 
+async def _check_recurring_reminders() -> None:
+    """Runs once a minute (see start_scheduler) and pushes a proactive notification for every
+    active RecurringReminder whose recurrence/hour/minute matches now - a repeatable counterpart
+    to Timer's one-off countdown. Matched against local server time (like _check_birthdays; no
+    per-user timezone stored yet). `RecurringReminder.last_triggered_date` guards against firing
+    twice within the same minute-resolution poll on the same day."""
+    now = datetime.now()
+    async with async_session_maker() as db:
+        due = await reminder_service.reminders_due_at(db, now)
+        if not due:
+            return
+
+        for reminder in due:
+            user = await db.get(User, reminder.user_id)
+            if user is None:
+                continue
+            reminder.last_triggered_date = now.date().isoformat()
+            try:
+                await push_service.send_push(db, user, title="Erinnerung", body=reminder.label)
+            except Exception:  # noqa: BLE001 - one failed push must not block the others or the loop
+                logger.exception("Failed to send push for recurring reminder %s", reminder.id)
+        await db.commit()
+
+
 def start_scheduler() -> AsyncIOScheduler:
-    """Starts the background poll for expired timers (see _check_expired_timers) and the daily
-    birthday check (see _check_birthdays). Runs in-process via APScheduler. Known limitation:
-    with multiple worker processes, each would poll independently and could send duplicate
-    notifications - docker-compose.yml runs a single uvicorn process, so this doesn't apply
-    today, but is worth knowing before scaling out to multiple workers/replicas (would need a
-    DB-level lock or moving this to a dedicated worker process)."""
+    """Starts the background poll for expired timers (see _check_expired_timers), the daily
+    birthday check (see _check_birthdays), and the per-minute recurring-reminder check (see
+    _check_recurring_reminders). Runs in-process via APScheduler. Known limitation: with multiple
+    worker processes, each would poll independently and could send duplicate notifications -
+    docker-compose.yml runs a single uvicorn process, so this doesn't apply today, but is worth
+    knowing before scaling out to multiple workers/replicas (would need a DB-level lock or moving
+    this to a dedicated worker process)."""
     global _scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(_check_expired_timers, "interval", seconds=15, id="expired_timers")
     scheduler.add_job(_check_birthdays, "cron", hour=8, minute=0, id="birthdays")
+    scheduler.add_job(_check_recurring_reminders, "cron", second=0, id="recurring_reminders")
     scheduler.start()
     _scheduler = scheduler
     return scheduler

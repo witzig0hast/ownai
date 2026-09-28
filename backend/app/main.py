@@ -20,6 +20,7 @@ from app.api import (
     memory,
     notifications,
     push,
+    reminders,
     timer,
     vision,
     voice,
@@ -88,6 +89,7 @@ api_v1_routers = (
     agent_bus.router,
     memory.router,
     contacts.router,
+    reminders.router,
     health.router,
 )
 for router in api_v1_routers:

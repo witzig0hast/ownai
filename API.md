@@ -345,6 +345,43 @@ Response `200`: das aktualisierte Kontaktobjekt.
 Response `204`.
 Fehler: `404 not_found` (Kontakt existiert nicht oder gehört einem anderen Nutzer).
 
+## Erinnerungen (Recurring Reminders)
+
+Erinnerungen, die im Gegensatz zu einem Timer (siehe oben) nicht einmalig sind, sondern dauerhaft zu einer festen Uhrzeit wiederkehren: täglich, wöchentlich an einem Wochentag, oder monatlich an einem Tag des Monats. Geprüft durch einen minütlichen Scheduler-Job (`_check_recurring_reminders` in `app/services/scheduler.py`) gegen die lokale Serverzeit (keine nutzerspezifische Zeitzone); `RecurringReminder.last_triggered_date` verhindert eine doppelte Erinnerung innerhalb derselben Minute/desselben Tages. Eine pausierte Erinnerung (`active: false`) bleibt gespeichert, wird aber vom Scheduler übersprungen.
+
+Erinnerungen entstehen entweder manuell über die Settings-UI (Tab "Erinnerungen") oder automatisch während des Chats über die Tools `add_reminder` / `list_reminders` / `update_reminder` / `delete_reminder` (siehe `app/agent/tools.py`).
+
+### `POST /reminders`  *(Bearer)*
+Request: `{ "label": string, "recurrence": "daily" | "weekly" | "monthly", "hour": int (0-23), "minute": int (0-59), "weekday": "mon".."sun" | null, "day_of_month": int (1-31) | null }` — `weekday` ist bei `recurrence="weekly"` Pflicht, `day_of_month` bei `recurrence="monthly"` Pflicht.
+Response `201`: die erstellte Erinnerung (siehe unten, inkl. `active: true`).
+Fehler: `422` bei fehlendem `weekday`/`day_of_month` für die jeweilige `recurrence`.
+
+### `GET /reminders`  *(Bearer)*
+Response `200`: `{ "reminders": [ Erinnerung ] }`, neueste zuerst.
+
+Erinnerungsobjekt:
+```json
+{
+  "id": "uuid",
+  "label": "Tabletten nehmen",
+  "recurrence": "daily",
+  "hour": 8,
+  "minute": 0,
+  "weekday": null,
+  "day_of_month": null,
+  "active": true,
+  "created_at": "datetime"
+}
+```
+
+### `PATCH /reminders/{id}`  *(Bearer)*
+Request: wie `POST`, alle Felder optional (inkl. `active`) — nur angegebene Felder werden geändert. Zum Pausieren/Reaktivieren einfach nur `{ "active": false }` schicken.
+Response `200`: die aktualisierte Erinnerung.
+
+### `DELETE /reminders/{id}`  *(Bearer)*
+Response `204`.
+Fehler: `404 not_found` (Erinnerung existiert nicht oder gehört einem anderen Nutzer).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*
