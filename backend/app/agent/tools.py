@@ -14,6 +14,7 @@ from app.services import (
     agent_bus_service,
     automation_service,
     calendar_service,
+    clipper_service,
     contact_service,
     email_service,
     expense_service,
@@ -452,6 +453,32 @@ async def _list_rss_items(
     db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
 ) -> Any:
     return await rss_service.latest_items(db, user, arguments.get("feed_id"))
+
+
+async def _clip_url(
+    _db: AsyncSession, _user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    return await clipper_service.clip(arguments["url"])
+
+
+async def _save_clipped_page(
+    db: AsyncSession, user: User, conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    clipped = await clipper_service.clip(arguments["url"])
+    record = await file_service.create_file(
+        db,
+        user,
+        conversation,
+        filename=arguments.get("filename") or clipped["title"],
+        content=f"# {clipped['title']}\n\nQuelle: {clipped['url']}\n\n{clipped['text']}",
+        file_format="md",
+    )
+    return {
+        "id": record.id,
+        "filename": record.filename,
+        "size_bytes": record.size_bytes,
+        "download_url": f"/api/v1/chat/conversations/{conversation.id}/files/{record.id}",
+    }
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -1192,6 +1219,44 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "clip_url",
+            "description": (
+                "Ruft eine Webseite ab und extrahiert ihren lesbaren Text (ohne Navigation/Skripte/Werbung), "
+                "damit du sie zusammenfassen kannst. Speichert nichts - für 'speichern' save_clipped_page nutzen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL der Seite"},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_clipped_page",
+            "description": (
+                "Ruft eine Webseite ab, extrahiert ihren lesbaren Text und speichert ihn als Markdown-Datei "
+                "(mit Download-Link), damit der Nutzer sie später nachlesen kann."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL der Seite"},
+                    "filename": {
+                        "type": "string",
+                        "description": "Dateiname, optional (Standard: Seitentitel)",
+                    },
+                },
+                "required": ["url"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -1237,4 +1302,6 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "list_rss_feeds": _list_rss_feeds,
     "delete_rss_feed": _delete_rss_feed,
     "list_rss_items": _list_rss_items,
+    "clip_url": _clip_url,
+    "save_clipped_page": _save_clipped_page,
 }

@@ -134,9 +134,9 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently thirteen tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, News, Konto)
-  via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  einstellen können" in one place). Currently fourteen tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, News,
+  Web-Clipper, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -240,6 +240,15 @@ the `{"error":{"code","message"}}` envelope).
     feed** (same sandbox network restriction as Wetter/Web-Suche — a live add attempt surfaced a
     clean `403` through `ErrorMessage`, confirming the wiring). Try it against a real feed URL
     before relying on it.
+  - **Web-Clipper** tab (`src/components/settings/WebClipperTab.tsx`): a preview-only lookup for
+    `POST /clip` — paste a URL, see its extracted title and readable text (nav/scripts/ads
+    stripped server-side). Deliberately has no "save as file" button: saving is conversation-scoped
+    (`GeneratedFile.conversation_id`) and Settings has no "current conversation" to attach one to,
+    so persisting a clip is only available conversationally via the `save_clipped_page` tool
+    (summarizing one without saving is `clip_url`). **Could not be verified against a real page**
+    (same sandbox network restriction as Wetter/Web-Suche/News — a live fetch attempt surfaced a
+    clean `403` through `ErrorMessage`, confirming the wiring). Try it against a real URL before
+    relying on it.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

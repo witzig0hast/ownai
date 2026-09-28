@@ -206,6 +206,12 @@ export interface RssItem {
   summary: string | null;
 }
 
+export interface ClippedPage {
+  title: string;
+  url: string;
+  text: string;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

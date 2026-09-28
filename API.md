@@ -571,6 +571,19 @@ Response `200`:
 
 Auch als Tools `add_rss_feed` / `list_rss_feeds` / `delete_rss_feed` / `list_rss_items` (siehe `app/agent/tools.py`) im Chat/Voice-Agenten nutzbar. **Nicht live gegen einen echten RSS-Feed getestet** — kein Netzwerkzugriff in der Build-Sandbox dieser Session (per Live-Test bestätigt: `403 Forbidden` durch die Sandbox-Egress-Policy, Fehlerbehandlung bis in die Frontend-UI aber bestätigt sauber durchgelaufen). Backend-seitig vollständig mit `httpx.MockTransport` und einem eingebetteten Beispiel-Feed getestet (`tests/test_rss.py`, nutzt `feedparser` zum Parsen). Vor Produktiveinsatz einmal mit einem echten Feed durchklicken.
 
+## Web-Clipper
+
+Ruft eine Webseite ab und extrahiert ihren lesbaren Text (Skripte/Styles/Nav/Header/Footer werden entfernt), damit der Assistent sie zusammenfassen kann — oder speichert sie als Markdown-Datei zum Nachlesen. Kein eigenes DB-Modell für den Clip selbst; das Speichern nutzt die bestehende `GET /chat/conversations/{id}/files/{file_id}`-Download-Infrastruktur (`GeneratedFile`, siehe Chat-Abschnitt oben) weiter.
+
+### `POST /clip`  *(Bearer)*
+Request: `{ "url": string }`
+Response `200`: `{ "title": string, "url": string, "text": string }` — `text` ist auf 5000 Zeichen gekürzt (mit `…` markiert).
+Fehler: `502 clip_error` (Seite nicht erreichbar oder enthält keinen lesbaren Text, z. B. eine leere Seite).
+
+Dieser Endpunkt speichert nichts — er treibt nur die Settings-UI-Vorschau (Tab "Web-Clipper"). Das **Speichern** als Datei läuft ausschließlich über den Chat/Voice-Agenten (Tool `save_clipped_page`), weil generierte Dateien an eine Unterhaltung gebunden sind (`GeneratedFile.conversation_id`, siehe `file_service.py`) — in den Settings gibt es keine "aktuelle Unterhaltung", in die gespeichert werden könnte.
+
+Auch als Tools `clip_url` (liefert Titel+Text, ohne zu speichern — für Zusammenfassungen) und `save_clipped_page` (liefert zusätzlich `{ "id", "filename", "size_bytes", "download_url" }` wie das `create_file`-Tool, speichert den Text als `.md`-Datei in der aktuellen Unterhaltung) nutzbar (siehe `app/agent/tools.py`). **Nicht live gegen eine echte Webseite getestet** — kein Netzwerkzugriff in der Build-Sandbox dieser Session (per Live-Test bestätigt: `403 Forbidden` durch die Sandbox-Egress-Policy, Fehlerbehandlung bis in die Frontend-UI aber bestätigt sauber durchgelaufen). Backend-seitig vollständig mit `httpx.MockTransport` gegen eine eingebettete Beispiel-HTML-Seite getestet (`tests/test_clipper.py`, nutzt `beautifulsoup4` zum Parsen). Vor Produktiveinsatz einmal mit einer echten Seite durchklicken.
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

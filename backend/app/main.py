@@ -13,6 +13,7 @@ from app.api import (
     automations,
     calendar,
     chat,
+    clipper,
     contacts,
     devices,
     email,
@@ -102,6 +103,7 @@ api_v1_routers = (
     weather.router,
     searxng.router,
     rss.router,
+    clipper.router,
     health.router,
 )
 for router in api_v1_routers:
