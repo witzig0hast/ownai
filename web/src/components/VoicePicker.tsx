@@ -60,7 +60,7 @@ export function VoicePicker() {
         id="voice-picker"
         value={selected}
         onChange={(e) => handleChange(e.target.value)}
-        className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+        className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700 transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
       >
         <option value="">Systemstandard</option>
         {germanFirst.map((voice) => (
@@ -73,7 +73,7 @@ export function VoicePicker() {
         type="button"
         onClick={() => speakSample(selected)}
         title="Stimme testen"
-        className="shrink-0 rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="shrink-0 rounded-full border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
       >
         Testen
       </button>

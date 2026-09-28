@@ -81,7 +81,7 @@ export function ExpensesTab() {
         Einfacher Ausgaben-Tracker mit Gesamtsumme und Aufschlüsselung nach Kategorie.
       </p>
 
-      <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
         <div className="flex gap-2">
           <input
             type="text"
@@ -89,14 +89,14 @@ export function ExpensesTab() {
             placeholder="Betrag, z.B. 12,50"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-32 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-32 rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
           <input
             type="text"
             placeholder="Kategorie (optional)"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <input
@@ -104,12 +104,12 @@ export function ExpensesTab() {
           placeholder="Wofür? z.B. 'Mittagessen'"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={adding || !description.trim() || !amount.trim()}
-          className="self-start rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="self-start rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Ausgabe eintragen
         </button>
@@ -123,7 +123,7 @@ export function ExpensesTab() {
         <p className="text-sm text-zinc-500">Noch keine Ausgaben.</p>
       ) : (
         <>
-          <div className="mb-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+          <div className="animate-fade-in-up mb-3 rounded-2xl border border-zinc-200 p-3 text-sm shadow-sm dark:border-zinc-800">
             <p className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
               Gesamt: {formatAmount(data.total)} €
             </p>
@@ -136,9 +136,9 @@ export function ExpensesTab() {
             </ul>
           </div>
 
-          <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
             {data.expenses.map((e: Expense) => (
-              <li key={e.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <li key={e.id} className="animate-fade-in-up flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60">
                 <div>
                   <p className="text-zinc-900 dark:text-zinc-100">{e.description}</p>
                   <p className="text-xs text-zinc-400">

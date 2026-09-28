@@ -47,7 +47,7 @@ function NewAgentForm({ onCreated }: { onCreated: () => void }) {
 
   if (createdKey) {
     return (
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950">
+      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950">
         <p className="mb-2 font-medium text-amber-900 dark:text-amber-200">
           Agent-Schlüssel (nur jetzt sichtbar, gut aufbewahren):
         </p>
@@ -57,7 +57,7 @@ function NewAgentForm({ onCreated }: { onCreated: () => void }) {
         <button
           type="button"
           onClick={() => setCreatedKey(null)}
-          className="mt-3 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          className="mt-3 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Verstanden
         </button>
@@ -73,20 +73,20 @@ function NewAgentForm({ onCreated }: { onCreated: () => void }) {
         placeholder="Name, z.B. shop-backend"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
       />
       <input
         type="text"
         placeholder="Beschreibung (optional)"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
       />
       <ErrorMessage message={error} />
       <button
         type="submit"
         disabled={creating}
-        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
       >
         {creating ? "Registriere..." : "Agent registrieren"}
       </button>
@@ -146,7 +146,7 @@ export function AgentBusTab() {
           <button
             type="button"
             onClick={() => setShowNewAgent(true)}
-            className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-xl bg-zinc-900 px-2 py-1 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-zinc-700 active:scale-95 dark:bg-zinc-100 dark:text-zinc-900"
           >
             + Neuer Agent
           </button>
@@ -156,9 +156,13 @@ export function AgentBusTab() {
         ) : agents.length === 0 ? (
           <p className="text-sm text-zinc-500">Noch keine Agents registriert.</p>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-            {agents.map((agent) => (
-              <li key={agent.id} className="flex items-center justify-between px-3 py-2 text-sm">
+          <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+            {agents.map((agent, i) => (
+              <li
+                key={agent.id}
+                className="animate-fade-in-up flex items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
+                style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+              >
                 <div>
                   <span className="font-medium text-zinc-900 dark:text-zinc-100">{agent.name}</span>
                   {agent.description ? (
@@ -168,7 +172,7 @@ export function AgentBusTab() {
                 <button
                   type="button"
                   onClick={() => handleDelete(agent)}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  className="rounded-full px-2 py-1 text-xs text-red-500 transition-all hover:scale-105 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
                 >
                   Entfernen
                 </button>
@@ -185,7 +189,7 @@ export function AgentBusTab() {
         ) : messages.length === 0 ? (
           <p className="text-sm text-zinc-500">Noch keine Nachrichten.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
             <table className="w-full text-left text-sm">
               <thead className="bg-zinc-50 text-xs text-zinc-500 dark:bg-zinc-900">
                 <tr>
@@ -198,8 +202,12 @@ export function AgentBusTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {messages.map((m) => (
-                  <tr key={m.id}>
+                {messages.map((m, i) => (
+                  <tr
+                    key={m.id}
+                    className="animate-fade-in-up transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
+                    style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                  >
                     <td className="px-3 py-2">{m.from_label}</td>
                     <td className="px-3 py-2">{m.to_label}</td>
                     <td className="px-3 py-2">{m.kind === "task" ? m.task_type || "task" : "text"}</td>

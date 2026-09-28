@@ -74,12 +74,12 @@ export function MemoryTab() {
           placeholder="Fakt hinzufügen, z.B. 'Mag keine Zwiebeln'"
           value={newContent}
           onChange={(e) => setNewContent(e.target.value)}
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={adding || !newContent.trim()}
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Hinzufügen
         </button>
@@ -92,9 +92,9 @@ export function MemoryTab() {
       ) : memories.length === 0 ? (
         <p className="text-sm text-zinc-500">Noch nichts gemerkt.</p>
       ) : (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {memories.map((m) => (
-            <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <li key={m.id} className="animate-fade-in-up flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60">
               <div>
                 <p className="text-zinc-900 dark:text-zinc-100">{m.content}</p>
                 <p className="text-xs text-zinc-400">{formatTime(m.created_at)}</p>

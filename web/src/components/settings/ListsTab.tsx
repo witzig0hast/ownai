@@ -49,16 +49,16 @@ function ListCard({ list, onChange, onError, onDeleteList }: {
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="animate-fade-in-up rounded-2xl border border-zinc-200 p-3 transition-shadow hover:shadow-sm dark:border-zinc-800">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{list.kind === "shopping" ? "🛒" : "✅"}</span>
+          <span className="text-xl">{list.kind === "shopping" ? "🛒" : "✅"}</span>
           <span className="font-medium text-zinc-900 dark:text-zinc-100">{list.name}</span>
         </div>
         <button
           type="button"
           onClick={() => onDeleteList(list.id)}
-          className="text-xs text-red-500 hover:text-red-700"
+          className="rounded-full px-2 py-1 text-xs text-red-500 transition-all hover:scale-105 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
         >
           Liste löschen
         </button>
@@ -68,21 +68,25 @@ function ListCard({ list, onChange, onError, onDeleteList }: {
         <p className="mb-2 text-xs text-zinc-400">Noch keine Einträge.</p>
       ) : (
         <ul className="mb-2 flex flex-col gap-1">
-          {list.items.map((item) => (
-            <li key={item.id} className="flex items-center gap-2 text-sm">
+          {list.items.map((item, i) => (
+            <li
+              key={item.id}
+              className="animate-fade-in-up flex items-center gap-2 rounded-lg px-1 py-0.5 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
+              style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+            >
               <input
                 type="checkbox"
                 checked={item.done}
                 onChange={() => handleToggle(item.id, item.done)}
-                className="h-4 w-4"
+                className="h-5 w-5 cursor-pointer accent-indigo-500"
               />
-              <span className={`flex-1 ${item.done ? "text-zinc-400 line-through" : "text-zinc-900 dark:text-zinc-100"}`}>
+              <span className={`flex-1 transition-all ${item.done ? "text-zinc-400 line-through" : "text-zinc-900 dark:text-zinc-100"}`}>
                 {item.content}
               </span>
               <button
                 type="button"
                 onClick={() => handleDeleteItem(item.id)}
-                className="text-xs text-red-500 hover:text-red-700"
+                className="rounded-full px-1.5 py-0.5 text-xs text-red-500 transition-all hover:scale-110 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
               >
                 ✕
               </button>
@@ -97,12 +101,12 @@ function ListCard({ list, onChange, onError, onDeleteList }: {
           placeholder="Neuer Eintrag..."
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
-          className="flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-xl border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={adding || !newItem.trim()}
-          className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
         >
           +
         </button>
@@ -171,18 +175,18 @@ export function ListsTab() {
         die Einkaufsliste&ldquo;, &bdquo;hak Brot ab&ldquo;).
       </p>
 
-      <form onSubmit={handleCreate} className="mb-4 flex gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <form onSubmit={handleCreate} className="mb-4 flex gap-2 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
         <input
           type="text"
           placeholder="Name der neuen Liste"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as ListKind)}
-          className="rounded-md border border-zinc-300 px-2 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-2 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         >
           <option value="shopping">Einkaufsliste</option>
           <option value="todo">Todo</option>
@@ -190,7 +194,7 @@ export function ListsTab() {
         <button
           type="submit"
           disabled={creating || !name.trim()}
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Anlegen
         </button>
@@ -204,14 +208,15 @@ export function ListsTab() {
         <p className="text-sm text-zinc-500">Noch keine Listen.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {lists.map((list) => (
-            <ListCard
-              key={list.id}
-              list={list}
-              onChange={handleListChange}
-              onError={setError}
-              onDeleteList={handleDeleteList}
-            />
+          {lists.map((list, i) => (
+            <div key={list.id} style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }} className="animate-fade-in-up">
+              <ListCard
+                list={list}
+                onChange={handleListChange}
+                onError={setError}
+                onDeleteList={handleDeleteList}
+              />
+            </div>
           ))}
         </div>
       )}

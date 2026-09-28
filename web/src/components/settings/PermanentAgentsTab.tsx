@@ -51,12 +51,12 @@ function NewAgentForm({ presets, onCreated }: { presets: AgentPreset[]; onCreate
         placeholder="Name, z.B. 'Krypto-Beobachter'"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
       />
       <select
         value={preset}
         onChange={(e) => setPreset(e.target.value)}
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
       >
         {presets.map((p) => (
           <option key={p.key} value={p.key}>
@@ -73,14 +73,14 @@ function NewAgentForm({ presets, onCreated }: { presets: AgentPreset[]; onCreate
         value={rolePrompt}
         onChange={(e) => setRolePrompt(e.target.value)}
         rows={3}
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
       />
       <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         Intervall:
         <select
           value={intervalMinutes}
           onChange={(e) => setIntervalMinutes(e.target.value)}
-          className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         >
           <option value="15">15 Minuten</option>
           <option value="30">30 Minuten</option>
@@ -94,7 +94,7 @@ function NewAgentForm({ presets, onCreated }: { presets: AgentPreset[]; onCreate
       <button
         type="submit"
         disabled={creating || !name.trim() || !rolePrompt.trim()}
-        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
       >
         {creating ? "Lege an..." : "Agent anlegen"}
       </button>
@@ -209,7 +209,7 @@ export function PermanentAgentsTab() {
         <button
           type="button"
           onClick={() => setShowNewAgent(true)}
-          className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-2 py-1 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-zinc-700 active:scale-95 dark:bg-zinc-100 dark:text-zinc-900"
         >
           + Neuer Agent
         </button>
@@ -220,10 +220,10 @@ export function PermanentAgentsTab() {
       ) : agents.length === 0 ? (
         <p className="text-sm text-zinc-500">Noch keine permanenten Agenten.</p>
       ) : (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {agents.map((agent) => (
             <li key={agent.id}>
-              <div className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <div className="animate-fade-in-up flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60">
                 <div className={agent.active ? "" : "opacity-50"}>
                   <p className="text-zinc-900 dark:text-zinc-100">{agent.name}</p>
                   <p className="text-xs text-zinc-400">

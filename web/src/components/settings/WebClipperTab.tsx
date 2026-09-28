@@ -42,12 +42,12 @@ export function WebClipperTab() {
           placeholder="URL, z.B. https://example.com/artikel"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={loading || !url.trim()}
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           {loading ? "Lade..." : "Abrufen"}
         </button>
@@ -56,7 +56,7 @@ export function WebClipperTab() {
       <ErrorMessage message={error} />
 
       {clipped && (
-        <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <div className="animate-fade-in-up rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800">
           <p className="mb-1 text-lg font-medium text-zinc-900 dark:text-zinc-100">{clipped.title}</p>
           <a
             href={clipped.url}

@@ -137,7 +137,7 @@ export function CalendarTab() {
   return (
     <div>
       <label className="mb-4 flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-        <input type="checkbox" checked={enabled} onChange={toggleEnabled} className="h-4 w-4" />
+        <input type="checkbox" checked={enabled} onChange={toggleEnabled} className="h-5 w-5 cursor-pointer accent-indigo-500" />
         Kalender aktivieren
       </label>
 
@@ -148,7 +148,7 @@ export function CalendarTab() {
         </p>
       ) : (
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <section className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <section className="flex-1 rounded-2xl border border-zinc-200 dark:border-zinc-800">
             <div className="flex flex-wrap items-end gap-3 border-b border-zinc-200 p-3 dark:border-zinc-800">
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-zinc-700 dark:text-zinc-300">From</span>
@@ -156,7 +156,7 @@ export function CalendarTab() {
                   type="date"
                   value={rangeStart}
                   onChange={(e) => setRangeStart(e.target.value)}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded-xl border border-zinc-300 px-2 py-1 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
@@ -165,13 +165,13 @@ export function CalendarTab() {
                   type="date"
                   value={rangeEnd}
                   onChange={(e) => setRangeEnd(e.target.value)}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded-xl border border-zinc-300 px-2 py-1 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
               </label>
               <button
                 type="button"
                 onClick={() => loadEvents(rangeStart, rangeEnd)}
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+                className="rounded-full bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-zinc-700 active:scale-95 dark:bg-zinc-100 dark:text-zinc-900"
               >
                 Apply
               </button>
@@ -191,8 +191,12 @@ export function CalendarTab() {
                 <p className="text-sm text-zinc-500">No events in this range.</p>
               ) : (
                 <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {events.map((event) => (
-                    <li key={event.id} className="py-2">
+                  {events.map((event, i) => (
+                    <li
+                      key={event.id}
+                      style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                      className="animate-fade-in-up rounded-lg px-1 py-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
+                    >
                       <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {event.title}
                       </p>
@@ -209,7 +213,7 @@ export function CalendarTab() {
           </section>
 
           <section className="flex w-full flex-col gap-6 lg:w-80">
-            <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <div className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
               <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                 New event
               </h2>
@@ -220,7 +224,7 @@ export function CalendarTab() {
                   placeholder="Title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
                 <label className="flex flex-col gap-1 text-xs text-zinc-500">
                   Start
@@ -229,7 +233,7 @@ export function CalendarTab() {
                     required
                     value={start}
                     onChange={(e) => setStart(e.target.value)}
-                    className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-zinc-500">
@@ -239,7 +243,7 @@ export function CalendarTab() {
                     required
                     value={end}
                     onChange={(e) => setEnd(e.target.value)}
-                    className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                   />
                 </label>
                 <input
@@ -247,13 +251,13 @@ export function CalendarTab() {
                   placeholder="Location (optional)"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
                 <ErrorMessage message={createError} />
                 <button
                   type="submit"
                   disabled={creating}
-                  className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+                  className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
                 >
                   {creating ? "Creating..." : "Create event"}
                 </button>

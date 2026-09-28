@@ -88,7 +88,7 @@ export function SetupHelperChat() {
   );
 
   return (
-    <div className="flex h-full flex-col rounded-lg border border-zinc-200 dark:border-zinc-800">
+    <div className="flex h-full flex-col rounded-2xl border border-zinc-200 dark:border-zinc-800">
       <div className="border-b border-zinc-200 p-3 dark:border-zinc-800">
         <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Einrichtungshilfe</h2>
         <p className="mt-0.5 text-xs text-zinc-500">
@@ -107,7 +107,7 @@ export function SetupHelperChat() {
             .map((m) => (
               <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
                     m.role === "user"
                       ? "bg-indigo-500 text-white"
                       : "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
@@ -132,12 +132,12 @@ export function SetupHelperChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Frage stellen..."
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-xl border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={sending || !input.trim()}
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Senden
         </button>

@@ -28,7 +28,7 @@ const STATE_RING_COLOR: Record<LiveTalkState, string> = {
 
 function MicGlyph() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-10 w-10 text-white" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" className="h-12 w-12 text-white" aria-hidden="true">
       <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" strokeWidth={2} />
       <path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
     </svg>
@@ -37,7 +37,7 @@ function MicGlyph() {
 
 function MuteIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
       <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v3" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
       <path d="M19 11a7 7 0 0 1-1.4 4.2M4 4l16 16" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
       <path d="M12 18v3" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
@@ -47,7 +47,7 @@ function MuteIcon() {
 
 function FileIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0" aria-hidden="true">
       <path
         d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
         stroke="currentColor"
@@ -61,7 +61,7 @@ function FileIcon() {
 
 function CodeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0" aria-hidden="true">
       <path d="m8 8-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -127,7 +127,7 @@ export default function VoicePage() {
                   start();
                 }
               }}
-              className="relative flex h-40 w-40 items-center justify-center rounded-full transition-transform duration-150 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-300"
+              className="relative flex h-40 w-40 items-center justify-center rounded-full shadow-lg transition-transform duration-200 ease-out hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-300 active:scale-95"
               style={{ transform: `scale(${scale})` }}
             >
               <span
@@ -140,7 +140,7 @@ export default function VoicePage() {
               </span>
             </button>
 
-            <div className="text-center">
+            <div className="animate-fade-in-up text-center">
               <p className="text-lg font-medium text-zinc-900 dark:text-zinc-100">{stateLabel}</p>
               {!isActive ? (
                 <>
@@ -152,12 +152,12 @@ export default function VoicePage() {
                   </div>
                 </>
               ) : (
-                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <div className="animate-fade-in-up mt-3 flex flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
                     onClick={toggleMute}
                     title={muted ? "Mikrofon wieder aktivieren" : "Mikrofon stummschalten"}
-                    className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all hover:scale-105 active:scale-95 ${
                       muted
                         ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300"
                         : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -170,7 +170,7 @@ export default function VoicePage() {
                     <button
                       type="button"
                       onClick={interrupt}
-                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       Unterbrechen
                     </button>
@@ -178,7 +178,7 @@ export default function VoicePage() {
                   <button
                     type="button"
                     onClick={stop}
-                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   >
                     Beenden
                   </button>
@@ -187,7 +187,7 @@ export default function VoicePage() {
             </div>
 
             {(lastUserText || lastAssistantText) && (
-              <div className="w-full max-w-md space-y-3 text-center">
+              <div className="animate-fade-in-up w-full max-w-md space-y-3 text-center">
                 {lastUserText ? (
                   <p className="text-sm text-zinc-500">
                     <span className="font-medium text-zinc-700 dark:text-zinc-300">Du:</span> {lastUserText}
@@ -215,7 +215,7 @@ export default function VoicePage() {
                                   typeof tc.result.size_bytes === "number" ? tc.result.size_bytes : undefined,
                               })
                             }
-                            className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                           >
                             <FileIcon /> {tc.result.filename as string}
                           </button>
@@ -228,7 +228,7 @@ export default function VoicePage() {
                           codeSegment.type === "code" &&
                           openArtifact({ type: "code", language: codeSegment.language, code: codeSegment.value })
                         }
-                        className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       >
                         <CodeIcon /> Code anzeigen
                       </button>

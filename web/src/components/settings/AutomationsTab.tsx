@@ -79,32 +79,32 @@ export function AutomationsTab() {
         kann dir der Assistent im Chat nennen. Feuert nur bei Zustandswechsel, nicht wiederholt.
       </p>
 
-      <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
         <input
           type="text"
           placeholder="entity_id, z.B. 'lock.haustuer'"
           value={entityId}
           onChange={(e) => setEntityId(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <input
           type="text"
           placeholder="Zustand, der auslöst, z.B. 'unlocked'"
           value={triggerState}
           onChange={(e) => setTriggerState(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <input
           type="text"
           placeholder="Nachricht, z.B. 'Haustür ist auf'"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={adding || !entityId.trim() || !triggerState.trim() || !message.trim()}
-          className="self-start rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="self-start rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Automatisierung hinzufügen
         </button>
@@ -117,9 +117,9 @@ export function AutomationsTab() {
       ) : automations.length === 0 ? (
         <p className="text-sm text-zinc-500">Noch keine Automatisierungen.</p>
       ) : (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {automations.map((a) => (
-            <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <li key={a.id} className="animate-fade-in-up flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60">
               <div className={a.active ? "" : "opacity-50"}>
                 <p className="text-zinc-900 dark:text-zinc-100">{a.message}</p>
                 <p className="text-xs text-zinc-400">

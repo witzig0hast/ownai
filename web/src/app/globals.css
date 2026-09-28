@@ -22,6 +22,35 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Global interaction polish: every interactive element gets a smooth, consistent transition
+   by default (color/background/border/shadow/transform), so hover/focus/active states never
+   feel like a hard cut - the "everything should feel smooth" pass. Layout-affecting properties
+   (width/height/margin) are deliberately excluded to avoid jank. Respects the OS-level
+   "reduce motion" setting, which overrides all custom animations below too. */
+a,
+button,
+input,
+select,
+textarea,
+[role="button"] {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Slide-in for NotificationToast (macOS Notification Center-style banners) - no animation
@@ -73,4 +102,144 @@ body {
 
 .animate-typing-dot {
   animation: typing-dot 1.2s ease-in-out infinite;
+}
+
+/* General-purpose entrance for cards/list rows/panels across the app - pair with an inline
+   `animationDelay` (e.g. `${index * 40}ms`) when rendering a list, so items settle in as a
+   staggered cascade rather than all popping in at once. */
+@keyframes fade-in-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Plain fade, no movement - for things that shouldn't shift layout as they appear (page-level
+   content, tab panels). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+
+/* Modal/popover entrance - a soft scale-up-and-settle rather than an instant appear, matching
+   the native macOS/iOS sheet feel. */
+@keyframes scale-in {
+  from {
+    transform: scale(0.96) translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Backdrop fade behind a modal. */
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop-in {
+  animation: backdrop-in 0.2s ease-out both;
+}
+
+/* Dropdown/mobile-menu unfurl. */
+@keyframes slide-down {
+  from {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Slide-in-from-right for the Artifact Panel's contents refreshing. */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Gentle pulse for a "live/active" status dot (e.g. a connected integration, an active
+   permanent agent) - draws the eye without being distracting. */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Skeleton shimmer for loading states, replacing plain "Lade..." text where a shape is known. */
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 25%, rgba(0, 0, 0, 0.12) 37%, rgba(0, 0, 0, 0.06) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.06) 25%,
+      rgba(255, 255, 255, 0.12) 37%,
+      rgba(255, 255, 255, 0.06) 63%
+    );
+    background-size: 400% 100%;
+  }
 }

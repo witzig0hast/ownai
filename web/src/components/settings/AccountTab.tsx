@@ -54,7 +54,7 @@ function PushNotificationsCard() {
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <div className="animate-fade-in-up mt-4 rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Push-Benachrichtigungen</p>
@@ -67,7 +67,7 @@ function PushNotificationsCard() {
           type="button"
           onClick={handleToggle}
           disabled={busy || state === "checking"}
-          className="shrink-0 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="shrink-0 rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-all hover:scale-105 hover:bg-zinc-700 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           {state === "checking" ? "..." : state === "subscribed" ? "Deaktivieren" : "Aktivieren"}
         </button>
@@ -88,7 +88,7 @@ export function AccountTab() {
   return (
     <div className="max-w-md">
       <p className="mb-4 text-sm text-zinc-500">Dein Konto.</p>
-      <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+      <div className="animate-fade-in-up rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800">
         <dl className="flex flex-col gap-3 text-sm">
           <div>
             <dt className="text-xs font-medium text-zinc-400">Name</dt>

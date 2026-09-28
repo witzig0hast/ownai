@@ -38,7 +38,7 @@ export function CodeBlock({ language, code }: { language: string; code: string }
   }
 
   return (
-    <div className="my-2 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700">
+    <div className="my-2 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
       <div className="flex items-center justify-between bg-zinc-100 px-3 py-1.5 dark:bg-zinc-800">
         <span className="font-mono text-xs text-zinc-500">{language || "code"}</span>
         <div className="flex items-center gap-1.5">
@@ -46,7 +46,7 @@ export function CodeBlock({ language, code }: { language: string; code: string }
             type="button"
             onClick={() => openArtifact({ type: "code", language, code })}
             title="Im Panel öffnen"
-            className="rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+            className="rounded-full p-1 text-zinc-500 transition-all hover:scale-110 hover:bg-zinc-200 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
           >
             <ExpandIcon />
           </button>

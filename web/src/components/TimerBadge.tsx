@@ -147,13 +147,13 @@ export function TimerBadge() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all hover:scale-105 active:scale-95 ${
           nearestExpired
             ? "animate-pulse border-red-300 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
             : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
         }`}
       >
-        <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
           <circle cx="12" cy="13" r="8" stroke="currentColor" strokeWidth={2} />
           <path d="M12 9v4l3 2M9 2h6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
         </svg>
@@ -162,14 +162,14 @@ export function TimerBadge() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-10 mt-2 w-64 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="animate-scale-in absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-2xl border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
           <ul className="flex flex-col gap-1">
             {sorted.map((timer) => {
               const expired = remainingSeconds(timer) <= 0;
               return (
                 <li
                   key={timer.id}
-                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-zinc-800 dark:text-zinc-200">{timer.label ?? "Timer"}</p>
@@ -180,7 +180,7 @@ export function TimerBadge() {
                   <button
                     type="button"
                     onClick={() => handleDismiss(timer.id)}
-                    className="shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    className="shrink-0 rounded-full p-1 text-zinc-400 transition-all hover:scale-110 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                     aria-label="Timer beenden"
                   >
                     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">

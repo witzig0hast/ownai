@@ -73,7 +73,7 @@ function FileArtifactView({
         type="button"
         onClick={handleDownload}
         disabled={downloading}
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-zinc-700 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
       >
         {downloading ? "Lade herunter..." : "Herunterladen"}
       </button>
@@ -147,7 +147,7 @@ export function ArtifactPanel() {
       {/* Backdrop - only really needed on narrow screens where the panel covers the content,
           but harmless (transparent-ish, click-to-close) on wide screens too. */}
       <div
-        className={`fixed inset-0 z-30 bg-black/20 transition-opacity duration-200 ${
+        className={`fixed inset-0 z-30 bg-black/20 backdrop-blur-sm transition-opacity duration-200 ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={close}
@@ -156,7 +156,7 @@ export function ArtifactPanel() {
       <aside
         role="dialog"
         aria-label={title || "Artefakt"}
-        className={`fixed top-0 right-0 z-40 flex h-full w-full max-w-md transform flex-col border-l border-zinc-200 bg-white shadow-xl transition-transform duration-300 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
+        className={`fixed top-0 right-0 z-40 flex h-full w-full max-w-md transform flex-col border-l border-zinc-200 bg-white shadow-2xl transition-transform duration-300 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -166,7 +166,7 @@ export function ArtifactPanel() {
             type="button"
             onClick={close}
             aria-label="Schließen"
-            className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-full p-1.5 text-zinc-400 transition-all hover:scale-110 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
           >
             <CloseIcon />
           </button>

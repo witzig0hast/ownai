@@ -60,7 +60,7 @@ export function EmailTab() {
         Ohne eigenes Konto nutzt er, falls vorhanden, die System-Standard-Adresse.
       </p>
 
-      <div className="mb-4 rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+      <div className="animate-fade-in-up mb-4 rounded-2xl border border-zinc-200 p-4 text-sm shadow-sm dark:border-zinc-800">
         {status === "checking" ? (
           <span className="text-zinc-500">Prüfe...</span>
         ) : status === "error" ? (
@@ -89,7 +89,7 @@ export function EmailTab() {
           placeholder="SMTP-Host, z.B. smtp.gmail.com"
           value={host}
           onChange={(e) => setHost(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <input
           type="number"
@@ -97,7 +97,7 @@ export function EmailTab() {
           placeholder="Port"
           value={port}
           onChange={(e) => setPort(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <input
           type="text"
@@ -105,7 +105,7 @@ export function EmailTab() {
           placeholder="Benutzername"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <input
           type="password"
@@ -113,7 +113,7 @@ export function EmailTab() {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <input
           type="email"
@@ -121,17 +121,22 @@ export function EmailTab() {
           placeholder="Absenderadresse"
           value={fromAddress}
           onChange={(e) => setFromAddress(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
         <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-          <input type="checkbox" checked={useTls} onChange={(e) => setUseTls(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={useTls}
+            onChange={(e) => setUseTls(e.target.checked)}
+            className="h-5 w-5 cursor-pointer accent-indigo-500"
+          />
           TLS verwenden (empfohlen)
         </label>
         <ErrorMessage message={connectError} />
         <button
           type="submit"
           disabled={connecting}
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
           {connecting ? "Verbinde..." : "Verbinden"}
         </button>

@@ -48,7 +48,7 @@ export function NotificationToastStack({
               type="button"
               onClick={() => onDismiss(toast.id)}
               aria-label="Schließen"
-              className="shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="shrink-0 rounded-full p-1 text-zinc-400 transition-all hover:scale-110 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />

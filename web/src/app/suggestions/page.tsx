@@ -164,7 +164,7 @@ export default function SuggestionsPage() {
         {hasAndroidDevice === null ? (
           <p className="text-sm text-zinc-500">Lade...</p>
         ) : hasAndroidDevice === false ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
+          <div className="rounded-2xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
             <p>Vorschläge brauchen die OwnAI-Android-App.</p>
             <p className="mt-2">
               Diese Funktion liest Benachrichtigungen auf deinem Android-Gerät (z. B. WhatsApp) und
@@ -175,7 +175,7 @@ export default function SuggestionsPage() {
         ) : loading ? (
           <p className="text-sm text-zinc-500">Lade...</p>
         ) : suggestions.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
+          <div className="rounded-2xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
             <p>Aktuell keine offenen Vorschläge.</p>
             <p className="mt-2">
               Das ist normal, solange noch keine passende Benachrichtigung erkannt wurde. Voraussetzungen:
@@ -192,8 +192,12 @@ export default function SuggestionsPage() {
           </div>
         ) : (
           <ul className="flex flex-col gap-3">
-            {suggestions.map((s) => (
-              <li key={s.id} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            {suggestions.map((s, i) => (
+              <li
+                key={s.id}
+                style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
+                className="animate-fade-in-up rounded-2xl border border-zinc-200 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <span className="mb-1 inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
@@ -208,7 +212,7 @@ export default function SuggestionsPage() {
                       type="button"
                       onClick={() => handleApply(s.id)}
                       disabled={pendingId === s.id}
-                      className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+                      className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-all hover:scale-105 hover:bg-zinc-700 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
                     >
                       Übernehmen
                     </button>
@@ -216,7 +220,7 @@ export default function SuggestionsPage() {
                       type="button"
                       onClick={() => handleDismiss(s.id)}
                       disabled={pendingId === s.id}
-                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       Verwerfen
                     </button>
