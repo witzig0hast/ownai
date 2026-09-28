@@ -18,10 +18,10 @@ ownai/
 │   ├── android/        Kotlin/Compose App (S25 Ultra) inkl. Notification-Listener
 │   └── ios/             SwiftUI App (iPad)
 ├── infra/
-│   ├── caddy/          Reverse-Proxy-Config (TLS)
+│   ├── caddy/          Reverse-Proxy-Config (TLS) — optional, siehe unten
 │   └── ollama/          Ollama-Setup-Doku für die P40
-├── docker-compose.yml   Orchestriert postgres, redis, backend, web, caddy — Ollama läuft
-│                        separat auf deinem Server, siehe infra/ollama/README.md
+├── docker-compose.yml   Orchestriert postgres, redis, backend, web (+ optional caddy) —
+│                        Ollama läuft separat auf deinem Server, siehe infra/ollama/README.md
 └── .env.example
 ```
 
@@ -36,8 +36,22 @@ ollama pull nomic-embed-text
 cp .env.example .env
 # .env ausfüllen: SECRET_KEY, POSTGRES_PASSWORD, DOMAIN
 
-docker compose up -d postgres redis backend web caddy
+docker compose up -d
 ```
+
+Das startet standardmäßig **kein** Caddy — nur postgres, redis, backend, web (Caddy ist als
+Compose-Profil `caddy` markiert und bindet sonst ungefragt :80/:443, was mit einem bereits
+laufenden eigenen Reverse Proxy kollidiert).
+
+- **Hast du schon einen eigenen Reverse Proxy** (Nginx, Apache, Traefik, ...)? Dann brauchst du
+  Caddy nicht — richte dort einen Server-Block ein, der `/api/*` an `backend:8000` und alles
+  andere an `web:3000` weiterleitet (die exakte Routing-Logik steht zum Abgleich in
+  [`infra/caddy/Caddyfile`](./infra/caddy/Caddyfile)), inklusive TLS-Terminierung dort.
+- **Hast du noch keinen eigenen Reverse Proxy?** Dann starte Caddy zusätzlich mit:
+  ```bash
+  docker compose --profile caddy up -d
+  ```
+  Caddy übernimmt dann automatisch TLS (Let's Encrypt) für `DOMAIN` aus deiner `.env`.
 
 Details zur GPU/Modellwahl und wie OwnAI deine Ollama-Instanz erreicht: [`infra/ollama/README.md`](./infra/ollama/README.md).
 Backend-Entwicklung/Tests lokal ohne Docker: [`backend/README.md`](./backend/README.md).

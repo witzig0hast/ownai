@@ -65,10 +65,16 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
 
+  # Optional: only needed if you don't already run your own reverse proxy in front of this
+  # host. Not started by a plain `docker compose up -d` — it binds :80/:443, which conflicts
+  # with an existing Nginx/Apache/etc. Start it explicitly with `--profile caddy` if you want
+  # it; otherwise point your own reverse proxy at backend:8000 (/api/*) and web:3000 (see
+  # infra/caddy/Caddyfile for the exact routing to replicate).
   caddy:
     image: caddy:2-alpine
     container_name: ownai-caddy
     restart: unless-stopped
+    profiles: ["caddy"]
     ports:
       - "80:80"
       - "443:443"
