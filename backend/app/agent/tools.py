@@ -5,9 +5,11 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Conversation, User
+from app.schemas.contact import ContactCreateRequest, ContactUpdateRequest
 from app.services import (
     agent_bus_service,
     calendar_service,
+    contact_service,
     email_service,
     file_service,
     home_assistant_service,
@@ -156,6 +158,63 @@ async def _list_memories(
 async def _forget_fact(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
     await memory_service.delete_memory(db, user, arguments["memory_id"])
     return {"forgotten": True}
+
+
+def _contact_dict(contact: Any) -> dict[str, Any]:
+    return {
+        "id": contact.id,
+        "name": contact.name,
+        "phone": contact.phone,
+        "email": contact.email,
+        "birthday_month": contact.birthday_month,
+        "birthday_day": contact.birthday_day,
+        "birthday_year": contact.birthday_year,
+        "notes": contact.notes,
+    }
+
+
+async def _add_contact(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    payload = ContactCreateRequest(
+        name=arguments["name"],
+        phone=arguments.get("phone"),
+        email=arguments.get("email"),
+        birthday_month=arguments.get("birthday_month"),
+        birthday_day=arguments.get("birthday_day"),
+        birthday_year=arguments.get("birthday_year"),
+        notes=arguments.get("notes"),
+    )
+    contact = await contact_service.add_contact(db, user, payload)
+    return _contact_dict(contact)
+
+
+async def _list_contacts(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    contacts = await contact_service.list_contacts(db, user)
+    return [_contact_dict(c) for c in contacts]
+
+
+async def _update_contact(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = ContactUpdateRequest(
+        name=arguments.get("name"),
+        phone=arguments.get("phone"),
+        email=arguments.get("email"),
+        birthday_month=arguments.get("birthday_month"),
+        birthday_day=arguments.get("birthday_day"),
+        birthday_year=arguments.get("birthday_year"),
+        notes=arguments.get("notes"),
+    )
+    contact = await contact_service.update_contact(db, user, arguments["contact_id"], payload)
+    return _contact_dict(contact)
+
+
+async def _delete_contact(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    await contact_service.delete_contact(db, user, arguments["contact_id"])
+    return {"deleted": True}
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -445,6 +504,78 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_contact",
+            "description": (
+                "Legt einen neuen Kontakt an (Name, optional Telefon, E-Mail, Geburtstag, Notizen). "
+                "Ist ein Geburtstag bekannt, wird der Nutzer am Tag selbst automatisch per Push daran erinnert."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name des Kontakts"},
+                    "phone": {"type": "string", "description": "Telefonnummer, optional"},
+                    "email": {"type": "string", "description": "E-Mail-Adresse, optional"},
+                    "birthday_month": {"type": "integer", "description": "Geburtstag: Monat (1-12), optional"},
+                    "birthday_day": {"type": "integer", "description": "Geburtstag: Tag (1-31), optional"},
+                    "birthday_year": {
+                        "type": "integer",
+                        "description": "Geburtsjahr, optional (nur für die Altersanzeige)",
+                    },
+                    "notes": {"type": "string", "description": "Freitext-Notizen, optional"},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_contacts",
+            "description": "Listet alle gespeicherten Kontakte des Nutzers auf (mit ihrer ID).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_contact",
+            "description": (
+                "Ändert Felder eines bestehenden Kontakts. contact_id vorher über list_contacts "
+                "herausfinden. Nur angegebene Felder werden geändert."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {"type": "string", "description": "ID des Kontakts (aus list_contacts)"},
+                    "name": {"type": "string"},
+                    "phone": {"type": "string"},
+                    "email": {"type": "string"},
+                    "birthday_month": {"type": "integer"},
+                    "birthday_day": {"type": "integer"},
+                    "birthday_year": {"type": "integer"},
+                    "notes": {"type": "string"},
+                },
+                "required": ["contact_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_contact",
+            "description": "Löscht einen Kontakt endgültig. contact_id vorher über list_contacts herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {"type": "string", "description": "ID des Kontakts (aus list_contacts)"},
+                },
+                "required": ["contact_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -463,4 +594,8 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "remember_fact": _remember_fact,
     "list_memories": _list_memories,
     "forget_fact": _forget_fact,
+    "add_contact": _add_contact,
+    "list_contacts": _list_contacts,
+    "update_contact": _update_contact,
+    "delete_contact": _delete_contact,
 }

@@ -134,8 +134,8 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently six tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  einstellen können" in one place). Currently seven tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -170,6 +170,14 @@ the `{"error":{"code","message"}}` envelope).
     to be re-told. Facts are added here manually or by the assistant itself during chat via the
     `remember_fact`/`list_memories`/`forget_fact` tools. Verified live: added a memory through
     the form, confirmed it listed with its date, deleted it, confirmed the empty state.
+  - **Kontakte** tab (`src/components/settings/ContactsTab.tsx`): CRUD UI for
+    `GET/POST/PATCH/DELETE /contacts` — name, phone, email, birthday (day/month/optional year)
+    and notes per contact. A birthday, once set, gets the user an automatic push notification on
+    the day itself (backend's daily `_check_birthdays` scheduler job) — no separate reminder
+    needs to be set up. Contacts are added here manually or by the assistant during chat via the
+    `add_contact`/`list_contacts`/`update_contact`/`delete_contact` tools. Verified live: added a
+    contact with a full birthday through the form, confirmed it listed as "17. Mai 1990", deleted
+    it, confirmed the empty state.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

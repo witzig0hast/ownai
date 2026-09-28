@@ -44,6 +44,7 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     memories: Mapped[list["UserMemory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    contacts: Mapped[list["Contact"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -325,3 +326,28 @@ class UserMemory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="memories")
+
+
+class Contact(Base):
+    """A person the user wants OwnAI to keep track of (name, birthday, contact details, notes). Birthday
+    is stored as separate month/day/year columns rather than a single Date - month+day are what the
+    scheduler's daily birthday check (app/services/scheduler.py) matches against "today", while year is
+    optional (many people don't want to share/don't know it) and only used to show an age."""
+
+    __tablename__ = "contacts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    birthday_month: Mapped[int | None] = mapped_column(nullable=True)
+    birthday_day: Mapped[int | None] = mapped_column(nullable=True)
+    birthday_year: Mapped[int | None] = mapped_column(nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set to today's ISO date once a birthday push has been sent for this contact this year, so the
+    # daily scheduler poll never sends the same birthday reminder twice.
+    last_birthday_push_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="contacts")

@@ -106,6 +106,18 @@ export interface Memory {
   created_at: string;
 }
 
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  birthday_month: number | null;
+  birthday_day: number | null;
+  birthday_year: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

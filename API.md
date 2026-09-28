@@ -308,6 +308,43 @@ Response `200`: `{ "memories": [ { "id", "content", "created_at" } ] }` — neue
 Response `204`.
 Fehler: `404 not_found` (Fakt existiert nicht oder gehört einem anderen Nutzer).
 
+## Kontakte
+
+Personen, die sich der Assistent merken soll — Name, optional Telefon/E-Mail, Geburtstag und Notizen. Ist ein Geburtstag hinterlegt (Monat+Tag; Jahr optional, nur für die Altersanzeige), erinnert der Assistent den Nutzer am Tag selbst automatisch per Push (siehe Push-Benachrichtigungen oben) — geprüft durch einen täglichen Scheduler-Job (`_check_birthdays` in `app/services/scheduler.py`, läuft um 08:00 Serverzeit; es gibt noch keine nutzerspezifische Zeitzone). `Contact.last_birthday_push_date` verhindert eine doppelte Erinnerung am selben Tag.
+
+Kontakte entstehen entweder manuell über die Settings-UI (Tab "Kontakte") oder automatisch während des Chats über die Tools `add_contact` / `list_contacts` / `update_contact` / `delete_contact` (siehe `app/agent/tools.py`).
+
+### `POST /contacts`  *(Bearer)*
+Request: `{ "name": string, "phone": string | null, "email": string | null, "birthday_month": int | null, "birthday_day": int | null, "birthday_year": int | null, "notes": string | null }` — `birthday_month` und `birthday_day` müssen zusammen angegeben werden (oder beide weggelassen).
+Response `201`: das erstellte Kontaktobjekt (siehe unten).
+Fehler: `422` bei nur einem von `birthday_month`/`birthday_day`.
+
+### `GET /contacts`  *(Bearer)*
+Response `200`: `{ "contacts": [ Kontakt ] }`, alphabetisch nach Name.
+
+Kontaktobjekt:
+```json
+{
+  "id": "uuid",
+  "name": "Anna Muster",
+  "phone": "+49 170 1234567",
+  "email": null,
+  "birthday_month": 5,
+  "birthday_day": 17,
+  "birthday_year": 1990,
+  "notes": null,
+  "created_at": "datetime"
+}
+```
+
+### `PATCH /contacts/{id}`  *(Bearer)*
+Request: wie `POST`, alle Felder optional — nur angegebene Felder werden geändert (analog zu `PATCH /chat/conversations/{id}`).
+Response `200`: das aktualisierte Kontaktobjekt.
+
+### `DELETE /contacts/{id}`  *(Bearer)*
+Response `204`.
+Fehler: `404 not_found` (Kontakt existiert nicht oder gehört einem anderen Nutzer).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

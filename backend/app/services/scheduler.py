@@ -1,12 +1,12 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
 from app.db.models import Timer, User
 from app.db.session import async_session_maker
-from app.services import push_service
+from app.services import contact_service, push_service
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +38,45 @@ async def _check_expired_timers() -> None:
         await db.commit()
 
 
+async def _check_birthdays() -> None:
+    """Runs once a day (see start_scheduler) and pushes a proactive notification for every
+    contact whose birthday is today - the third proactive channel alongside expired timers and
+    Agent Bus messages. `Contact.last_birthday_push_date` (set to today's ISO date after a push)
+    guards against sending twice if the job somehow runs more than once on the same day (e.g. a
+    restart). Runs in server time - there's no per-user timezone stored yet, so "today" is the
+    scheduler process's local date."""
+    today = date.today()
+    async with async_session_maker() as db:
+        contacts = await contact_service.contacts_with_birthday_on(db, today)
+        if not contacts:
+            return
+
+        for contact in contacts:
+            user = await db.get(User, contact.user_id)
+            if user is None:
+                continue
+            contact.last_birthday_push_date = today.isoformat()
+            body = contact.name
+            if contact.birthday_year is not None:
+                body = f"{contact.name} wird heute {today.year - contact.birthday_year}"
+            try:
+                await push_service.send_push(db, user, title="Geburtstag", body=body)
+            except Exception:  # noqa: BLE001 - one failed push must not block the others or the loop
+                logger.exception("Failed to send birthday push for contact %s", contact.id)
+        await db.commit()
+
+
 def start_scheduler() -> AsyncIOScheduler:
-    """Starts the background poll for expired timers (see _check_expired_timers). Runs
-    in-process via APScheduler. Known limitation: with multiple worker processes, each would
-    poll independently and could send duplicate notifications - docker-compose.yml runs a
-    single uvicorn process, so this doesn't apply today, but is worth knowing before scaling out
-    to multiple workers/replicas (would need a DB-level lock or moving this to a dedicated
-    worker process)."""
+    """Starts the background poll for expired timers (see _check_expired_timers) and the daily
+    birthday check (see _check_birthdays). Runs in-process via APScheduler. Known limitation:
+    with multiple worker processes, each would poll independently and could send duplicate
+    notifications - docker-compose.yml runs a single uvicorn process, so this doesn't apply
+    today, but is worth knowing before scaling out to multiple workers/replicas (would need a
+    DB-level lock or moving this to a dedicated worker process)."""
     global _scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(_check_expired_timers, "interval", seconds=15, id="expired_timers")
+    scheduler.add_job(_check_birthdays, "cron", hour=8, minute=0, id="birthdays")
     scheduler.start()
     _scheduler = scheduler
     return scheduler

@@ -12,6 +12,7 @@ from app.api import (
     auth,
     calendar,
     chat,
+    contacts,
     devices,
     email,
     health,
@@ -86,6 +87,7 @@ api_v1_routers = (
     push.router,
     agent_bus.router,
     memory.router,
+    contacts.router,
     health.router,
 )
 for router in api_v1_routers:
