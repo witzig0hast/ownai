@@ -19,7 +19,9 @@ ownai/
 │   └── ios/             SwiftUI App (iPad)
 ├── infra/
 │   ├── caddy/          Reverse-Proxy-Config (TLS) — optional, siehe unten
-│   └── ollama/          Ollama-Setup-Doku für die P40
+│   ├── ollama/          Ollama-Setup-Doku für die P40
+│   ├── kokoro/          Setup-Doku für den optionalen neuralen TTS-Server
+│   └── searxng/         Setup-Doku für die optionale eigene SearXNG-Instanz (Web-Suche)
 ├── docker-compose.yml   Orchestriert postgres, redis, backend, web (+ optional caddy) —
 │                        Ollama läuft separat auf deinem Server, siehe infra/ollama/README.md
 └── .env.example
