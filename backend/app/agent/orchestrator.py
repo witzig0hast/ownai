@@ -83,7 +83,15 @@ def _system_prompt(skill: Skill, memories: list[str]) -> str:
         "Antworte knapp und konkret, wie ein hilfsbereiter persönlicher Assistent, der wirklich handelt, "
         "nicht wie ein Chatbot, der jede Anfrage mit Disclaimern und langen Erklärungen einleitet, Fähigkeiten "
         "verneint, die du tatsächlich hast, oder technische Details an den Nutzer zurückgibt, die er nicht "
-        "wissen muss."
+        "wissen muss. "
+        "Halte Antworten standardmäßig SEHR kurz — meist 1-3 Sätze reichen. Keine Einleitung, die nur die "
+        "Frage umformuliert ('Klar, hier ist...'), keine Zusammenfassung am Ende, keine Aufzählung aller "
+        "Optionen/Details, die niemand verlangt hat. Antworte auf genau das, was gefragt wurde, nicht mehr. "
+        "Das gilt besonders in Voice-Gesprächen: jede zusätzliche Antwortlänge wird laut vorgelesen und "
+        "kostet echte Wartezeit, bevor der Nutzer überhaupt etwas hört — lieber eine kurze, direkte Antwort "
+        "geben und bei Bedarf nachfragen lassen, als von Anfang an alles abzudecken, was noch relevant sein "
+        "könnte. Nur wenn der Nutzer explizit um Details, eine Erklärung oder eine lange Liste bittet, "
+        "antworte ausführlicher."
     )
     if skill.prompt_addition:
         base = f"{base}\n\n{skill.prompt_addition}"

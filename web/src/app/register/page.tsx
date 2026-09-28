@@ -43,7 +43,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center p-4">
+    <div className="flex flex-1 items-center justify-center overflow-y-auto p-4">
       <div className="animate-scale-in w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
         <h1 className="mb-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
           Create your OwnAI account

@@ -336,6 +336,12 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  // Whether the user was already following the bottom of the conversation - new messages only
+  // auto-scroll in that case, so scrolling up to reread history doesn't keep getting yanked
+  // back down by an incoming reply. A ref (not state): purely gates an imperative scroll
+  // action, doesn't need to trigger a re-render itself.
+  const autoScrollRef = useRef(true);
 
   // Auto-grow the composer with content, like Claude's - capped by the max-h-40 CSS class on
   // the textarea itself, which also gives it a scrollbar once it hits that cap.
@@ -476,8 +482,18 @@ export default function ChatPage() {
   }, [selectedId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (autoScrollRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, sending]);
+
+  // Always jump straight to the bottom (no scroll-position memory) when switching
+  // conversations - re-enables auto-follow too, since re-opening a chat should show its latest
+  // messages regardless of where a previous conversation was scrolled to.
+  useEffect(() => {
+    autoScrollRef.current = true;
+    bottomRef.current?.scrollIntoView({ behavior: "auto" });
+  }, [selectedId]);
 
   const handleCreateConversation = useCallback(async () => {
     setListError(null);
@@ -551,6 +567,7 @@ export default function ChatPage() {
       // (see API.md) - remember that so we know to refresh the title after the reply lands.
       const wasUntitled = conversations.find((c) => c.id === selectedId)?.title == null;
 
+      autoScrollRef.current = true; // sending a message re-engages auto-follow
       setMessages((prev) => [...prev, optimisticMessage]);
       setInput("");
       setSending(true);
@@ -641,7 +658,15 @@ export default function ChatPage() {
                   </select>
                 </div>
               ) : null}
-              <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <div
+                ref={messagesContainerRef}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                  autoScrollRef.current = distanceFromBottom < 120;
+                }}
+                className="flex-1 space-y-3 overflow-y-auto p-4"
+              >
                 {messagesLoading ? (
                   <p className="text-sm text-zinc-500">Loading messages...</p>
                 ) : (

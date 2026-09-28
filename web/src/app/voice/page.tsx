@@ -126,7 +126,7 @@ export default function VoicePage() {
 
   return (
     <AppShell>
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
+      <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto p-8">
         {!isSupported ? (
           <ErrorMessage message="Live Talk braucht Mikrofonzugriff (getUserMedia) und Web Audio - dein Browser oder diese Verbindung unterstützt das nicht. Läuft die Seite über http:// statt https:// oder localhost, blockieren Browser den Mikrofonzugriff komplett." />
         ) : (
