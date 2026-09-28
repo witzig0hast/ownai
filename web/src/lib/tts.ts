@@ -223,8 +223,23 @@ function speakViaBrowserAndWait(text: string, lang: string): Promise<void> {
   });
 }
 
-/** Null if the server has nothing configured/reachable - callers fall back to browser TTS. */
-async function synthesizeViaServer(text: string): Promise<Blob | null> {
+/**
+ * Splits text into sentence-ish chunks for pipelined TTS (see speakAndWait's file-level
+ * comment for why) - deliberately simple: splits after ., !, or ? followed by whitespace and
+ * an uppercase/digit start, or on a blank line (paragraph/list-item break). An occasional
+ * early/late pause on an abbreviation or decimal number is an acceptable trade-off for a much
+ * lower time-to-first-audio on long replies - this never produces wrong audio, just imperfect
+ * pacing at worst.
+ */
+function splitIntoSentences(text: string): string[] {
+  const normalized = text.trim();
+  if (!normalized) return [];
+  const parts = normalized.split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ0-9])|\n\s*\n+/);
+  return parts.map((s) => s.trim()).filter(Boolean);
+}
+
+/** Null if synthesis failed (server not configured/unreachable, or this call errored). */
+async function synthesizeSentenceBlob(text: string): Promise<Blob | null> {
   try {
     return await ttsApi.synthesizeSpeech(text, getPreferredServerVoice() ?? undefined);
   } catch {
@@ -232,12 +247,60 @@ async function synthesizeViaServer(text: string): Promise<Blob | null> {
   }
 }
 
+/**
+ * Plays one synthesized sentence via the shared <audio> element, resolving on natural end and
+ * rejecting on playback failure. Also resolves (not rejects) if `stopSpeaking()` interrupts
+ * playback mid-sentence (detected via the generation counter - a plain `.pause()` doesn't fire
+ * `ended`/`error` on its own), so an interrupted pipeline doesn't fall back to browser TTS for
+ * whatever was cut off.
+ */
+function playBlob(blob: Blob, myGeneration: number): Promise<void> {
+  const audio = getSharedAudio();
+  const url = URL.createObjectURL(blob);
+  audio.src = url;
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      audio.removeEventListener("ended", onEnd);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("pause", onPause);
+      URL.revokeObjectURL(url);
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("audio playback failed"));
+    };
+    const onPause = () => {
+      if (myGeneration !== speakGeneration) {
+        cleanup();
+        resolve();
+      }
+    };
+    audio.addEventListener("ended", onEnd);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("pause", onPause);
+    audio.play().catch(() => {
+      cleanup();
+      reject(new Error("audio play() rejected"));
+    });
+  });
+}
+
 export function speak(text: string, lang = "de-DE"): void {
   if (!text.trim()) return;
   void speakAndWait(text, lang);
 }
 
+// Bumped on every stopSpeaking() call (including the one at the start of each speakAndWait) -
+// an in-flight speakAndWait pipeline checks this after every await and stops dead the moment
+// it no longer matches, rather than finishing out already-fetched/queued sentences.
+let speakGeneration = 0;
+
 export function stopSpeaking(): void {
+  speakGeneration += 1;
   if (sharedAudio && !sharedAudio.paused) {
     sharedAudio.pause();
     sharedAudio.currentTime = 0;
@@ -251,39 +314,47 @@ export function stopSpeaking(): void {
  * Speaks `text` aloud, resolving once playback finishes (or immediately if TTS isn't
  * supported / the text is empty) — used by the Live Talk loop to know when it's safe to start
  * listening again. Resolves rather than rejects on any failure, since a failed read-aloud
- * shouldn't break the conversation loop. Tries the self-hosted server voice first, falling
- * back to the browser's built-in one.
+ * shouldn't break the conversation loop.
+ *
+ * Sentence-pipelined: text is split into sentences (splitIntoSentences), and each is
+ * synthesized via the server while the *previous* one is still playing - so playback starts
+ * after the first sentence's synthesis instead of waiting for the entire reply, which matters
+ * a lot for long replies (each server round-trip otherwise stacks up before any sound plays).
+ * The moment server synthesis fails once (not configured, unreachable, ...), the rest of this
+ * call's sentences go straight to the browser voice instead of retrying the server per
+ * sentence (which would just repeat the same failure); the next speakAndWait call - i.e. the
+ * next reply - tries the server again fresh.
  */
 export async function speakAndWait(text: string, lang = "de-DE"): Promise<void> {
   if (!isTtsSupported() || !text.trim()) return;
   stopSpeaking();
+  const myGeneration = speakGeneration;
 
-  const blob = await synthesizeViaServer(text);
-  if (!blob) {
-    return speakViaBrowserAndWait(text, lang);
+  const sentences = splitIntoSentences(text);
+  if (sentences.length === 0) return;
+
+  let serverAvailable = true;
+  let nextBlobPromise: Promise<Blob | null> | null = synthesizeSentenceBlob(sentences[0]);
+
+  for (let i = 0; i < sentences.length; i++) {
+    if (myGeneration !== speakGeneration) return;
+
+    const blob = serverAvailable ? await nextBlobPromise : null;
+    if (myGeneration !== speakGeneration) return;
+    if (blob === null) serverAvailable = false;
+
+    // Kick off the next sentence's synthesis now, in parallel with playing this one.
+    nextBlobPromise = serverAvailable && i + 1 < sentences.length ? synthesizeSentenceBlob(sentences[i + 1]) : null;
+
+    if (blob) {
+      try {
+        await playBlob(blob, myGeneration);
+      } catch {
+        if (myGeneration !== speakGeneration) return;
+        await speakViaBrowserAndWait(sentences[i], lang);
+      }
+    } else {
+      await speakViaBrowserAndWait(sentences[i], lang);
+    }
   }
-
-  const audio = getSharedAudio();
-  const url = URL.createObjectURL(blob);
-  audio.src = url;
-  return new Promise((resolve) => {
-    const cleanup = () => {
-      audio.removeEventListener("ended", onEnd);
-      audio.removeEventListener("error", onError);
-      URL.revokeObjectURL(url);
-    };
-    const onEnd = () => {
-      cleanup();
-      resolve();
-    };
-    const onError = () => {
-      cleanup();
-      // Playback itself failed (e.g. unsupported format) - fall back to browser TTS rather
-      // than silently producing no audio at all.
-      speakViaBrowserAndWait(text, lang).then(resolve);
-    };
-    audio.addEventListener("ended", onEnd);
-    audio.addEventListener("error", onError);
-    audio.play().catch(onError);
-  });
 }
