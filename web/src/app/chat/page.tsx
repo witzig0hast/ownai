@@ -13,6 +13,7 @@ import { parseMessageContent } from "@/lib/parseMessageContent";
 import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message, Skill } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
+import { warmupOnce } from "@/lib/warmup";
 
 const AUTO_READ_STORAGE_KEY = "ownai.autoReadReplies";
 
@@ -421,10 +422,11 @@ export default function ChatPage() {
     };
   }, [showArchived]);
 
-  // Loads the model into Ollama ahead of time, so the first real reply on this screen doesn't
-  // pay for the load - best-effort, a failure here shouldn't surface as a user-facing error.
+  // AppShell already triggers this on mount (see lib/warmup.ts) - this is a fallback for the
+  // case where Chat is the first authenticated page opened after the dedupe window from an
+  // earlier visit has lapsed, so it doesn't hurt to call it here too.
   useEffect(() => {
-    chatApi.warmup().catch(() => {});
+    warmupOnce().catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { VoicePicker } from "@/components/VoicePicker";
-import * as chatApi from "@/lib/api/chat";
 import { useArtifactPanel } from "@/lib/artifactPanel";
 import { parseMessageContent } from "@/lib/parseMessageContent";
 import { unlockSpeech } from "@/lib/tts";
 import { useLiveTalk, type LiveTalkState } from "@/lib/useLiveTalk";
+import { warmupOnce } from "@/lib/warmup";
 
 const STATE_LABEL: Record<LiveTalkState, string> = {
   idle: "Tippen zum Starten",
@@ -90,6 +90,11 @@ export default function VoicePage() {
   const scale = state === "listening" ? 1 + Math.min(volume, 1) * 0.35 : 1;
   const stateLabel = muted && state === "listening" ? "Stummgeschaltet" : STATE_LABEL[state];
 
+  // Tracks the actual warmupOnce() promise (shared with AppShell/Chat, see lib/warmup.ts) so
+  // this shows real "still loading" feedback instead of silently eating the first reply's
+  // latency - true only while the underlying model-load request is genuinely still in flight.
+  const [modelWarming, setModelWarming] = useState(true);
+
   // Voice has no message thread to render code blocks/download links inline in (unlike Chat) -
   // strip fenced code from the displayed text (still spoken in full by tts, code isn't useful
   // read aloud anyway) and surface it plus any generated file as Artifact Panel buttons instead.
@@ -104,10 +109,19 @@ export default function VoicePage() {
     (tc) => tc.tool === "create_file" && typeof tc.result.id === "string" && typeof tc.result.filename === "string",
   );
 
-  // Loads the model into Ollama ahead of time, so the first reply in this session doesn't pay
-  // for the load - best-effort, a failure here shouldn't surface as a user-facing error.
+  // AppShell already triggers this on mount (see lib/warmup.ts) - awaiting the same (deduped)
+  // promise here just lets this page know when the model is actually ready, so it can tell the
+  // user instead of silently eating the delay in the first reply's latency.
   useEffect(() => {
-    chatApi.warmup().catch(() => {});
+    let cancelled = false;
+    warmupOnce()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setModelWarming(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -147,6 +161,12 @@ export default function VoicePage() {
                   <p className="mt-1 text-sm text-zinc-500">
                     Ein Gespräch ohne Tippen — sprich, die Antwort kommt automatisch als Sprache zurück.
                   </p>
+                  {modelWarming ? (
+                    <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                      Modell wird geladen — die erste Antwort kann noch etwas dauern.
+                    </p>
+                  ) : null}
                   <div className="mx-auto mt-4 max-w-xs">
                     <VoicePicker />
                   </div>
