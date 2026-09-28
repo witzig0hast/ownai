@@ -58,6 +58,7 @@ class User(Base):
     automations: Mapped[list["Automation"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     todo_lists: Mapped[list["TodoList"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     expenses: Mapped[list["Expense"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    rss_feeds: Mapped[list["RssFeed"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -478,3 +479,21 @@ class Expense(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="expenses")
+
+
+class RssFeed(Base):
+    """An RSS/Atom feed the user wants summarized ("was gibt's Neues bei X?"). No items are
+    stored - every lookup fetches the feed live and hands the raw items to the chat/voice LLM,
+    which does the actual summarizing as part of its normal response (same division of labor as
+    calendar_list_events: the tool returns structured data, the assistant's own reply is the
+    summary)."""
+
+    __tablename__ = "rss_feeds"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="rss_feeds")

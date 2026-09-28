@@ -191,6 +191,21 @@ export interface Weather {
   daily: DailyForecast[];
 }
 
+export interface RssFeed {
+  id: string;
+  url: string;
+  name: string | null;
+  created_at: string;
+}
+
+export interface RssItem {
+  feed_name: string;
+  title: string;
+  link: string;
+  published: string | null;
+  summary: string | null;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

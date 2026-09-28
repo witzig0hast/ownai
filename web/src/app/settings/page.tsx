@@ -14,6 +14,7 @@ import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ListsTab } from "@/components/settings/ListsTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
 import { RemindersTab } from "@/components/settings/RemindersTab";
+import { RssTab } from "@/components/settings/RssTab";
 import { WeatherTab } from "@/components/settings/WeatherTab";
 
 type SettingsTab =
@@ -28,6 +29,7 @@ type SettingsTab =
   | "lists"
   | "expenses"
   | "weather"
+  | "rss"
   | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
@@ -42,6 +44,7 @@ const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   lists: ListsTab,
   expenses: ExpensesTab,
   weather: WeatherTab,
+  rss: RssTab,
   account: AccountTab,
 };
 
@@ -57,6 +60,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "lists", label: "Listen" },
   { key: "expenses", label: "Ausgaben" },
   { key: "weather", label: "Wetter" },
+  { key: "rss", label: "News" },
   { key: "account", label: "Konto" },
 ];
 

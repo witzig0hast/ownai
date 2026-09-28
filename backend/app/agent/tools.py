@@ -22,6 +22,7 @@ from app.services import (
     list_service,
     memory_service,
     reminder_service,
+    rss_service,
     searxng_service,
     timer_service,
     weather_service,
@@ -426,6 +427,31 @@ async def _get_weather(
 
 async def _web_search(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
     return await searxng_service.search(db, user, arguments["query"])
+
+
+async def _add_rss_feed(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    feed = await rss_service.add_feed(db, user, arguments["url"], arguments.get("name"))
+    return {"id": feed.id, "url": feed.url, "name": feed.name}
+
+
+async def _list_rss_feeds(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    feeds = await rss_service.list_feeds(db, user)
+    return [{"id": f.id, "url": f.url, "name": f.name} for f in feeds]
+
+
+async def _delete_rss_feed(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    await rss_service.delete_feed(db, user, arguments["feed_id"])
+    return {"deleted": True}
+
+
+async def _list_rss_items(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    return await rss_service.latest_items(db, user, arguments.get("feed_id"))
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -1109,6 +1135,63 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_rss_feed",
+            "description": "Abonniert einen RSS/Atom-Feed, damit der Nutzer sich Neuigkeiten daraus zusammenfassen lassen kann.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "Feed-URL"},
+                    "name": {"type": "string", "description": "Anzeigename, optional (Standard: Feed-Titel)"},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_rss_feeds",
+            "description": "Listet alle abonnierten RSS-Feeds des Nutzers auf (mit ihrer ID).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_rss_feed",
+            "description": "Kündigt ein Feed-Abonnement. feed_id vorher über list_rss_feeds herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "feed_id": {"type": "string", "description": "ID des Feeds (aus list_rss_feeds)"},
+                },
+                "required": ["feed_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_rss_items",
+            "description": (
+                "Ruft die neuesten Einträge aus einem oder allen abonnierten RSS-Feeds ab, damit sie "
+                "zusammengefasst werden können. Ohne feed_id werden alle Feeds des Nutzers abgefragt."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "feed_id": {
+                        "type": "string",
+                        "description": "Nur diesen Feed abfragen, optional (aus list_rss_feeds)",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -1150,4 +1233,8 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "delete_expense": _delete_expense,
     "get_weather": _get_weather,
     "web_search": _web_search,
+    "add_rss_feed": _add_rss_feed,
+    "list_rss_feeds": _list_rss_feeds,
+    "delete_rss_feed": _delete_rss_feed,
+    "list_rss_items": _list_rss_items,
 }

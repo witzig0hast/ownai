@@ -536,6 +536,41 @@ Fehler: `404 location_not_found` (Ort nicht gefunden), `502 weather_service_erro
 
 Auch als Tool `get_weather` (siehe `app/agent/tools.py`) im Chat/Voice-Agenten nutzbar. **Nicht live gegen die echte Open-Meteo-API getestet** — kein Netzwerkzugriff in der Build-Sandbox dieser Session (bestätigt per Live-Test: `403 Forbidden` durch die Sandbox-Egress-Policy). Backend-seitig vollständig mit `httpx.MockTransport` getestet (`tests/test_weather.py`); die Frontend-Fehlerbehandlung wurde live bestätigt (derselbe `403`-Fehler kam sauber über `ErrorMessage` in der UI an). Vor Produktiveinsatz einmal mit echtem Netzwerkzugriff gegen eine echte Stadt durchklicken.
 
+## News/RSS
+
+RSS/Atom-Feeds abonnieren, damit sich der Assistent Neuigkeiten daraus zusammenfassen kann ("was gibt's Neues bei X?"). Es werden **keine Artikel gespeichert** — jede Abfrage holt den Feed live und gibt die rohen Einträge zurück; das Zusammenfassen übernimmt das LLM selbst als Teil seiner normalen Chat-Antwort (gleiches Prinzip wie bei `calendar_list_events`: das Tool liefert Rohdaten, die eigentliche Zusammenfassung ist die Antwort des Assistenten).
+
+### `POST /rss/feeds`  *(Bearer)*
+Request: `{ "url": string, "name": string | null }` — fehlt `name`, wird der Feed einmal abgerufen und sein `<title>` als Name übernommen.
+Response `201`: `{ "id": uuid, "url": string, "name": string | null, "created_at": datetime }`
+
+### `GET /rss/feeds`  *(Bearer)*
+Response `200`: `{ "feeds": [ Feed ] }`
+
+### `DELETE /rss/feeds/{id}`  *(Bearer)*
+Response `204`.
+Fehler: `404 not_found` (Feed existiert nicht oder gehört einem anderen Nutzer).
+
+### `GET /rss/items?feed_id={uuid}`  *(Bearer)*
+`feed_id` optional — ohne Angabe werden alle abonnierten Feeds des Nutzers abgefragt und ihre Einträge zusammengeführt. Pro Feed werden maximal die neuesten 10 Einträge geholt.
+Response `200`:
+```json
+{
+  "items": [
+    {
+      "feed_name": "OwnAI Blog",
+      "title": "Erster Artikel",
+      "link": "https://example.com/1",
+      "published": "Mon, 28 Sep 2026 08:00:00 GMT",
+      "summary": "Zusammenfassung des ersten Artikels."
+    }
+  ]
+}
+```
+`summary` ist auf 500 Zeichen gekürzt (mit `…` markiert) und kann rohes HTML aus dem Feed enthalten (wird nicht bereinigt). Fehler: `404 not_found` (bei explizitem `feed_id`, wenn der Feed nicht existiert/nicht dem Nutzer gehört), `502 rss_feed_error` (Feed nicht erreichbar oder kein gültiges RSS/Atom-XML).
+
+Auch als Tools `add_rss_feed` / `list_rss_feeds` / `delete_rss_feed` / `list_rss_items` (siehe `app/agent/tools.py`) im Chat/Voice-Agenten nutzbar. **Nicht live gegen einen echten RSS-Feed getestet** — kein Netzwerkzugriff in der Build-Sandbox dieser Session (per Live-Test bestätigt: `403 Forbidden` durch die Sandbox-Egress-Policy, Fehlerbehandlung bis in die Frontend-UI aber bestätigt sauber durchgelaufen). Backend-seitig vollständig mit `httpx.MockTransport` und einem eingebetteten Beispiel-Feed getestet (`tests/test_rss.py`, nutzt `feedparser` zum Parsen). Vor Produktiveinsatz einmal mit einem echten Feed durchklicken.
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

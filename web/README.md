@@ -134,9 +134,9 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently twelve tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, Konto) via a
-  `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  einstellen können" in one place). Currently thirteen tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, News, Konto)
+  via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -230,6 +230,16 @@ the `{"error":{"code","message"}}` envelope).
     backend's `502 weather_service_error` cleanly through the same `ErrorMessage` component every
     other tab uses, confirming the request/error wiring works; only the actual forecast content is
     unverified. Try it against a real network before relying on it.
+  - **News** tab (`src/components/settings/RssTab.tsx`): subscribe to RSS/Atom feeds
+    (`GET/POST /rss/feeds`, `DELETE /rss/feeds/{id}`) and pull their latest items
+    (`GET /rss/items`, per-feed or across all feeds via a "Neuigkeiten aus allen Feeds anzeigen"
+    link) — no summarization happens client- or server-side, the raw items (title/link/date/
+    excerpt) are just listed; asking the assistant to summarize them in Chat/Voice is the
+    intended flow. Same feeds/tools are reachable conversationally via `add_rss_feed`/
+    `list_rss_feeds`/`delete_rss_feed`/`list_rss_items`. **Could not be verified against a real
+    feed** (same sandbox network restriction as Wetter/Web-Suche — a live add attempt surfaced a
+    clean `403` through `ErrorMessage`, confirming the wiring). Try it against a real feed URL
+    before relying on it.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker
