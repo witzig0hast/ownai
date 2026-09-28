@@ -495,6 +495,30 @@ Ausgabenobjekt:
 Response `204`.
 Fehler: `404 not_found` (Ausgabe existiert nicht oder gehört einem anderen Nutzer).
 
+## Wetter
+
+Wetterabfrage über [Open-Meteo](https://open-meteo.com/) (kostenlos, kein API-Key nötig). Kein eigenes DB-Modell — jede Anfrage geht live gegen Open-Meteos Geocoding- und Forecast-API, nichts wird gespeichert.
+
+### `GET /weather?location={string}`  *(Bearer)*
+`location` ist ein Ortsname (z.B. `"Berlin"`), wird zuerst per Geocoding-API in Koordinaten übersetzt.
+Response `200`:
+```json
+{
+  "location": "Berlin",
+  "country": "Germany",
+  "current_temperature": 18.5,
+  "current_condition": "Bedeckt",
+  "current_wind_speed": 12.0,
+  "daily": [
+    { "date": "2026-09-28", "temp_min": 12.0, "temp_max": 20.0, "condition": "Bedeckt" }
+  ]
+}
+```
+`daily` enthält eine 3-Tage-Vorhersage (heute + 2 weitere Tage). `current_condition`/`daily[].condition` sind aus dem numerischen WMO-Wettercode von Open-Meteo in einen kurzen deutschen Text übersetzt (`app/services/weather_service.py`).
+Fehler: `404 location_not_found` (Ort nicht gefunden), `502 weather_service_error` (Open-Meteo nicht erreichbar).
+
+Auch als Tool `get_weather` (siehe `app/agent/tools.py`) im Chat/Voice-Agenten nutzbar. **Nicht live gegen die echte Open-Meteo-API getestet** — kein Netzwerkzugriff in der Build-Sandbox dieser Session (bestätigt per Live-Test: `403 Forbidden` durch die Sandbox-Egress-Policy). Backend-seitig vollständig mit `httpx.MockTransport` getestet (`tests/test_weather.py`); die Frontend-Fehlerbehandlung wurde live bestätigt (derselbe `403`-Fehler kam sauber über `ErrorMessage` in der UI an). Vor Produktiveinsatz einmal mit echtem Netzwerkzugriff gegen eine echte Stadt durchklicken.
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

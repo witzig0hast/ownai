@@ -14,6 +14,7 @@ import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ListsTab } from "@/components/settings/ListsTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
 import { RemindersTab } from "@/components/settings/RemindersTab";
+import { WeatherTab } from "@/components/settings/WeatherTab";
 
 type SettingsTab =
   | "integrations"
@@ -26,6 +27,7 @@ type SettingsTab =
   | "automations"
   | "lists"
   | "expenses"
+  | "weather"
   | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
@@ -39,6 +41,7 @@ const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   automations: AutomationsTab,
   lists: ListsTab,
   expenses: ExpensesTab,
+  weather: WeatherTab,
   account: AccountTab,
 };
 
@@ -53,6 +56,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "automations", label: "Automatisierungen" },
   { key: "lists", label: "Listen" },
   { key: "expenses", label: "Ausgaben" },
+  { key: "weather", label: "Wetter" },
   { key: "account", label: "Konto" },
 ];
 

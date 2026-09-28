@@ -175,6 +175,22 @@ export interface ExpensesList {
   by_category: Record<string, number>;
 }
 
+export interface DailyForecast {
+  date: string;
+  temp_min: number;
+  temp_max: number;
+  condition: string;
+}
+
+export interface Weather {
+  location: string;
+  country: string | null;
+  current_temperature: number;
+  current_condition: string;
+  current_wind_speed: number;
+  daily: DailyForecast[];
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

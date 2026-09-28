@@ -23,6 +23,7 @@ from app.services import (
     memory_service,
     reminder_service,
     timer_service,
+    weather_service,
 )
 from app.utils import ensure_utc
 
@@ -414,6 +415,12 @@ async def _delete_expense(
 ) -> Any:
     await expense_service.delete_expense(db, user, arguments["expense_id"])
     return {"deleted": True}
+
+
+async def _get_weather(
+    _db: AsyncSession, _user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    return await weather_service.weather_for_location(arguments["location"])
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -1066,6 +1073,20 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Ruft die aktuelle Wetterlage und eine 3-Tage-Vorhersage für einen Ort ab.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "Ortsname, z.B. 'Berlin'"},
+                },
+                "required": ["location"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -1105,4 +1126,5 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "add_expense": _add_expense,
     "list_expenses": _list_expenses,
     "delete_expense": _delete_expense,
+    "get_weather": _get_weather,
 }

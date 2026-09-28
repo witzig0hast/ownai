@@ -27,6 +27,7 @@ from app.api import (
     timer,
     vision,
     voice,
+    weather,
 )
 from app.config import get_settings
 from app.errors import APIError
@@ -96,6 +97,7 @@ api_v1_routers = (
     automations.router,
     lists.router,
     expenses.router,
+    weather.router,
     health.router,
 )
 for router in api_v1_routers:

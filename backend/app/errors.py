@@ -76,3 +76,13 @@ class AgentNameTaken(APIError):
 class AgentNotFound(APIError):
     def __init__(self, message: str = "Agent nicht gefunden."):
         super().__init__(404, "agent_not_found", message)
+
+
+class LocationNotFound(APIError):
+    def __init__(self, message: str = "Ort nicht gefunden."):
+        super().__init__(404, "location_not_found", message)
+
+
+class WeatherServiceError(APIError):
+    def __init__(self, message: str = "Wetterdienst nicht erreichbar."):
+        super().__init__(502, "weather_service_error", message)

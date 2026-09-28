@@ -134,8 +134,8 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently eleven tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Konto) via a
+  einstellen können" in one place). Currently twelve tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, Konto) via a
   `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
@@ -218,6 +218,15 @@ the `{"error":{"code","message"}}` envelope).
     during chat via the `add_expense`/`list_expenses`/`delete_expense` tools. Verified live: added
     an expense with a category, confirmed the total and per-category breakdown lines, deleted it,
     confirmed the empty state.
+  - **Wetter** tab (`src/components/settings/WeatherTab.tsx`): a plain lookup, not a CRUD list
+    like the other tabs (nothing to persist) — a location text field plus a card showing the
+    current condition/temperature/wind and a 3-day forecast strip, all from `GET /weather`. Same
+    lookup is available conversationally via the `get_weather` tool. **Could not be verified
+    against the real Open-Meteo API** (this sandbox's outbound network policy denies the call with
+    a `403`), but that gave a real end-to-end check anyway: submitting a location live surfaced the
+    backend's `502 weather_service_error` cleanly through the same `ErrorMessage` component every
+    other tab uses, confirming the request/error wiring works; only the actual forecast content is
+    unverified. Try it against a real network before relying on it.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker
