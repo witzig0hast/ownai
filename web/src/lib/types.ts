@@ -133,6 +133,16 @@ export interface Reminder {
   created_at: string;
 }
 
+export interface Automation {
+  id: string;
+  entity_id: string;
+  trigger_state: string;
+  message: string;
+  active: boolean;
+  last_seen_state: string | null;
+  created_at: string;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

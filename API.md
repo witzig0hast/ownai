@@ -382,6 +382,42 @@ Response `200`: die aktualisierte Erinnerung.
 Response `204`.
 Fehler: `404 not_found` (Erinnerung existiert nicht oder gehört einem anderen Nutzer).
 
+## Automatisierungen
+
+HA-getriggerte Push-Benachrichtigungen: "warne mich, wenn diese Home-Assistant-Entität einen bestimmten Zustand erreicht" (z.B. Tür wird aufgeschlossen, Wäsche fertig, Temperatur überschritten). Setzt eine verbundene Home-Assistant-Instanz voraus (siehe Home Assistant oben) — geprüft wird gegen die zum jeweiligen Nutzerkonto gehörende Instanz.
+
+Geprüft durch einen Scheduler-Job (`_check_automations` in `app/services/scheduler.py`, alle 30s), der pro betroffenem Nutzer einmal `GET /api/states` gegen dessen Home Assistant abruft und alle seine aktiven Automatisierungen dagegen matcht. **Kantengetriggert, nicht zustandsgetriggert**: die Push feuert nur beim Übergang *in* den `trigger_state`, nicht bei jedem Poll, solange der Zustand bestehen bleibt (`Automation.last_seen_state` verhindert Spam). Ist die Home-Assistant-Instanz des Nutzers nicht verbunden oder nicht erreichbar, werden seine Automatisierungen für diesen Poll einfach übersprungen (kein Fehler für andere Nutzer).
+
+Automatisierungen entstehen entweder manuell über die Settings-UI (Tab "Automatisierungen") oder automatisch während des Chats über die Tools `add_automation` / `list_automations` / `update_automation` / `delete_automation` (siehe `app/agent/tools.py`) — üblicherweise nachdem der Agent zuerst `home_assistant_list_entities` genutzt hat, um die passende `entity_id` und mögliche Zustandswerte herauszufinden.
+
+### `POST /automations`  *(Bearer)*
+Request: `{ "entity_id": string, "trigger_state": string, "message": string }`
+Response `201`: die erstellte Automatisierung (siehe unten, inkl. `active: true`, `last_seen_state: null`).
+
+### `GET /automations`  *(Bearer)*
+Response `200`: `{ "automations": [ Automatisierung ] }`, neueste zuerst.
+
+Automatisierungsobjekt:
+```json
+{
+  "id": "uuid",
+  "entity_id": "lock.haustuer",
+  "trigger_state": "unlocked",
+  "message": "Haustür ist auf",
+  "active": true,
+  "last_seen_state": "locked",
+  "created_at": "datetime"
+}
+```
+
+### `PATCH /automations/{id}`  *(Bearer)*
+Request: wie `POST`, alle Felder optional (inkl. `active`) — nur angegebene Felder werden geändert. Zum Pausieren/Reaktivieren einfach nur `{ "active": false }` schicken.
+Response `200`: die aktualisierte Automatisierung.
+
+### `DELETE /automations/{id}`  *(Bearer)*
+Response `204`.
+Fehler: `404 not_found` (Automatisierung existiert nicht oder gehört einem anderen Nutzer).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

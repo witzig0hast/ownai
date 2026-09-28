@@ -10,6 +10,7 @@ from app.api import (
     admin,
     agent_bus,
     auth,
+    automations,
     calendar,
     chat,
     contacts,
@@ -90,6 +91,7 @@ api_v1_routers = (
     memory.router,
     contacts.router,
     reminders.router,
+    automations.router,
     health.router,
 )
 for router in api_v1_routers:

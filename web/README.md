@@ -134,8 +134,8 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently eight tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Erinnerungen, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  einstellen können" in one place). Currently nine tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -188,6 +188,17 @@ the `{"error":{"code","message"}}` envelope).
     the `add_reminder`/`list_reminders`/`update_reminder`/`delete_reminder` tools. Verified live:
     added a weekly reminder, confirmed the description text, paused it (confirmed the toggle
     label flipped to "Aktivieren"), deleted it, confirmed the empty state.
+  - **Automatisierungen** tab (`src/components/settings/AutomationsTab.tsx`): CRUD UI for
+    `GET/POST/PATCH/DELETE /automations` — "warn me when this Home Assistant entity reaches this
+    state" (entity_id, trigger state, push message), e.g. a door lock or a washing machine's
+    "done" state. Requires a connected Home Assistant account (Integrations tab); the backend's
+    `_check_automations` scheduler job is edge-triggered, so a row also shows the entity's
+    currently observed state for context. Same Pausieren/Aktivieren pattern as Reminders.
+    Automations are added here manually or by the assistant during chat via the
+    `add_automation`/`list_automations`/`update_automation`/`delete_automation` tools (the
+    assistant typically calls `home_assistant_list_entities` first to find the right entity_id).
+    Verified live: added an automation, confirmed the entity/state summary line, paused it
+    (confirmed the toggle label flipped to "Aktivieren"), deleted it, confirmed the empty state.
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

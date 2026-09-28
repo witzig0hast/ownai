@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { AccountTab } from "@/components/settings/AccountTab";
 import { AgentBusTab } from "@/components/settings/AgentBusTab";
+import { AutomationsTab } from "@/components/settings/AutomationsTab";
 import { CalendarTab } from "@/components/settings/CalendarTab";
 import { ContactsTab } from "@/components/settings/ContactsTab";
 import { EmailTab } from "@/components/settings/EmailTab";
@@ -20,6 +21,7 @@ type SettingsTab =
   | "memory"
   | "contacts"
   | "reminders"
+  | "automations"
   | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
@@ -30,6 +32,7 @@ const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   memory: MemoryTab,
   contacts: ContactsTab,
   reminders: RemindersTab,
+  automations: AutomationsTab,
   account: AccountTab,
 };
 
@@ -41,6 +44,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "memory", label: "Gedächtnis" },
   { key: "contacts", label: "Kontakte" },
   { key: "reminders", label: "Erinnerungen" },
+  { key: "automations", label: "Automatisierungen" },
   { key: "account", label: "Konto" },
 ];
 

@@ -48,6 +48,7 @@ class User(Base):
     recurring_reminders: Mapped[list["RecurringReminder"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    automations: Mapped[list["Automation"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -380,3 +381,23 @@ class RecurringReminder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="recurring_reminders")
+
+
+class Automation(Base):
+    """Push the user when a Home Assistant entity reaches a given state (e.g. "warn me when the
+    front door unlocks"). Edge-triggered, not level-triggered: `last_seen_state` records the state
+    seen on the previous poll so the scheduler's _check_automations job (app/services/scheduler.py)
+    only pushes on the transition INTO `trigger_state`, not on every poll while it stays there."""
+
+    __tablename__ = "automations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    trigger_state: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(String(255), nullable=False)
+    active: Mapped[bool] = mapped_column(default=True)
+    last_seen_state: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="automations")

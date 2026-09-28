@@ -5,10 +5,12 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Conversation, User
+from app.schemas.automation import AutomationCreateRequest, AutomationUpdateRequest
 from app.schemas.contact import ContactCreateRequest, ContactUpdateRequest
 from app.schemas.reminder import ReminderCreateRequest, ReminderUpdateRequest
 from app.services import (
     agent_bus_service,
+    automation_service,
     calendar_service,
     contact_service,
     email_service,
@@ -272,6 +274,53 @@ async def _delete_reminder(
     db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
 ) -> Any:
     await reminder_service.delete_reminder(db, user, arguments["reminder_id"])
+    return {"deleted": True}
+
+
+def _automation_dict(automation: Any) -> dict[str, Any]:
+    return {
+        "id": automation.id,
+        "entity_id": automation.entity_id,
+        "trigger_state": automation.trigger_state,
+        "message": automation.message,
+        "active": automation.active,
+    }
+
+
+async def _add_automation(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = AutomationCreateRequest(
+        entity_id=arguments["entity_id"], trigger_state=arguments["trigger_state"], message=arguments["message"]
+    )
+    automation = await automation_service.add_automation(db, user, payload)
+    return _automation_dict(automation)
+
+
+async def _list_automations(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    automations = await automation_service.list_automations(db, user)
+    return [_automation_dict(a) for a in automations]
+
+
+async def _update_automation(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = AutomationUpdateRequest(
+        entity_id=arguments.get("entity_id"),
+        trigger_state=arguments.get("trigger_state"),
+        message=arguments.get("message"),
+        active=arguments.get("active"),
+    )
+    automation = await automation_service.update_automation(db, user, arguments["automation_id"], payload)
+    return _automation_dict(automation)
+
+
+async def _delete_automation(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    await automation_service.delete_automation(db, user, arguments["automation_id"])
     return {"deleted": True}
 
 
@@ -710,6 +759,73 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_automation",
+            "description": (
+                "Legt eine Automatisierung an, die den Nutzer per Push benachrichtigt, sobald eine "
+                "Home-Assistant-Entität einen bestimmten Zustand erreicht (z.B. 'Tür wird aufgeschlossen'). "
+                "Nutze vorher home_assistant_list_entities, um die richtige entity_id und mögliche "
+                "Zustandswerte herauszufinden. Feuert nur bei Zustandswechsel, nicht wiederholt, solange "
+                "der Zustand bestehen bleibt."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_id": {"type": "string", "description": "Home-Assistant entity_id, z.B. 'lock.haustuer'"},
+                    "trigger_state": {"type": "string", "description": "Zustand, der die Push auslöst, z.B. 'unlocked'"},
+                    "message": {"type": "string", "description": "Text der Push-Benachrichtigung"},
+                },
+                "required": ["entity_id", "trigger_state", "message"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_automations",
+            "description": "Listet alle Automatisierungen des Nutzers auf (mit ihrer ID).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_automation",
+            "description": (
+                "Ändert Felder einer bestehenden Automatisierung, z.B. um sie zu pausieren (active=false). "
+                "automation_id vorher über list_automations herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "automation_id": {"type": "string", "description": "ID der Automatisierung (aus list_automations)"},
+                    "entity_id": {"type": "string"},
+                    "trigger_state": {"type": "string"},
+                    "message": {"type": "string"},
+                    "active": {"type": "boolean"},
+                },
+                "required": ["automation_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_automation",
+            "description": (
+                "Löscht eine Automatisierung endgültig. automation_id vorher über list_automations herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "automation_id": {"type": "string", "description": "ID der Automatisierung (aus list_automations)"},
+                },
+                "required": ["automation_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -736,4 +852,8 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "list_reminders": _list_reminders,
     "update_reminder": _update_reminder,
     "delete_reminder": _delete_reminder,
+    "add_automation": _add_automation,
+    "list_automations": _list_automations,
+    "update_automation": _update_automation,
+    "delete_automation": _delete_automation,
 }

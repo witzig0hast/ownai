@@ -1,12 +1,13 @@
 from datetime import date, datetime, timedelta, timezone
 
+import httpx
 from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db.models import Contact, RecurringReminder, Timer, User
+from app.db.models import Automation, Contact, RecurringReminder, Timer, User
 from app.db.session import async_session_maker
-from app.services import push_service, scheduler
+from app.services import home_assistant_service, push_service, scheduler
 
 _WEEKDAY_BY_INDEX = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -249,4 +250,137 @@ async def test_weekly_reminder_on_wrong_weekday_is_not_notified(client: AsyncCli
         await db.commit()
 
     await scheduler._check_recurring_reminders()
+    assert pushed == []
+
+
+def _ha_mock_transport(state: str):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/states":
+            return httpx.Response(200, json=[{"entity_id": "lock.haustuer", "state": state, "attributes": {}}])
+        return httpx.Response(404, json={"message": "not found"})
+
+    return handler
+
+
+async def test_automation_fires_once_on_state_transition(client: AsyncClient, auth_headers: dict, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "vapid_public_key", "pub-key")
+    monkeypatch.setattr(settings, "vapid_private_key", "priv-key")
+
+    await client.post(
+        "/push/subscribe",
+        json={"endpoint": "https://push.example/automation", "keys": {"p256dh": "p", "auth": "a"}},
+        headers=auth_headers,
+    )
+    await client.post(
+        "/integrations/home-assistant",
+        json={"url": "http://homeassistant.local:8123", "token": "secret-token"},
+        headers=auth_headers,
+    )
+    await client.post(
+        "/automations",
+        json={"entity_id": "lock.haustuer", "trigger_state": "unlocked", "message": "Tür ist auf"},
+        headers=auth_headers,
+    )
+
+    pushed = []
+    monkeypatch.setattr(
+        push_service,
+        "_send_sync",
+        lambda subscription, payload: pushed.append((subscription.endpoint, payload)) or None,
+    )
+
+    def fake_client(account):
+        return httpx.AsyncClient(base_url=account.url, transport=httpx.MockTransport(_ha_mock_transport("locked")))
+
+    monkeypatch.setattr(home_assistant_service, "_client", fake_client)
+    await scheduler._check_automations()
+    assert pushed == []  # not yet in the trigger state
+
+    def fake_client_unlocked(account):
+        return httpx.AsyncClient(
+            base_url=account.url, transport=httpx.MockTransport(_ha_mock_transport("unlocked"))
+        )
+
+    monkeypatch.setattr(home_assistant_service, "_client", fake_client_unlocked)
+    await scheduler._check_automations()
+    assert len(pushed) == 1
+    endpoint, payload = pushed[0]
+    assert endpoint == "https://push.example/automation"
+    assert payload["title"] == "Automatisierung"
+    assert payload["body"] == "Tür ist auf"
+
+    # Staying in the trigger state on the next poll must not re-notify.
+    await scheduler._check_automations()
+    assert len(pushed) == 1
+
+    # Leaving and re-entering the trigger state fires again.
+    monkeypatch.setattr(home_assistant_service, "_client", fake_client)
+    await scheduler._check_automations()
+    monkeypatch.setattr(home_assistant_service, "_client", fake_client_unlocked)
+    await scheduler._check_automations()
+    assert len(pushed) == 2
+
+
+async def test_inactive_automation_is_never_notified(client: AsyncClient, auth_headers: dict, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "vapid_public_key", "pub-key")
+    monkeypatch.setattr(settings, "vapid_private_key", "priv-key")
+
+    await client.post(
+        "/integrations/home-assistant",
+        json={"url": "http://homeassistant.local:8123", "token": "secret-token"},
+        headers=auth_headers,
+    )
+
+    pushed = []
+    monkeypatch.setattr(
+        push_service, "_send_sync", lambda subscription, payload: pushed.append(subscription.endpoint) or None
+    )
+    monkeypatch.setattr(
+        home_assistant_service,
+        "_client",
+        lambda account: httpx.AsyncClient(
+            base_url=account.url, transport=httpx.MockTransport(_ha_mock_transport("unlocked"))
+        ),
+    )
+
+    async with async_session_maker() as db:
+        user = (await db.execute(select(User))).scalar_one()
+        db.add(
+            Automation(
+                user_id=user.id,
+                entity_id="lock.haustuer",
+                trigger_state="unlocked",
+                message="Sollte nicht feuern",
+                active=False,
+            )
+        )
+        await db.commit()
+
+    await scheduler._check_automations()
+    assert pushed == []
+
+
+async def test_automation_without_connected_home_assistant_is_skipped(
+    client: AsyncClient, auth_headers: dict, monkeypatch
+):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "vapid_public_key", "pub-key")
+    monkeypatch.setattr(settings, "vapid_private_key", "priv-key")
+
+    pushed = []
+    monkeypatch.setattr(
+        push_service, "_send_sync", lambda subscription, payload: pushed.append(subscription.endpoint) or None
+    )
+
+    async with async_session_maker() as db:
+        user = (await db.execute(select(User))).scalar_one()
+        db.add(
+            Automation(user_id=user.id, entity_id="lock.haustuer", trigger_state="unlocked", message="Nie gesendet")
+        )
+        await db.commit()
+
+    # No HA account connected for this user - the check must skip it without raising.
+    await scheduler._check_automations()
     assert pushed == []
