@@ -134,8 +134,8 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently nine tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  einstellen können" in one place). Currently ten tabs (Integrations, Kalender, E-Mail, Agent
+  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -199,6 +199,16 @@ the `{"error":{"code","message"}}` envelope).
     assistant typically calls `home_assistant_list_entities` first to find the right entity_id).
     Verified live: added an automation, confirmed the entity/state summary line, paused it
     (confirmed the toggle label flipped to "Aktivieren"), deleted it, confirmed the empty state.
+  - **Listen** tab (`src/components/settings/ListsTab.tsx`): CRUD UI for
+    `GET/POST/PATCH/DELETE /lists` and its nested `/lists/{id}/items` endpoints — todo lists and
+    shopping lists with checkable items. Each `ListCard` shows its items with a checkbox (PATCHes
+    `done`) and an inline add-item form; every item mutation replaces the whole list in state from
+    the endpoint's response (the backend always returns the full updated list, not just the
+    changed item, to save a round trip). Lists are added here manually or by the assistant during
+    chat via the `create_list`/`list_lists`/`delete_list`/`add_list_item`/`update_list_item`/
+    `delete_list_item` tools. Verified live: created a shopping list, added an item, checked it
+    off, removed it (confirmed the empty-items state), deleted the list (confirmed the
+    empty-lists state).
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

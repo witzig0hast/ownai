@@ -49,6 +49,7 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     automations: Mapped[list["Automation"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    todo_lists: Mapped[list["TodoList"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -401,3 +402,34 @@ class Automation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="automations")
+
+
+class TodoList(Base):
+    """A named list (todo list or shopping list, distinguished by `kind`) holding checkable items.
+    Named `TodoList` rather than `List` to avoid shadowing the builtin `list` used throughout this
+    module's own type hints."""
+
+    __tablename__ = "todo_lists"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # todo | shopping
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="todo_lists")
+    items: Mapped[list["TodoListItem"]] = relationship(
+        back_populates="todo_list", cascade="all, delete-orphan", order_by="TodoListItem.created_at"
+    )
+
+
+class TodoListItem(Base):
+    __tablename__ = "todo_list_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    list_id: Mapped[str] = mapped_column(String(36), ForeignKey("todo_lists.id", ondelete="CASCADE"), nullable=False)
+    content: Mapped[str] = mapped_column(String(512), nullable=False)
+    done: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    todo_list: Mapped["TodoList"] = relationship(back_populates="items")

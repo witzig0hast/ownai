@@ -10,6 +10,7 @@ import { CalendarTab } from "@/components/settings/CalendarTab";
 import { ContactsTab } from "@/components/settings/ContactsTab";
 import { EmailTab } from "@/components/settings/EmailTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
+import { ListsTab } from "@/components/settings/ListsTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
 import { RemindersTab } from "@/components/settings/RemindersTab";
 
@@ -22,6 +23,7 @@ type SettingsTab =
   | "contacts"
   | "reminders"
   | "automations"
+  | "lists"
   | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
@@ -33,6 +35,7 @@ const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   contacts: ContactsTab,
   reminders: RemindersTab,
   automations: AutomationsTab,
+  lists: ListsTab,
   account: AccountTab,
 };
 
@@ -45,6 +48,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "contacts", label: "Kontakte" },
   { key: "reminders", label: "Erinnerungen" },
   { key: "automations", label: "Automatisierungen" },
+  { key: "lists", label: "Listen" },
   { key: "account", label: "Konto" },
 ];
 

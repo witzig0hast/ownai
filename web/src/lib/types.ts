@@ -143,6 +143,23 @@ export interface Automation {
   created_at: string;
 }
 
+export type ListKind = "todo" | "shopping";
+
+export interface ListItem {
+  id: string;
+  content: string;
+  done: boolean;
+  created_at: string;
+}
+
+export interface TodoList {
+  id: string;
+  name: string;
+  kind: ListKind;
+  created_at: string;
+  items: ListItem[];
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

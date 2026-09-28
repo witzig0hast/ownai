@@ -418,6 +418,53 @@ Response `200`: die aktualisierte Automatisierung.
 Response `204`.
 Fehler: `404 not_found` (Automatisierung existiert nicht oder gehört einem anderen Nutzer).
 
+## Listen
+
+Todo- und Einkaufslisten (`kind`: `"todo"` oder `"shopping"`) mit abhakbaren Einträgen. Eine Liste wird immer mitsamt ihrer Einträge zurückgegeben (kein separater Endpunkt für einzelne Listen nötig) — bei mehreren Einträgen typischerweise überschaubar viele, daher kein Paging.
+
+Listen und Einträge entstehen entweder manuell über die Settings-UI (Tab "Listen") oder automatisch während des Chats über die Tools `create_list` / `list_lists` / `delete_list` / `add_list_item` / `update_list_item` / `delete_list_item` (siehe `app/agent/tools.py`).
+
+### `POST /lists`  *(Bearer)*
+Request: `{ "name": string, "kind": "todo" | "shopping" }`
+Response `201`: die erstellte Liste (siehe unten, `items: []`).
+
+### `GET /lists`  *(Bearer)*
+Response `200`: `{ "lists": [ Liste ] }`, nach Erstelldatum.
+
+Listenobjekt:
+```json
+{
+  "id": "uuid",
+  "name": "Einkaufsliste",
+  "kind": "shopping",
+  "created_at": "datetime",
+  "items": [
+    { "id": "uuid", "content": "Milch", "done": false, "created_at": "datetime" }
+  ]
+}
+```
+
+### `PATCH /lists/{id}`  *(Bearer)*
+Request: `{ "name": string }` — aktuell nur der Name änderbar.
+Response `200`: die aktualisierte Liste.
+
+### `DELETE /lists/{id}`  *(Bearer)*
+Löscht die Liste inkl. aller Einträge.
+Response `204`.
+Fehler: `404 not_found` (Liste existiert nicht oder gehört einem anderen Nutzer).
+
+### `POST /lists/{id}/items`  *(Bearer)*
+Request: `{ "content": string }`
+Response `201`: die **gesamte aktualisierte Liste** (nicht nur der neue Eintrag) — spart der UI einen zweiten Roundtrip.
+
+### `PATCH /lists/{id}/items/{item_id}`  *(Bearer)*
+Request: `{ "content": string | null, "done": bool | null }`, beide optional. Zum Abhaken einfach nur `{ "done": true }` schicken.
+Response `200`: die gesamte aktualisierte Liste.
+
+### `DELETE /lists/{id}/items/{item_id}`  *(Bearer)*
+Response `200` (**nicht 204** — Ausnahme von der sonstigen Konvention, da die Antwort direkt die aktualisierte Liste liefert): die gesamte aktualisierte Liste ohne den gelöschten Eintrag.
+Fehler: `404 not_found` (Liste oder Eintrag existiert nicht oder gehört einem anderen Nutzer).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Conversation, User
 from app.schemas.automation import AutomationCreateRequest, AutomationUpdateRequest
 from app.schemas.contact import ContactCreateRequest, ContactUpdateRequest
+from app.schemas.list import ListCreateRequest, ListItemCreateRequest, ListItemUpdateRequest
 from app.schemas.reminder import ReminderCreateRequest, ReminderUpdateRequest
 from app.services import (
     agent_bus_service,
@@ -16,6 +17,7 @@ from app.services import (
     email_service,
     file_service,
     home_assistant_service,
+    list_service,
     memory_service,
     reminder_service,
     timer_service,
@@ -322,6 +324,52 @@ async def _delete_automation(
 ) -> Any:
     await automation_service.delete_automation(db, user, arguments["automation_id"])
     return {"deleted": True}
+
+
+def _list_dict(todo_list: Any) -> dict[str, Any]:
+    return {
+        "id": todo_list.id,
+        "name": todo_list.name,
+        "kind": todo_list.kind,
+        "items": [{"id": i.id, "content": i.content, "done": i.done} for i in todo_list.items],
+    }
+
+
+async def _create_list(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    payload = ListCreateRequest(name=arguments["name"], kind=arguments["kind"])
+    todo_list = await list_service.add_list(db, user, payload)
+    return _list_dict(todo_list)
+
+
+async def _list_lists(db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]) -> Any:
+    lists = await list_service.list_lists(db, user)
+    return [_list_dict(todo_list) for todo_list in lists]
+
+
+async def _delete_list(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    await list_service.delete_list(db, user, arguments["list_id"])
+    return {"deleted": True}
+
+
+async def _add_list_item(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    payload = ListItemCreateRequest(content=arguments["content"])
+    todo_list = await list_service.add_item(db, user, arguments["list_id"], payload)
+    return _list_dict(todo_list)
+
+
+async def _update_list_item(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = ListItemUpdateRequest(content=arguments.get("content"), done=arguments.get("done"))
+    todo_list = await list_service.update_item(db, user, arguments["list_id"], arguments["item_id"], payload)
+    return _list_dict(todo_list)
+
+
+async def _delete_list_item(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    todo_list = await list_service.delete_item(db, user, arguments["list_id"], arguments["item_id"])
+    return _list_dict(todo_list)
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -826,6 +874,96 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_list",
+            "description": "Legt eine neue Liste an - eine Todo-Liste oder eine Einkaufsliste.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name der Liste, z.B. 'Einkaufsliste'"},
+                    "kind": {"type": "string", "enum": ["todo", "shopping"]},
+                },
+                "required": ["name", "kind"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_lists",
+            "description": "Listet alle Listen des Nutzers mitsamt ihrer Einträge auf (mit IDs).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_list",
+            "description": "Löscht eine ganze Liste inkl. aller Einträge. list_id vorher über list_lists herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "list_id": {"type": "string", "description": "ID der Liste (aus list_lists)"},
+                },
+                "required": ["list_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_list_item",
+            "description": "Fügt einen Eintrag zu einer bestehenden Liste hinzu. list_id vorher über list_lists herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "list_id": {"type": "string", "description": "ID der Liste (aus list_lists)"},
+                    "content": {"type": "string", "description": "Text des Eintrags, z.B. 'Milch'"},
+                },
+                "required": ["list_id", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_list_item",
+            "description": (
+                "Ändert einen Eintrag - z.B. als erledigt/abgehakt markieren (done=true) oder den Text ändern. "
+                "list_id und item_id vorher über list_lists herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "list_id": {"type": "string", "description": "ID der Liste (aus list_lists)"},
+                    "item_id": {"type": "string", "description": "ID des Eintrags (aus list_lists)"},
+                    "content": {"type": "string"},
+                    "done": {"type": "boolean"},
+                },
+                "required": ["list_id", "item_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_list_item",
+            "description": (
+                "Löscht einen einzelnen Eintrag aus einer Liste. list_id und item_id vorher über "
+                "list_lists herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "list_id": {"type": "string", "description": "ID der Liste (aus list_lists)"},
+                    "item_id": {"type": "string", "description": "ID des Eintrags (aus list_lists)"},
+                },
+                "required": ["list_id", "item_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -856,4 +994,10 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "list_automations": _list_automations,
     "update_automation": _update_automation,
     "delete_automation": _delete_automation,
+    "create_list": _create_list,
+    "list_lists": _list_lists,
+    "delete_list": _delete_list,
+    "add_list_item": _add_list_item,
+    "update_list_item": _update_list_item,
+    "delete_list_item": _delete_list_item,
 }

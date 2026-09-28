@@ -18,6 +18,7 @@ from app.api import (
     email,
     health,
     home_assistant,
+    lists,
     memory,
     notifications,
     push,
@@ -92,6 +93,7 @@ api_v1_routers = (
     contacts.router,
     reminders.router,
     automations.router,
+    lists.router,
     health.router,
 )
 for router in api_v1_routers:
