@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Modal } from "@/components/Modal";
 import { SetupHelperChat } from "@/components/SetupHelperChat";
@@ -269,6 +270,39 @@ function SearxngForm({ onConnected }: { onConnected: () => void }) {
   );
 }
 
+/**
+ * Portals the FAB + its popup straight to document.body, escaping IntegrationsTab's normal
+ * position in the DOM tree entirely. Necessary because settings/page.tsx wraps each tab's
+ * content in an `animate-fade-in-up` div - its entrance animation ends on `transform:
+ * translateY(0)`, which the animation's fill-mode holds permanently afterwards, and *any*
+ * non-`none` transform on an ancestor (even one that looks like a no-op) makes that ancestor
+ * the containing block for `position: fixed` descendants instead of the viewport. Without the
+ * portal, the FAB/popup end up positioned relative to that div's box - roughly the middle of
+ * the page - rather than pinned to the actual bottom-right corner of the screen.
+ */
+function ChatFabPortal({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // See Modal.tsx's identical pattern for why this is the correct SSR-safe portal mount
+    // check, not the kind of cascading setState this lint rule otherwise guards against.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+  if (!mounted) return null;
+
+  return createPortal(
+    <>
+      <ChatFab open={open} onToggle={onToggle} />
+      {open ? (
+        <div className="animate-scale-in fixed right-5 bottom-20 z-10 h-[28rem] w-[22rem] max-w-[calc(100vw-2.5rem)]">
+          <SetupHelperChat />
+        </div>
+      ) : null}
+    </>,
+    document.body,
+  );
+}
+
 function ChatFab({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button
@@ -409,12 +443,7 @@ export function IntegrationsTab() {
         </Modal>
       ) : null}
 
-      <ChatFab open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} />
-      {helpOpen ? (
-        <div className="animate-scale-in fixed right-5 bottom-20 z-10 h-[28rem] w-[22rem] max-w-[calc(100vw-2.5rem)]">
-          <SetupHelperChat />
-        </div>
-      ) : null}
+      <ChatFabPortal open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} />
     </div>
   );
 }

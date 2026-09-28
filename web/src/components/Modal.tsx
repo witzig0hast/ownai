@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   title: string;
@@ -8,9 +9,26 @@ interface ModalProps {
   children: ReactNode;
 }
 
-/** A small centered popup dialog — no library, matches the app's existing minimal styling. */
+/**
+ * A small centered popup dialog — no library, matches the app's existing minimal styling.
+ * Portaled to document.body: several callers (every Settings tab) render this from inside
+ * settings/page.tsx's `animate-fade-in-up` tab wrapper, whose entrance animation ends on
+ * `transform: translateY(0)` and holds it via fill-mode - any non-`none` transform on an
+ * ancestor (even a visual no-op like translateY(0)) makes it the containing block for
+ * `position: fixed` descendants instead of the viewport. Without the portal, this modal's
+ * `fixed inset-0` backdrop would size/position itself against that wrapper div's box - not
+ * necessarily full-screen or centered - instead of the actual viewport.
+ */
 export function Modal({ title, onClose, children }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    // Client-only flag so the first client render matches the server's (both render nothing -
+    // document.body doesn't exist server-side to portal into) before flipping true - the
+    // standard, necessary pattern for a portal under SSR, not one this lint rule's "avoid
+    // cascading renders" concern actually applies to.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -18,7 +36,9 @@ export function Modal({ title, onClose, children }: ModalProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       className="animate-backdrop-in fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       onClick={onClose}
@@ -45,6 +65,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
