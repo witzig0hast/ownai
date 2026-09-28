@@ -23,6 +23,7 @@ from app.api import (
     lists,
     memory,
     notifications,
+    permanent_agents,
     push,
     reminders,
     rss,
@@ -104,6 +105,7 @@ api_v1_routers = (
     searxng.router,
     rss.router,
     clipper.router,
+    permanent_agents.router,
     health.router,
 )
 for router in api_v1_routers:

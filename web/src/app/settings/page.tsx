@@ -13,6 +13,7 @@ import { ExpensesTab } from "@/components/settings/ExpensesTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ListsTab } from "@/components/settings/ListsTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
+import { PermanentAgentsTab } from "@/components/settings/PermanentAgentsTab";
 import { RemindersTab } from "@/components/settings/RemindersTab";
 import { RssTab } from "@/components/settings/RssTab";
 import { WeatherTab } from "@/components/settings/WeatherTab";
@@ -32,6 +33,7 @@ type SettingsTab =
   | "weather"
   | "rss"
   | "clipper"
+  | "permanent-agents"
   | "account";
 
 const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
@@ -48,6 +50,7 @@ const TAB_COMPONENTS: Record<SettingsTab, ComponentType> = {
   weather: WeatherTab,
   rss: RssTab,
   clipper: WebClipperTab,
+  "permanent-agents": PermanentAgentsTab,
   account: AccountTab,
 };
 
@@ -65,6 +68,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "weather", label: "Wetter" },
   { key: "rss", label: "News" },
   { key: "clipper", label: "Web-Clipper" },
+  { key: "permanent-agents", label: "Agenten" },
   { key: "account", label: "Konto" },
 ];
 

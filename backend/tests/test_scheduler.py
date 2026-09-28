@@ -5,9 +5,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db.models import Automation, Contact, RecurringReminder, Timer, User
+from app.db.models import Automation, Contact, PermanentAgent, RecurringReminder, Timer, User
 from app.db.session import async_session_maker
-from app.services import home_assistant_service, push_service, scheduler
+from app.services import home_assistant_service, ollama_client, push_service, scheduler
 
 _WEEKDAY_BY_INDEX = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -384,3 +384,88 @@ async def test_automation_without_connected_home_assistant_is_skipped(
     # No HA account connected for this user - the check must skip it without raising.
     await scheduler._check_automations()
     assert pushed == []
+
+
+async def test_scheduler_runs_due_permanent_agent(client: AsyncClient, auth_headers: dict, monkeypatch):
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        return {"role": "assistant", "content": "Ruhig geblieben.", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    async with async_session_maker() as db:
+        user = (await db.execute(select(User))).scalar_one()
+        db.add(
+            PermanentAgent(
+                user_id=user.id,
+                name="Test-Beobachter",
+                preset="weather_watcher",
+                role_prompt="Test",
+                interval_minutes=60,
+            )
+        )
+        await db.commit()
+
+    await scheduler._run_permanent_agents()
+
+    async with async_session_maker() as db:
+        result = await db.execute(select(PermanentAgent))
+        agent = result.scalar_one()
+        assert agent.last_run_at is not None
+
+    log = await client.get(f"/permanent-agents/{agent.id}/log", headers=auth_headers)
+    assert len(log.json()["entries"]) == 1
+    assert log.json()["entries"][0]["content"] == "Ruhig geblieben."
+
+
+async def test_scheduler_skips_not_yet_due_permanent_agent(client: AsyncClient, auth_headers: dict, monkeypatch):
+    calls = {"n": 0}
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        calls["n"] += 1
+        return {"role": "assistant", "content": "Sollte nicht laufen.", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    async with async_session_maker() as db:
+        user = (await db.execute(select(User))).scalar_one()
+        db.add(
+            PermanentAgent(
+                user_id=user.id,
+                name="Frisch gelaufen",
+                preset="weather_watcher",
+                role_prompt="Test",
+                interval_minutes=60,
+                last_run_at=datetime.now(timezone.utc),
+            )
+        )
+        await db.commit()
+
+    await scheduler._run_permanent_agents()
+    assert calls["n"] == 0
+
+
+async def test_scheduler_skips_inactive_permanent_agent(client: AsyncClient, auth_headers: dict, monkeypatch):
+    calls = {"n": 0}
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        calls["n"] += 1
+        return {"role": "assistant", "content": "Sollte nicht laufen.", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    async with async_session_maker() as db:
+        user = (await db.execute(select(User))).scalar_one()
+        db.add(
+            PermanentAgent(
+                user_id=user.id,
+                name="Pausiert",
+                preset="weather_watcher",
+                role_prompt="Test",
+                interval_minutes=60,
+                active=False,
+            )
+        )
+        await db.commit()
+
+    await scheduler._run_permanent_agents()
+    assert calls["n"] == 0

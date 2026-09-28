@@ -4,11 +4,13 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.agent_presets import PRESETS
 from app.db.models import Conversation, User
 from app.schemas.automation import AutomationCreateRequest, AutomationUpdateRequest
 from app.schemas.contact import ContactCreateRequest, ContactUpdateRequest
 from app.schemas.expense import ExpenseCreateRequest
 from app.schemas.list import ListCreateRequest, ListItemCreateRequest, ListItemUpdateRequest
+from app.schemas.permanent_agent import PermanentAgentCreateRequest, PermanentAgentUpdateRequest
 from app.schemas.reminder import ReminderCreateRequest, ReminderUpdateRequest
 from app.services import (
     agent_bus_service,
@@ -22,6 +24,7 @@ from app.services import (
     home_assistant_service,
     list_service,
     memory_service,
+    permanent_agent_service,
     reminder_service,
     rss_service,
     searxng_service,
@@ -479,6 +482,69 @@ async def _save_clipped_page(
         "size_bytes": record.size_bytes,
         "download_url": f"/api/v1/chat/conversations/{conversation.id}/files/{record.id}",
     }
+
+
+def _permanent_agent_dict(agent: Any) -> dict[str, Any]:
+    return {
+        "id": agent.id,
+        "name": agent.name,
+        "preset": agent.preset,
+        "role_prompt": agent.role_prompt,
+        "interval_minutes": agent.interval_minutes,
+        "active": agent.active,
+        "last_run_at": agent.last_run_at.isoformat() if agent.last_run_at else None,
+    }
+
+
+async def _create_permanent_agent(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = PermanentAgentCreateRequest(
+        name=arguments["name"],
+        preset=arguments["preset"],
+        role_prompt=arguments["role_prompt"],
+        interval_minutes=arguments["interval_minutes"],
+    )
+    agent = await permanent_agent_service.add_agent(db, user, payload)
+    return _permanent_agent_dict(agent)
+
+
+async def _list_permanent_agents(
+    db: AsyncSession, user: User, _conversation: Conversation, _arguments: dict[str, Any]
+) -> Any:
+    agents = await permanent_agent_service.list_agents(db, user)
+    return [_permanent_agent_dict(a) for a in agents]
+
+
+async def _update_permanent_agent(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    payload = PermanentAgentUpdateRequest(
+        name=arguments.get("name"),
+        role_prompt=arguments.get("role_prompt"),
+        interval_minutes=arguments.get("interval_minutes"),
+        active=arguments.get("active"),
+    )
+    agent = await permanent_agent_service.update_agent(db, user, arguments["agent_id"], payload)
+    return _permanent_agent_dict(agent)
+
+
+async def _delete_permanent_agent(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    await permanent_agent_service.delete_agent(db, user, arguments["agent_id"])
+    return {"deleted": True}
+
+
+async def _list_agent_findings(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    entries = await permanent_agent_service.list_log_entries(
+        db, user, arguments["agent_id"], limit=int(arguments.get("limit") or 10)
+    )
+    return [
+        {"content": e.content, "notable": e.notable, "created_at": e.created_at.isoformat()} for e in entries
+    ]
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -1257,6 +1323,106 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_permanent_agent",
+            "description": (
+                "Legt einen permanenten Beobachtungs-Agenten an: läuft eigenständig in festen Intervallen "
+                "weiter (auch wenn niemand mit ihm spricht), sammelt Beobachtungen zu einer festen Rolle "
+                "und meldet Wichtiges per Push. Nutze das für dauerhafte Beobachtungsaufgaben ('behalte den "
+                "Krypto-Markt im Auge', 'beobachte News zu Thema X') — nicht für einmalige Aufgaben, dafür "
+                "spawn_subagent nutzen. Jeder Agent bekommt nur ein festes, sicheres Werkzeug-Preset "
+                "(nie die vollen Werkzeuge) und kann selbst keine weiteren Agenten anlegen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name des Agenten, z.B. 'Krypto-Beobachter'"},
+                    "preset": {
+                        "type": "string",
+                        "enum": list(PRESETS.keys()),
+                        "description": "Werkzeug-Preset: "
+                        + ", ".join(f"{k} ({p.description})" for k, p in PRESETS.items()),
+                    },
+                    "role_prompt": {
+                        "type": "string",
+                        "description": "Was der Agent genau beobachten/tun soll, z.B. 'Beobachte den Bitcoin-Kurs "
+                        "und größere Krypto-News, melde nur bei signifikanten Bewegungen (>5%) oder wichtigen News.'",
+                    },
+                    "interval_minutes": {
+                        "type": "integer",
+                        "description": "Wie oft er aufwacht, in Minuten (mindestens 15, z.B. 60 für stündlich)",
+                    },
+                },
+                "required": ["name", "preset", "role_prompt", "interval_minutes"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_permanent_agents",
+            "description": "Listet alle permanenten Agenten des Nutzers auf (mit ihrer ID, Status, letztem Lauf).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_permanent_agent",
+            "description": (
+                "Ändert Felder eines permanenten Agenten, z.B. um ihn zu pausieren (active=false) oder "
+                "seine Rolle/sein Intervall anzupassen. agent_id vorher über list_permanent_agents herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "ID des Agenten (aus list_permanent_agents)"},
+                    "name": {"type": "string"},
+                    "role_prompt": {"type": "string"},
+                    "interval_minutes": {"type": "integer"},
+                    "active": {"type": "boolean"},
+                },
+                "required": ["agent_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_permanent_agent",
+            "description": (
+                "Löscht einen permanenten Agenten endgültig, inkl. seines Logs. agent_id vorher über "
+                "list_permanent_agents herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "ID des Agenten (aus list_permanent_agents)"},
+                },
+                "required": ["agent_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_agent_findings",
+            "description": (
+                "Ruft die letzten Beobachtungen/Funde eines permanenten Agenten ab. agent_id vorher über "
+                "list_permanent_agents herausfinden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "ID des Agenten (aus list_permanent_agents)"},
+                    "limit": {"type": "integer", "description": "Maximale Anzahl Einträge, optional (Standard 10)"},
+                },
+                "required": ["agent_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -1304,4 +1470,9 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "list_rss_items": _list_rss_items,
     "clip_url": _clip_url,
     "save_clipped_page": _save_clipped_page,
+    "create_permanent_agent": _create_permanent_agent,
+    "list_permanent_agents": _list_permanent_agents,
+    "update_permanent_agent": _update_permanent_agent,
+    "delete_permanent_agent": _delete_permanent_agent,
+    "list_agent_findings": _list_agent_findings,
 }

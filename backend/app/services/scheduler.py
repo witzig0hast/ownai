@@ -6,7 +6,14 @@ from sqlalchemy import select
 
 from app.db.models import Automation, Timer, User
 from app.db.session import async_session_maker
-from app.services import automation_service, contact_service, home_assistant_service, push_service, reminder_service
+from app.services import (
+    automation_service,
+    contact_service,
+    home_assistant_service,
+    permanent_agent_service,
+    push_service,
+    reminder_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -129,21 +136,44 @@ async def _check_automations() -> None:
         await db.commit()
 
 
+async def _run_permanent_agents() -> None:
+    """Runs once a minute (see start_scheduler) and, for every due PermanentAgent (see
+    permanent_agent_service.due_agents - "due" = never run, or its interval has elapsed since
+    last_run_at), runs one headless LLM tool-calling turn (permanent_agent_service.run_agent_once).
+    Agents run sequentially, not concurrently, so several due agents in one poll don't hammer the
+    local Ollama instance with simultaneous requests. One agent's failure (bad preset, Ollama
+    down, a broken tool call) must not block the others - run_agent_once already contains
+    Ollama/tool errors internally and always writes a log entry, so this loop only needs to guard
+    against something unexpected escaping that."""
+    async with async_session_maker() as db:
+        due = await permanent_agent_service.due_agents(db, datetime.now(timezone.utc))
+        for agent in due:
+            user = await db.get(User, agent.user_id)
+            if user is None:
+                continue
+            try:
+                await permanent_agent_service.run_agent_once(db, user, agent)
+            except Exception:  # noqa: BLE001 - one agent's failure must not block the others or the loop
+                logger.exception("Permanent agent %s failed to run", agent.id)
+
+
 def start_scheduler() -> AsyncIOScheduler:
     """Starts the background poll for expired timers (see _check_expired_timers), the daily
     birthday check (see _check_birthdays), the per-minute recurring-reminder check (see
-    _check_recurring_reminders), and the Home-Assistant-triggered automation check (see
-    _check_automations). Runs in-process via APScheduler. Known limitation: with multiple worker
-    processes, each would poll independently and could send duplicate notifications -
-    docker-compose.yml runs a single uvicorn process, so this doesn't apply today, but is worth
-    knowing before scaling out to multiple workers/replicas (would need a DB-level lock or moving
-    this to a dedicated worker process)."""
+    _check_recurring_reminders), the Home-Assistant-triggered automation check (see
+    _check_automations), and the per-minute permanent-agent runner (see _run_permanent_agents).
+    Runs in-process via APScheduler. Known limitation: with multiple worker processes, each would
+    poll independently and could send duplicate notifications - docker-compose.yml runs a single
+    uvicorn process, so this doesn't apply today, but is worth knowing before scaling out to
+    multiple workers/replicas (would need a DB-level lock or moving this to a dedicated worker
+    process)."""
     global _scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(_check_expired_timers, "interval", seconds=15, id="expired_timers")
     scheduler.add_job(_check_birthdays, "cron", hour=8, minute=0, id="birthdays")
     scheduler.add_job(_check_recurring_reminders, "cron", second=0, id="recurring_reminders")
     scheduler.add_job(_check_automations, "interval", seconds=30, id="automations")
+    scheduler.add_job(_run_permanent_agents, "interval", seconds=60, id="permanent_agents")
     scheduler.start()
     _scheduler = scheduler
     return scheduler

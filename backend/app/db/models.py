@@ -59,6 +59,9 @@ class User(Base):
     todo_lists: Mapped[list["TodoList"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     expenses: Mapped[list["Expense"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     rss_feeds: Mapped[list["RssFeed"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    permanent_agents: Mapped[list["PermanentAgent"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class RefreshToken(Base):
@@ -497,3 +500,49 @@ class RssFeed(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped["User"] = relationship(back_populates="rss_feeds")
+
+
+class PermanentAgent(Base):
+    """A named, recurring headless LLM agent ("Marktbeobachter") that wakes up on its own every
+    `interval_minutes` (scheduler poll in app/services/scheduler.py, not a real always-on
+    process - the LLM only runs during that one poll) and works a fixed, curated tool preset
+    (`app/agent/agent_presets.py`) - never the full tool set, and never spawn_permanent_agent
+    itself, so an unattended agent can't silently start creating further unattended agents. Its
+    `role_prompt` is what makes two agents on the same preset behave differently (e.g. two
+    web_watcher agents, one on "Bitcoin-Kurs", one on "Rust 2.0 Release News")."""
+
+    __tablename__ = "permanent_agents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    preset: Mapped[str] = mapped_column(String(32), nullable=False)
+    role_prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    interval_minutes: Mapped[int] = mapped_column(nullable=False)
+    active: Mapped[bool] = mapped_column(default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="permanent_agents")
+    log_entries: Mapped[list["AgentLogEntry"]] = relationship(
+        back_populates="agent", cascade="all, delete-orphan", order_by="AgentLogEntry.created_at.desc()"
+    )
+
+
+class AgentLogEntry(Base):
+    """One run's outcome for a PermanentAgent - what it found/did, and whether it judged the
+    finding worth a push (`notable`, set via the agent's own flag_finding tool call, see
+    permanent_agent_service.py). Findings accumulate here rather than in UserMemory because
+    they're a per-agent timestamped feed to browse, not facts to inject into unrelated chats."""
+
+    __tablename__ = "agent_log_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("permanent_agents.id", ondelete="CASCADE"), nullable=False
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    notable: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    agent: Mapped["PermanentAgent"] = relationship(back_populates="log_entries")

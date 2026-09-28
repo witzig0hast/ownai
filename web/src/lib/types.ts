@@ -212,6 +212,30 @@ export interface ClippedPage {
   text: string;
 }
 
+export interface AgentPreset {
+  key: string;
+  name: string;
+  description: string;
+}
+
+export interface PermanentAgent {
+  id: string;
+  name: string;
+  preset: string;
+  role_prompt: string;
+  interval_minutes: number;
+  active: boolean;
+  last_run_at: string | null;
+  created_at: string;
+}
+
+export interface AgentLogEntry {
+  id: string;
+  content: string;
+  notable: boolean;
+  created_at: string;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";

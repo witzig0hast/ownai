@@ -134,9 +134,9 @@ the `{"error":{"code","message"}}` envelope).
   page, just a short explanation instead.
 - **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
   as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently fourteen tabs (Integrations, Kalender, E-Mail, Agent
+  einstellen können" in one place). Currently fifteen tabs (Integrations, Kalender, E-Mail, Agent
   Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, News,
-  Web-Clipper, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
+  Web-Clipper, Agenten, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
   on narrow screens rather than wrapping, since more tabs keep getting added:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
@@ -249,6 +249,23 @@ the `{"error":{"code","message"}}` envelope).
     (same sandbox network restriction as Wetter/Web-Suche/News — a live fetch attempt surfaced a
     clean `403` through `ErrorMessage`, confirming the wiring). Try it against a real URL before
     relying on it.
+  - **Agenten** tab (`src/components/settings/PermanentAgentsTab.tsx`): create/pause/delete
+    permanent background agents (`GET/POST/PATCH/DELETE /permanent-agents`) — a named role, a
+    fixed read-only tool preset (fetched from `GET /permanent-agents/presets` for the create
+    form's dropdown), and a run interval (15 min–1 week, plain `<select>` of common presets).
+    Each row's "Log anzeigen" expands an inline findings feed (`GET /permanent-agents/{id}/log`),
+    matching the CalendarTab/AgentBusTab list+detail pattern rather than a separate route — a
+    `notable` entry (one where the agent itself called `flag_finding`, meaning it also pushed)
+    gets a small "wichtig" badge. Same lifecycle also reachable conversationally via
+    `create_permanent_agent`/`list_permanent_agents`/`update_permanent_agent`/
+    `delete_permanent_agent`/`list_agent_findings` — deliberately only on the main chat agent,
+    never on a permanent agent's own toolset, so an unattended agent can never spawn further
+    agents on its own. Verified live end-to-end further than the other network-dependent tabs:
+    created an agent, confirmed it listed with "Noch nie gelaufen", then waited out a real
+    ~60s scheduler poll and confirmed the backend's own `_run_permanent_agents` job picked it up,
+    ran its headless tool loop, hit the sandbox's unreachable Ollama, and wrote a graceful
+    "Ollama nicht erreichbar" log entry with a real timestamp — the create→schedule→run→log→UI
+    pipeline works, only the actual LLM output content is unverified (needs a real Ollama).
   - **Konto** tab (`src/components/settings/AccountTab.tsx`): read-only account info (name,
     email, admin badge) plus a Push-Benachrichtigungen enable/disable toggle
     (`src/lib/push.ts`) — requests notification permission, registers the Service Worker

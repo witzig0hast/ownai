@@ -308,6 +308,56 @@ Eine Nachricht an `"ownai"` löst zusätzlich eine **Push-Benachrichtigung** an 
 
 Der Chat/Voice-Agent selbst ist ebenfalls Teilnehmer: die Tools `agent_bus_list_agents`/`agent_bus_send_message` (siehe `app/agent/tools.py`) lassen ihn im Auftrag des Nutzers Nachrichten an registrierte Agents schicken (`from = "ownai"`).
 
+## Permanente Agenten
+
+Ein **permanenter Agent** ist ein eigenständiger, dauerhaft laufender LLM-Beobachter mit einer festen Rolle — z. B. "beobachte den Bitcoin-Kurs und melde signifikante Bewegungen". Anders als der normale Chat/Voice-Agent oder ein `spawn_subagent` läuft er **ohne dass jemand mit ihm spricht**: ein Scheduler-Job weckt ihn in festen Intervallen (`interval_minutes`, mindestens 15) auf, er führt einen eigenständigen Tool-Loop durch und schreibt das Ergebnis in sein Log.
+
+**Sicherheitsdesign**: jeder Agent bekommt beim Anlegen ein festes **Preset** — eine kuratierte, rein lesende Werkzeug-Teilmenge (siehe `GET /permanent-agents/presets`) — nie die vollen Werkzeuge, und explizit nicht die Werkzeuge, um selbst weitere permanente Agenten anzulegen. Das verhindert, dass ein unbeaufsichtigter Agent beginnt, selbstständig weitere Agenten zu erzeugen. Anlegen/Ändern/Löschen bleibt dem Nutzer vorbehalten — entweder über die Settings-UI oder per Zuruf an den Haupt-Chat-Agenten (Tools `create_permanent_agent` etc., siehe unten), nie durch einen permanenten Agenten selbst.
+
+Findet ein Agent während eines Laufs etwas, das er für push-würdig hält, ruft er intern `flag_finding` auf (kein REST-Endpunkt — nur innerhalb des Agenten-Laufs verfügbar) — das markiert den Log-Eintrag als `notable` und löst eine Push-Benachrichtigung aus. Alles andere landet nur im Log.
+
+### `GET /permanent-agents/presets`  *(Bearer)*
+Response `200`: `{ "presets": [ { "key": string, "name": string, "description": string } ] }`. Aktuell: `web_watcher` (Web-Suche + RSS), `weather_watcher` (Wetter), `calendar_watcher` (Kalender lesen), `home_watcher` (Home-Assistant-Zustände lesen, keine Steuerung).
+
+### `POST /permanent-agents`  *(Bearer)*
+Request: `{ "name": string, "preset": string, "role_prompt": string, "interval_minutes": int }` — `interval_minutes` zwischen 15 und 10080 (eine Woche).
+Response `201`: der erstellte Agent (siehe unten, `active: true`, `last_run_at: null`).
+Fehler: `422 invalid_preset` (unbekanntes Preset).
+
+### `GET /permanent-agents`  *(Bearer)*
+Response `200`: `{ "agents": [ Agent ] }`, neueste zuerst.
+
+Agentenobjekt:
+```json
+{
+  "id": "uuid",
+  "name": "Krypto-Beobachter",
+  "preset": "web_watcher",
+  "role_prompt": "Beobachte den Bitcoin-Kurs, melde nur bei Bewegungen über 5%.",
+  "interval_minutes": 60,
+  "active": true,
+  "last_run_at": "datetime | null",
+  "created_at": "datetime"
+}
+```
+
+### `PATCH /permanent-agents/{id}`  *(Bearer)*
+Request: wie `POST` ohne `preset` (das Preset ist nach dem Anlegen fest), alle Felder optional (inkl. `active`). Zum Pausieren/Reaktivieren einfach nur `{ "active": false }` schicken.
+Response `200`: der aktualisierte Agent.
+
+### `DELETE /permanent-agents/{id}`  *(Bearer)*
+Löscht den Agenten inkl. seines gesamten Logs.
+Response `204`.
+Fehler: `404 not_found` (Agent existiert nicht oder gehört einem anderen Nutzer).
+
+### `GET /permanent-agents/{id}/log?limit={int}`  *(Bearer)*
+`limit` optional, 1–200, Standard 50.
+Response `200`: `{ "entries": [ { "id", "content", "notable", "created_at" } ] }`, neueste zuerst.
+
+Auch als Tools `create_permanent_agent` / `list_permanent_agents` / `update_permanent_agent` / `delete_permanent_agent` / `list_agent_findings` (siehe `app/agent/tools.py`) im Haupt-Chat/Voice-Agenten nutzbar — so kann der Nutzer per Zuruf einen Agenten anlegen ("leg mir einen Agenten an, der..."), ohne die Settings-UI zu öffnen. Geprüft durch einen minütlichen Scheduler-Job (`_run_permanent_agents` in `app/services/scheduler.py`), der fällige Agenten (`permanent_agent_service.due_agents`) sequenziell (nicht parallel, um die lokale Ollama-Instanz nicht mit gleichzeitigen Anfragen zu überlasten) abarbeitet. Ist Ollama nicht erreichbar, wird das als Fehler-Eintrag im Log festgehalten statt den Lauf zu verwerfen — `last_run_at` wird trotzdem aktualisiert, damit ein dauerhaft nicht erreichbares Ollama nicht zu einem Retry-Sturm bei jedem Scheduler-Poll führt.
+
+Live bis zum echten Scheduler-Lauf getestet: ein Agent wurde angelegt, nach ~60s hat der reale Scheduler-Job ihn selbstständig ausgeführt und (mangels Ollama-Zugriff in der Build-Sandbox) einen sauberen Fehler-Log-Eintrag geschrieben — bestätigt, dass die komplette Kette (Poll → Fälligkeitsprüfung → Tool-Loop → Fehlerbehandlung → Log-Eintrag → UI-Anzeige) funktioniert.
+
 ## Gedächtnis (Memory)
 
 Kurze Fakten, die sich der Assistent über den Nutzer merkt (z.B. "Mag keine Zwiebeln", "Wohnt in Berlin") und die bei **jeder** Unterhaltung automatisch in den System-Prompt eingemischt werden (siehe `_system_prompt()` in `app/agent/orchestrator.py`), ohne dass der Nutzer sie wiederholen muss. Maximal die letzten 50 Fakten werden eingemischt (`MAX_MEMORIES_IN_PROMPT` in `app/services/memory_service.py`), neueste zuerst.
