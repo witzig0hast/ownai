@@ -1,3 +1,5 @@
+import socket
+
 from httpx import AsyncClient
 
 from app.services import email_service, ollama_client
@@ -112,3 +114,61 @@ async def test_send_email_tool_reports_error_when_unconfigured(client: AsyncClie
     )
     result = sent.json()["message"]["tool_calls"][0]["result"]
     assert "error" in result
+
+
+def test_connect_ipv4_only_requests_af_inet(monkeypatch):
+    """_connect_ipv4 must ask getaddrinfo for AF_INET explicitly - the whole point is to never
+    even consider an AAAA/IPv6 result, not just to prefer IPv4 among mixed results."""
+    seen_family = {}
+
+    class FakeSocket:
+        def __init__(self, family, socktype, proto):
+            self.family = family
+
+        def settimeout(self, timeout):
+            pass
+
+        def connect(self, sockaddr):
+            pass
+
+        def close(self):
+            pass
+
+    def fake_getaddrinfo(host, port, family, socktype):
+        seen_family["family"] = family
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, port))]
+
+    monkeypatch.setattr(email_service.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(email_service.socket, "socket", FakeSocket)
+
+    result = email_service._connect_ipv4("smtp.example.com", 587, 15)
+
+    assert seen_family["family"] == socket.AF_INET
+    assert isinstance(result, FakeSocket)
+
+
+def test_connect_ipv4_raises_last_error_when_all_attempts_fail(monkeypatch):
+    class FailingSocket:
+        def __init__(self, *args):
+            pass
+
+        def settimeout(self, timeout):
+            pass
+
+        def connect(self, sockaddr):
+            raise OSError(101, "Network is unreachable")
+
+        def close(self):
+            pass
+
+    def fake_getaddrinfo(host, port, family, socktype):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, port))]
+
+    monkeypatch.setattr(email_service.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(email_service.socket, "socket", FailingSocket)
+
+    try:
+        email_service._connect_ipv4("smtp.example.com", 587, 15)
+        assert False, "expected OSError"
+    except OSError as exc:
+        assert "Network is unreachable" in str(exc)

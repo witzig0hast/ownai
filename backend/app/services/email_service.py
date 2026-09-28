@@ -1,5 +1,6 @@
 import asyncio
 import smtplib
+import socket
 from email.message import EmailMessage
 
 from sqlalchemy import select
@@ -98,6 +99,41 @@ async def effective_config(db: AsyncSession, user: User) -> _EffectiveConfig | N
     return None
 
 
+def _connect_ipv4(host: str, port: int, timeout: float) -> socket.socket:
+    """Like socket.create_connection(), but only tries IPv4 (A) addresses, never IPv6 (AAAA).
+
+    Docker containers commonly have an IPv6 address on their interface with no actual IPv6
+    route to the internet (host/VPN routing only handles IPv4). getaddrinfo()'s default address
+    order often puts an AAAA record first, so plain socket.create_connection()/smtplib then
+    tries to connect over IPv6 first and fails immediately with OSError [Errno 101] "Network is
+    unreachable" - even though IPv4 would work fine. Forcing IPv4 sidesteps that entirely."""
+    last_error: OSError | None = None
+    for family, socktype, proto, _canonname, sockaddr in socket.getaddrinfo(
+        host, port, socket.AF_INET, socket.SOCK_STREAM
+    ):
+        sock = socket.socket(family, socktype, proto)
+        try:
+            sock.settimeout(timeout)
+            sock.connect(sockaddr)
+            return sock
+        except OSError as exc:
+            last_error = exc
+            sock.close()
+    raise last_error or OSError(f"Konnte {host}:{port} nicht per IPv4 auflösen/erreichen.")
+
+
+class _IPv4SMTP(smtplib.SMTP):
+    """smtplib.SMTP, but its socket connects over IPv4 only (see _connect_ipv4). TLS hostname
+    verification in starttls() still checks against the original hostname (self._host), which
+    smtplib sets from the constructor argument below unchanged - swapping to an IPv4-only
+    *connection* doesn't affect that."""
+
+    def _get_socket(self, host: str, port: int, timeout: float) -> socket.socket:
+        if timeout is not None and not timeout:
+            raise OSError("nonblocking socket (timeout=0) is not supported")
+        return _connect_ipv4(host, port, timeout)
+
+
 def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> None:
     message = EmailMessage()
     message["From"] = config.from_address
@@ -105,7 +141,7 @@ def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> No
     message["Subject"] = subject
     message.set_content(body)
 
-    with smtplib.SMTP(config.host, config.port, timeout=15) as smtp:
+    with _IPv4SMTP(config.host, config.port, timeout=15) as smtp:
         if config.use_tls:
             smtp.starttls()
         if config.username and config.password:
