@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -13,6 +13,10 @@ def _uuid() -> str:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _today() -> date:
+    return datetime.now(timezone.utc).date()
 
 
 class User(Base):
@@ -50,6 +54,7 @@ class User(Base):
     )
     automations: Mapped[list["Automation"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     todo_lists: Mapped[list["TodoList"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    expenses: Mapped[list["Expense"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -433,3 +438,23 @@ class TodoListItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     todo_list: Mapped["TodoList"] = relationship(back_populates="items")
+
+
+class Expense(Base):
+    """A single expense entry for the simple expense tracker ("gib 12,50€ für Mittagessen aus").
+    No `updated_at`/edit support by design - correcting a mistake is delete-and-re-add, matching the
+    scope of a lightweight log rather than a full accounting ledger. `amount` is a plain float
+    (single implied currency, no multi-currency support) - fine for personal totals, not for
+    anything that needs exact decimal accounting."""
+
+    __tablename__ = "expenses"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    spent_at: Mapped[date] = mapped_column(Date, default=_today)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user: Mapped["User"] = relationship(back_populates="expenses")

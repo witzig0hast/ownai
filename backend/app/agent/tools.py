@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Conversation, User
 from app.schemas.automation import AutomationCreateRequest, AutomationUpdateRequest
 from app.schemas.contact import ContactCreateRequest, ContactUpdateRequest
+from app.schemas.expense import ExpenseCreateRequest
 from app.schemas.list import ListCreateRequest, ListItemCreateRequest, ListItemUpdateRequest
 from app.schemas.reminder import ReminderCreateRequest, ReminderUpdateRequest
 from app.services import (
@@ -15,6 +16,7 @@ from app.services import (
     calendar_service,
     contact_service,
     email_service,
+    expense_service,
     file_service,
     home_assistant_service,
     list_service,
@@ -370,6 +372,54 @@ async def _delete_list_item(
 ) -> Any:
     todo_list = await list_service.delete_item(db, user, arguments["list_id"], arguments["item_id"])
     return _list_dict(todo_list)
+
+
+def _expense_dict(expense: Any) -> dict[str, Any]:
+    return {
+        "id": expense.id,
+        "amount": expense.amount,
+        "description": expense.description,
+        "category": expense.category,
+        "spent_at": expense.spent_at.isoformat(),
+    }
+
+
+async def _add_expense(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
+    payload = ExpenseCreateRequest(
+        amount=arguments["amount"],
+        description=arguments["description"],
+        category=arguments.get("category"),
+        spent_at=_parse_date(arguments.get("spent_at")),
+    )
+    expense = await expense_service.add_expense(db, user, payload)
+    return _expense_dict(expense)
+
+
+async def _list_expenses(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    expenses = await expense_service.list_expenses(
+        db,
+        user,
+        date_from=_parse_date(arguments.get("from")),
+        date_to=_parse_date(arguments.get("to")),
+        category=arguments.get("category"),
+    )
+    total, by_category = expense_service.totals(expenses)
+    return {"expenses": [_expense_dict(e) for e in expenses], "total": total, "by_category": by_category}
+
+
+async def _delete_expense(
+    db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    await expense_service.delete_expense(db, user, arguments["expense_id"])
+    return {"deleted": True}
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value).date()
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -964,6 +1014,58 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_expense",
+            "description": "Trägt eine Ausgabe im Ausgaben-Tracker ein.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number", "description": "Betrag, z.B. 12.50"},
+                    "description": {"type": "string", "description": "Wofür, z.B. 'Mittagessen'"},
+                    "category": {"type": "string", "description": "Kategorie, z.B. 'Essen', optional"},
+                    "spent_at": {
+                        "type": "string",
+                        "description": "Datum als YYYY-MM-DD, optional (Standard: heute)",
+                    },
+                },
+                "required": ["amount", "description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_expenses",
+            "description": (
+                "Listet Ausgaben auf, mit Gesamtsumme und Aufschlüsselung nach Kategorie. Alle Filter optional."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from": {"type": "string", "description": "Startdatum YYYY-MM-DD, optional"},
+                    "to": {"type": "string", "description": "Enddatum YYYY-MM-DD, optional"},
+                    "category": {"type": "string", "description": "Nur diese Kategorie, optional"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_expense",
+            "description": "Löscht eine Ausgabe endgültig. expense_id vorher über list_expenses herausfinden.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expense_id": {"type": "string", "description": "ID der Ausgabe (aus list_expenses)"},
+                },
+                "required": ["expense_id"],
+            },
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, ToolHandler] = {
@@ -1000,4 +1102,7 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "add_list_item": _add_list_item,
     "update_list_item": _update_list_item,
     "delete_list_item": _delete_list_item,
+    "add_expense": _add_expense,
+    "list_expenses": _list_expenses,
+    "delete_expense": _delete_expense,
 }

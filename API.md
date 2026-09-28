@@ -465,6 +465,36 @@ Response `200`: die gesamte aktualisierte Liste.
 Response `200` (**nicht 204** — Ausnahme von der sonstigen Konvention, da die Antwort direkt die aktualisierte Liste liefert): die gesamte aktualisierte Liste ohne den gelöschten Eintrag.
 Fehler: `404 not_found` (Liste oder Eintrag existiert nicht oder gehört einem anderen Nutzer).
 
+## Ausgaben-Tracker
+
+Einfacher Ausgaben-Tracker: einzelne Ausgaben eintragen, mit Gesamtsumme und Aufschlüsselung nach Kategorie. Bewusst schlank gehalten (kein Edit, keine Mehrwährung) — eine falsch eingetragene Ausgabe wird gelöscht und neu angelegt statt bearbeitet, entsprechend gibt es keinen `PATCH`-Endpunkt. `amount` ist ein einfacher Float ohne Währungsfeld (implizit eine Währung) — für persönliche Summenübersichten ausreichend, nicht für exakte Buchhaltung gedacht.
+
+Ausgaben entstehen entweder manuell über die Settings-UI (Tab "Ausgaben") oder automatisch während des Chats über die Tools `add_expense` / `list_expenses` / `delete_expense` (siehe `app/agent/tools.py`).
+
+### `POST /expenses`  *(Bearer)*
+Request: `{ "amount": number, "description": string, "category": string | null, "spent_at": date | null }` — `spent_at` fehlt → heute.
+Response `201`: die erstellte Ausgabe (siehe unten).
+
+### `GET /expenses?from={date}&to={date}&category={string}`  *(Bearer)*
+Alle Query-Parameter optional (Datumsfilter inklusive Grenzen).
+Response `200`: `{ "expenses": [ Ausgabe ], "total": number, "by_category": { "Essen": number, "Sonstiges": number, ... } }` — `total`/`by_category` sind über die (gefilterte) `expenses`-Liste berechnet, nicht über alle Ausgaben des Nutzers. Ausgaben ohne `category` fallen unter den Schlüssel `"Sonstiges"`.
+
+Ausgabenobjekt:
+```json
+{
+  "id": "uuid",
+  "amount": 12.5,
+  "description": "Mittagessen",
+  "category": "Essen",
+  "spent_at": "2026-09-28",
+  "created_at": "datetime"
+}
+```
+
+### `DELETE /expenses/{id}`  *(Bearer)*
+Response `204`.
+Fehler: `404 not_found` (Ausgabe existiert nicht oder gehört einem anderen Nutzer).
+
 ## Sprache (Voice)
 
 ### `POST /voice/transcribe`  *(Bearer, multipart/form-data)*

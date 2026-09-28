@@ -160,6 +160,21 @@ export interface TodoList {
   items: ListItem[];
 }
 
+export interface Expense {
+  id: string;
+  amount: number;
+  description: string;
+  category: string | null;
+  spent_at: string;
+  created_at: string;
+}
+
+export interface ExpensesList {
+  expenses: Expense[];
+  total: number;
+  by_category: Record<string, number>;
+}
+
 export interface Device {
   id: string;
   platform: "android" | "ios" | "web";
