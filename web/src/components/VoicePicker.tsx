@@ -1,26 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPreferredVoiceURI, getVoices, isTtsSupported, setPreferredVoiceURI, speak, unlockSpeech } from "@/lib/tts";
+import {
+  getPreferredServerVoice,
+  getPreferredVoiceURI,
+  getServerVoices,
+  getVoices,
+  isTtsSupported,
+  setPreferredServerVoice,
+  setPreferredVoiceURI,
+  speak,
+  unlockSpeech,
+} from "@/lib/tts";
 
 /**
- * Lets the user pick which browser/OS voice reads replies aloud. Some devices default to
- * a low-quality offline voice (e.g. an espeak/Piper-based one on Linux) that sounds robotic
- * — this surfaces every voice the platform offers so the user can pick a better one, without
- * needing a server-side TTS engine (see root DECISIONS.md #10).
+ * Lets the user pick which voice reads replies aloud. Prefers the self-hosted TTS server's
+ * voices when one is configured (see backend KOKORO_TTS_BASE_URL) — usually just one natural
+ * neural voice, but still worth letting the user confirm/test it — and falls back to the
+ * browser/OS's built-in voices otherwise. Some devices default to a low-quality offline voice
+ * (e.g. an espeak/Piper-based one on Linux) that sounds robotic — surfacing every voice the
+ * platform offers lets the user pick a better one even without a configured TTS server.
  */
 export function VoicePicker() {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [serverVoices, setServerVoices] = useState<string[]>([]);
+  const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!isTtsSupported()) return;
     let cancelled = false;
-    getVoices().then((list) => {
+    Promise.all([getServerVoices(), getVoices()]).then(([serverList, browserList]) => {
       if (cancelled) return;
-      setVoices(list);
-      setSelected(getPreferredVoiceURI() ?? "");
+      setServerVoices(serverList);
+      setBrowserVoices(browserList);
+      setSelected((serverList.length > 0 ? getPreferredServerVoice() : getPreferredVoiceURI()) ?? "");
       setLoaded(true);
     });
     return () => {
@@ -28,27 +42,35 @@ export function VoicePicker() {
     };
   }, []);
 
-  if (!isTtsSupported() || !loaded || voices.length === 0) return null;
+  const usingServerVoices = serverVoices.length > 0;
 
-  const germanFirst = [...voices].sort((a, b) => {
+  if (!isTtsSupported() || !loaded || (serverVoices.length === 0 && browserVoices.length === 0)) return null;
+
+  const germanFirst = [...browserVoices].sort((a, b) => {
     const aDe = a.lang.toLowerCase().startsWith("de") ? 0 : 1;
     const bDe = b.lang.toLowerCase().startsWith("de") ? 0 : 1;
     return aDe - bDe || a.name.localeCompare(b.name);
   });
 
-  const speakSample = (voiceURI: string) => {
+  const speakSample = (value: string) => {
     // Native <select> "change" events aren't a reliably "trusted" gesture on every
     // platform (notably iOS Safari, where the picker is a system sheet) - unlock
     // defensively here too, even though it's a no-op after the first real call.
     unlockSpeech();
-    const voice = voices.find((v) => v.voiceURI === voiceURI);
-    speak(voice ? `Hallo, ich bin ${voice.name}.` : "Hallo, das ist die Standardstimme.");
+    const label = usingServerVoices
+      ? value || "der Standardstimme"
+      : (browserVoices.find((v) => v.voiceURI === value)?.name ?? null);
+    speak(label ? `Hallo, ich bin ${label}.` : "Hallo, das ist die Standardstimme.");
   };
 
-  const handleChange = (voiceURI: string) => {
-    setSelected(voiceURI);
-    setPreferredVoiceURI(voiceURI || null);
-    speakSample(voiceURI);
+  const handleChange = (value: string) => {
+    setSelected(value);
+    if (usingServerVoices) {
+      setPreferredServerVoice(value || null);
+    } else {
+      setPreferredVoiceURI(value || null);
+    }
+    speakSample(value);
   };
 
   return (
@@ -63,11 +85,17 @@ export function VoicePicker() {
         className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700 transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
       >
         <option value="">Systemstandard</option>
-        {germanFirst.map((voice) => (
-          <option key={voice.voiceURI} value={voice.voiceURI}>
-            {voice.name} ({voice.lang})
-          </option>
-        ))}
+        {usingServerVoices
+          ? serverVoices.map((voice) => (
+              <option key={voice} value={voice}>
+                {voice}
+              </option>
+            ))
+          : germanFirst.map((voice) => (
+              <option key={voice.voiceURI} value={voice.voiceURI}>
+                {voice.name} ({voice.lang})
+              </option>
+            ))}
       </select>
       <button
         type="button"

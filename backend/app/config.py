@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     whisper_port: int = 10300
     whisper_language: str = "de"
 
+    # Self-hosted, OpenAI-compatible TTS server (e.g. Godelaune/Kokoro-82M-ONNX-German-Martin,
+    # run separately - see infra/kokoro/README.md) for reading replies aloud with a natural
+    # neural voice instead of the browser's built-in speechSynthesis. Unset means server-side
+    # TTS is disabled and the web app falls back to browser TTS entirely (see tts_service.py).
+    kokoro_tts_base_url: str | None = None
+    kokoro_tts_voice: str = "martin"
+
     # Where the create_file tool's output lives on disk, per user/conversation (see
     # app/services/file_service.py) - mount a volume here in production so files survive
     # container restarts.

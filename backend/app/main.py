@@ -29,6 +29,7 @@ from app.api import (
     rss,
     searxng,
     timer,
+    tts,
     vision,
     voice,
     weather,
@@ -106,6 +107,7 @@ api_v1_routers = (
     rss.router,
     clipper.router,
     permanent_agents.router,
+    tts.router,
     health.router,
 )
 for router in api_v1_routers:

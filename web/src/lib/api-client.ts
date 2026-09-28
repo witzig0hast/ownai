@@ -127,14 +127,17 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 }
 
 /**
- * Like apiFetch, but for endpoints that return a raw file body (e.g. a generated PDF) rather
- * than JSON — GET-only, since that's the only case we need this for.
+ * Like apiFetch, but for endpoints that return a raw file body (e.g. a generated PDF, or
+ * synthesized audio) rather than JSON. GET by default; pass a JSON-serializable `body` for a
+ * POST (e.g. TTS synthesis). Returns null for a 204 (e.g. nothing to synthesize).
  */
-export async function apiFetchBlob(path: string): Promise<Blob> {
+export async function apiFetchBlob(path: string, body?: unknown): Promise<Blob | null> {
   const buildInit = (accessToken: string | null): RequestInit => {
     const headers = new Headers();
     if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-    return { headers };
+    if (body === undefined) return { headers };
+    headers.set("Content-Type", "application/json");
+    return { method: "POST", headers, body: JSON.stringify(body) };
   };
 
   const tokens = getTokens();
@@ -158,5 +161,6 @@ export async function apiFetchBlob(path: string): Promise<Blob> {
     const { code, message } = await parseErrorBody(res);
     throw new ApiError(code, message, res.status);
   }
+  if (res.status === 204) return null;
   return await res.blob();
 }

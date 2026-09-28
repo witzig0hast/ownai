@@ -302,21 +302,31 @@ the `{"error":{"code","message"}}` envelope).
   the transcription is off). Only shown when the browser supports
   `getUserMedia` — iPad/Windows/Android browsers all do; needs an HTTPS or
   `localhost` origin (browsers block mic access on plain HTTP otherwise).
-  Text-to-speech (`src/lib/tts.ts`) reads assistant replies aloud via the
-  browser's native `speechSynthesis` — a speaker icon on each reply for a
-  one-off read, or a persistent "auto-read replies" checkbox (per-viewer
-  preference, stored in `localStorage`). Both run entirely client-side/
-  on-device: STT goes to your own self-hosted Whisper (see root
-  `DECISIONS.md`), TTS never leaves the browser at all.
+  Text-to-speech (`src/lib/tts.ts`) reads assistant replies aloud — a
+  speaker icon on each reply for a one-off read, or a persistent "auto-read
+  replies" checkbox (per-viewer preference, stored in `localStorage`). STT
+  goes to your own self-hosted Whisper (see root `DECISIONS.md`). TTS is
+  **server-first with a client-side fallback**: it tries the backend's
+  `POST /tts/speak` first (a self-hosted, OpenAI-compatible neural TTS
+  server, e.g. Kokoro-82M with a German community voice — see root
+  `infra/kokoro/README.md`, config'd via `KOKORO_TTS_BASE_URL`) for a much
+  more natural voice, and transparently falls back to the browser's native
+  `speechSynthesis` (which never leaves the device) whenever the server
+  isn't configured, unreachable, or fails for any reason — so read-aloud
+  never breaks, it just sounds better once a TTS server is set up.
 - **Voice picker** (`src/components/VoicePicker.tsx`, shown on `/voice` and in
-  `/chat`'s toolbar): the browser/OS often ships several `speechSynthesis`
-  voices of wildly different quality (e.g. a low-quality offline
-  espeak/Piper-style voice alongside better ones) — this enumerates every
-  voice the platform reports (`src/lib/tts.ts`'s `getVoices()`, handling the
-  async `voiceschanged` event some browsers need), lets the user pick one,
-  persists the choice in `localStorage`, and plays a short sample on
-  selection. Applied automatically everywhere replies are read aloud
-  (`speak`/`speakAndWait`), including the Live Talk loop.
+  `/chat`'s toolbar): prefers the configured TTS server's voices
+  (`src/lib/tts.ts`'s `getServerVoices()`, usually just one) when available,
+  falling back to the browser/OS's `speechSynthesis` voices otherwise — the
+  browser/OS often ships several of wildly different quality (e.g. a
+  low-quality offline espeak/Piper-style voice alongside better ones), so
+  this enumerates every voice the platform reports (`getVoices()`, handling
+  the async `voiceschanged` event some browsers need), lets the user pick
+  one, persists the choice in `localStorage` (a separate key per voice
+  source, so switching TTS config later doesn't mix up stale selections),
+  and plays a short sample on selection. Applied automatically everywhere
+  replies are read aloud (`speak`/`speakAndWait`), including the Live Talk
+  loop.
 
 ## Installing as an app (PWA)
 

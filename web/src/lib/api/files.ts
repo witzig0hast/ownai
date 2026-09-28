@@ -6,8 +6,10 @@ export async function listConversationFiles(conversationId: string): Promise<Gen
   return data.files;
 }
 
-export function downloadConversationFile(conversationId: string, fileId: string): Promise<Blob> {
-  return apiFetchBlob(`/chat/conversations/${conversationId}/files/${fileId}`);
+export async function downloadConversationFile(conversationId: string, fileId: string): Promise<Blob> {
+  const blob = await apiFetchBlob(`/chat/conversations/${conversationId}/files/${fileId}`);
+  if (!blob) throw new Error("Datei-Download lieferte keinen Inhalt.");
+  return blob;
 }
 
 /** Fetches a generated file and triggers a normal browser "Save As" download - shared by the

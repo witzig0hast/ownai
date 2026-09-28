@@ -86,3 +86,13 @@ class LocationNotFound(APIError):
 class WeatherServiceError(APIError):
     def __init__(self, message: str = "Wetterdienst nicht erreichbar."):
         super().__init__(502, "weather_service_error", message)
+
+
+class TTSNotConfigured(APIError):
+    def __init__(self, message: str = "Kein TTS-Server konfiguriert."):
+        super().__init__(404, "tts_not_configured", message)
+
+
+class TTSUnavailable(APIError):
+    def __init__(self, message: str = "TTS-Server nicht erreichbar."):
+        super().__init__(502, "tts_unavailable", message)
