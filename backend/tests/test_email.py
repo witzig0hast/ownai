@@ -172,3 +172,55 @@ def test_connect_ipv4_raises_last_error_when_all_attempts_fail(monkeypatch):
         assert False, "expected OSError"
     except OSError as exc:
         assert "Network is unreachable" in str(exc)
+
+
+async def test_send_email_timeout_gets_clear_message(client: AsyncClient, auth_headers: dict, monkeypatch):
+    """A raw connect/response timeout must surface as an explanation naming the mail server and
+    the likely (server-side) cause, not just the bare "timed out" text of str(TimeoutError())."""
+    await client.post(
+        "/integrations/email",
+        json={
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "smtp_username": "karim",
+            "smtp_password": "s3cret",
+            "from_address": "karim@example.com",
+        },
+        headers=auth_headers,
+    )
+
+    def fake_send_sync(config, to, subject, body):  # noqa: ARG001
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(email_service, "_send_sync", fake_send_sync)
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        if not any(m.get("role") == "tool" for m in messages):
+            return {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "send_email",
+                            "arguments": {"to": "x@example.com", "subject": "Hi", "body": "Hi"},
+                        }
+                    }
+                ],
+            }
+        return {"role": "assistant", "content": "Ging nicht.", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    created = await client.post("/chat/conversations", json={}, headers=auth_headers)
+    conversation_id = created.json()["id"]
+
+    sent = await client.post(
+        f"/chat/conversations/{conversation_id}/messages",
+        json={"content": "Schick eine Test-Mail"},
+        headers=auth_headers,
+    )
+    error = sent.json()["message"]["tool_calls"][0]["result"]["error"]
+    assert "smtp.example.com:587" in error
+    assert "Timeout" in error
+    assert error != "timed out"  # the old, unhelpful raw exception text

@@ -149,7 +149,12 @@ def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> No
     # the real 15s timeout finally fires (see smtplib.SMTP.getreply(), which wraps any OSError
     # from reading the socket - including a plain timeout - in that message). The EHLO hostname
     # is informational only for any well-behaved server, so a static value is safe here.
-    with _IPv4SMTP(config.host, config.port, timeout=15, local_hostname="ownai-backend") as smtp:
+    # 60s, not the previous 15s: some servers deliberately slow down the SMTP dialogue (spam
+    # scoring, greylisting-style delays) for senders they haven't seen before/don't fully trust
+    # yet, rather than rejecting outright - a real "250 OK" can take a while longer than a
+    # normal fast exchange without anything actually being broken. This applies to the whole
+    # conversation (greeting, EHLO, STARTTLS, AUTH, DATA), not per-step.
+    with _IPv4SMTP(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
         if config.use_tls:
             smtp.starttls()
         if config.username and config.password:
@@ -164,5 +169,12 @@ async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: 
     try:
         # smtplib is blocking I/O - runs in a worker thread so it doesn't stall the event loop.
         await asyncio.to_thread(_send_sync, config, to, subject, body)
+    except TimeoutError as exc:
+        raise EmailSendFailed(
+            f"Der Mailserver ({config.host}:{config.port}) hat nicht rechtzeitig geantwortet "
+            "(Timeout). Das liegt meist am Mailserver selbst, nicht an OwnAI - z.B. absichtliche "
+            "Verzögerung bei neuen/unbekannten Absendern (Spam-Schutz). Erneut versuchen oder "
+            "beim Mailserver-Betreiber nachfragen."
+        ) from exc
     except (smtplib.SMTPException, OSError) as exc:
         raise EmailSendFailed(f"E-Mail konnte nicht gesendet werden: {exc}") from exc
