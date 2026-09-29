@@ -105,6 +105,46 @@ async def test_chat_turn_executes_tool_call_then_answers(client: AsyncClient, au
     assert calls["n"] == 2
 
 
+async def test_tool_call_missing_argument_gets_actionable_error(
+    client: AsyncClient, auth_headers: dict, monkeypatch
+):
+    """A tool handler indexes required arguments (arguments["foo"]), so a model that omits one
+    raises a plain KeyError - str(KeyError) is just the quoted key name ("'foo'"), a cryptic
+    message that previously confused the model into relaying it verbatim instead of retrying
+    with a complete call. The error text now has to actually explain what's wrong."""
+    calls = {"n": 0}
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {
+                "role": "assistant",
+                "content": "",
+                # Missing "subject" and "body" - what the reported bug looked like in practice.
+                "tool_calls": [{"function": {"name": "send_email", "arguments": {"to": "x@example.com"}}}],
+            }
+        return {"role": "assistant", "content": "Ok, hier ist die vollständige E-Mail.", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    created = await client.post("/chat/conversations", json={}, headers=auth_headers)
+    conversation_id = created.json()["id"]
+
+    sent = await client.post(
+        f"/chat/conversations/{conversation_id}/messages",
+        json={"content": "Schick eine Test-Mail"},
+        headers=auth_headers,
+    )
+    assert sent.status_code == 200
+    tool_calls = sent.json()["message"]["tool_calls"]
+    assert tool_calls[0]["tool"] == "send_email"
+    error = tool_calls[0]["result"]["error"]
+    assert "subject" in error
+    assert "send_email" in error
+    assert error != "'subject'"  # the old, unhelpful raw KeyError text
+    assert calls["n"] == 2
+
+
 async def test_streaming_not_yet_implemented(client: AsyncClient, auth_headers: dict):
     created = await client.post("/chat/conversations", json={}, headers=auth_headers)
     conversation_id = created.json()["id"]

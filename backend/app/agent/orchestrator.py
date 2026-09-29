@@ -153,6 +153,19 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
                     result = await handler(db, user, conversation, arguments)
                 except APIError as exc:
                     result = {"error": exc.message}
+                except KeyError as exc:
+                    # A tool handler indexed a required argument the model didn't include
+                    # (arguments["foo"], not .get("foo")) - str(KeyError) is just the quoted
+                    # key name ("'foo'"), which reads as a cryptic, meaningless error to the
+                    # model rather than something it can act on. Spell out what's actually
+                    # wrong so it can immediately retry with a complete tool call instead of
+                    # getting stuck relaying the raw exception text to the user.
+                    result = {
+                        "error": (
+                            f"Pflicht-Parameter '{exc.args[0]}' fehlt beim Aufruf von '{name}'. "
+                            "Rufe das Werkzeug erneut mit allen benötigten Angaben auf."
+                        )
+                    }
                 except Exception as exc:  # noqa: BLE001 - tool failures must not crash the chat turn
                     result = {"error": str(exc)}
 
