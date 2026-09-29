@@ -141,7 +141,15 @@ def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> No
     message["Subject"] = subject
     message.set_content(body)
 
-    with _IPv4SMTP(config.host, config.port, timeout=15) as smtp:
+    # Explicit local_hostname skips smtplib's default behavior of calling socket.getfqdn() to
+    # guess one - a reverse-DNS lookup of the *container's own* address with no timeout control
+    # of its own, unrelated to this connection's target. In a Docker container this can be slow
+    # or hang, eating into the time budget before the actual SMTP conversation even starts,
+    # which then surfaces later as a misleading "Connection unexpectedly closed: timed out" once
+    # the real 15s timeout finally fires (see smtplib.SMTP.getreply(), which wraps any OSError
+    # from reading the socket - including a plain timeout - in that message). The EHLO hostname
+    # is informational only for any well-behaved server, so a static value is safe here.
+    with _IPv4SMTP(config.host, config.port, timeout=15, local_hostname="ownai-backend") as smtp:
         if config.use_tls:
             smtp.starttls()
         if config.username and config.password:
