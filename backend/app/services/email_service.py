@@ -1,6 +1,7 @@
 import asyncio
 import smtplib
 import socket
+import time
 from email.message import EmailMessage
 
 from sqlalchemy import select
@@ -134,6 +135,24 @@ class _IPv4SMTP(smtplib.SMTP):
         return _connect_ipv4(host, port, timeout)
 
 
+# Phases before the message is actually handed to the server (DATA) are safe to retry - a
+# blip during connect/STARTTLS/AUTH means nothing was sent yet. Never retry "send": if that
+# phase's response is what timed out, the server may already have accepted the message, and
+# retrying could deliver it twice.
+_RETRYABLE_PHASES = {"connect", "starttls", "login"}
+_RETRY_DELAY_SECONDS = 3
+
+
+class _SendPhaseError(Exception):
+    """Carries which step of the SMTP conversation failed, so callers can report something more
+    useful than a bare exception string - see send_email's error handling."""
+
+    def __init__(self, phase: str, original: Exception):
+        self.phase = phase
+        self.original = original
+        super().__init__(str(original))
+
+
 def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> None:
     message = EmailMessage()
     message["From"] = config.from_address
@@ -141,25 +160,49 @@ def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> No
     message["Subject"] = subject
     message.set_content(body)
 
-    # Explicit local_hostname skips smtplib's default behavior of calling socket.getfqdn() to
-    # guess one - a reverse-DNS lookup of the *container's own* address with no timeout control
-    # of its own, unrelated to this connection's target. In a Docker container this can be slow
-    # or hang, eating into the time budget before the actual SMTP conversation even starts,
-    # which then surfaces later as a misleading "Connection unexpectedly closed: timed out" once
-    # the real 15s timeout finally fires (see smtplib.SMTP.getreply(), which wraps any OSError
-    # from reading the socket - including a plain timeout - in that message). The EHLO hostname
-    # is informational only for any well-behaved server, so a static value is safe here.
-    # 60s, not the previous 15s: some servers deliberately slow down the SMTP dialogue (spam
-    # scoring, greylisting-style delays) for senders they haven't seen before/don't fully trust
-    # yet, rather than rejecting outright - a real "250 OK" can take a while longer than a
-    # normal fast exchange without anything actually being broken. This applies to the whole
-    # conversation (greeting, EHLO, STARTTLS, AUTH, DATA), not per-step.
-    with _IPv4SMTP(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
-        if config.use_tls:
-            smtp.starttls()
-        if config.username and config.password:
-            smtp.login(config.username, config.password)
-        smtp.send_message(message)
+    # One retry for anything before the message is actually sent (see _RETRYABLE_PHASES) - this
+    # server has shown transient, self-resolving slowness/timeouts during debugging (e.g.
+    # deliberate delays for senders it doesn't fully trust yet), so a single retry after a short
+    # pause is worth it before giving up and surfacing an error.
+    for attempt in range(2):
+        # Explicit local_hostname skips smtplib's default behavior of calling socket.getfqdn()
+        # to guess one - a reverse-DNS lookup of the *container's own* address with no timeout
+        # control of its own, unrelated to this connection's target. In a Docker container this
+        # can be slow or hang, eating into the time budget before the actual SMTP conversation
+        # even starts, which then surfaces later as a misleading "Connection unexpectedly
+        # closed: timed out" once the real timeout finally fires (see smtplib.SMTP.getreply(),
+        # which wraps any OSError from reading the socket - including a plain timeout - in that
+        # message). The EHLO hostname is informational only for any well-behaved server, so a
+        # static value is safe here.
+        # 60s, not the previous 15s: some servers deliberately slow down the SMTP dialogue (spam
+        # scoring, greylisting-style delays) for senders they haven't seen before/don't fully
+        # trust yet, rather than rejecting outright - a real "250 OK" can take a while longer
+        # than a normal fast exchange without anything actually being broken.
+        phase = "connect"
+        try:
+            with _IPv4SMTP(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
+                if config.use_tls:
+                    phase = "starttls"
+                    smtp.starttls()
+                if config.username and config.password:
+                    phase = "login"
+                    smtp.login(config.username, config.password)
+                phase = "send"
+                smtp.send_message(message)
+            return
+        except (smtplib.SMTPException, OSError) as exc:
+            if attempt == 0 and phase in _RETRYABLE_PHASES:
+                time.sleep(_RETRY_DELAY_SECONDS)
+                continue
+            raise _SendPhaseError(phase, exc) from exc
+
+
+_PHASE_LABELS = {
+    "connect": "beim Verbindungsaufbau",
+    "starttls": "bei der TLS-Verschlüsselung (STARTTLS)",
+    "login": "bei der Anmeldung (Login)",
+    "send": "beim eigentlichen Versenden der Nachricht",
+}
 
 
 async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: str) -> None:
@@ -169,12 +212,22 @@ async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: 
     try:
         # smtplib is blocking I/O - runs in a worker thread so it doesn't stall the event loop.
         await asyncio.to_thread(_send_sync, config, to, subject, body)
+    except _SendPhaseError as exc:
+        where = _PHASE_LABELS.get(exc.phase, exc.phase)
+        if isinstance(exc.original, TimeoutError):
+            raise EmailSendFailed(
+                f"Der Mailserver ({config.host}:{config.port}) hat {where} nicht rechtzeitig "
+                "geantwortet (Timeout, auch nach einem Wiederholungsversuch). Das liegt meist "
+                "am Mailserver selbst, nicht an OwnAI - z.B. absichtliche Verzögerung bei "
+                "neuen/unbekannten Absendern (Spam-Schutz). Erneut versuchen oder beim "
+                "Mailserver-Betreiber nachfragen."
+            ) from exc
+        raise EmailSendFailed(f"E-Mail konnte nicht gesendet werden ({where}): {exc.original}") from exc
     except TimeoutError as exc:
+        # Defense in depth - _send_sync always wraps its own failures in _SendPhaseError, but
+        # don't assume it's the only possible source of a bare exception here.
         raise EmailSendFailed(
-            f"Der Mailserver ({config.host}:{config.port}) hat nicht rechtzeitig geantwortet "
-            "(Timeout). Das liegt meist am Mailserver selbst, nicht an OwnAI - z.B. absichtliche "
-            "Verzögerung bei neuen/unbekannten Absendern (Spam-Schutz). Erneut versuchen oder "
-            "beim Mailserver-Betreiber nachfragen."
+            f"Der Mailserver ({config.host}:{config.port}) hat nicht rechtzeitig geantwortet (Timeout)."
         ) from exc
     except (smtplib.SMTPException, OSError) as exc:
         raise EmailSendFailed(f"E-Mail konnte nicht gesendet werden: {exc}") from exc
