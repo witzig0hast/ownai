@@ -175,9 +175,26 @@ Response `200`: `{ "connected": true }`
 Das Passwort wird serverseitig **verschlüsselt** (Fernet, Schlüssel aus `SECRET_KEY`) gespeichert, nie im Klartext zurückgegeben.
 
 ### `GET /integrations/email`  *(Bearer)*
-Response `200`: `{ "has_custom_account": bool, "effective_from_address": string | null }` — `effective_from_address` ist die Absenderadresse, die aktuell tatsächlich verwendet würde (eigenes Konto oder System-Standard), `null` falls weder noch konfiguriert ist.
+Response `200`: `{ "has_custom_account": bool, "effective_from_address": string | null, "has_imap_account": bool, "inbound_agent_enabled": bool }` — `effective_from_address` ist die Absenderadresse, die aktuell tatsächlich verwendet würde (eigenes Konto oder System-Standard), `null` falls weder noch konfiguriert ist. `has_imap_account`/`inbound_agent_enabled` beziehen sich auf die eingehende-E-Mail-Funktion unten.
 
-Versenden läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür das Tool `send_email` auf (siehe `app/agent/tools.py`), nur wenn der Nutzer explizit danach fragt. Der eigentliche SMTP-Versand läuft **asynchron im Hintergrund** — das Tool-Ergebnis ist immer sofort `{ "queued": true, "to": string, "note": string }`, nie `{ "error": ... }`, egal ob der Versand am Ende klappt oder nicht (SMTP kann gegen einen langsamen Mailserver legitim lange dauern, das darf den Chat-Turn nie blockieren). Erfolg oder Fehler landen stattdessen ausschließlich als `category: "email"`-Eintrag über `GET /logs` (siehe dort).
+Versenden läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür das Tool `send_email` auf (siehe `app/agent/tools.py`), nur wenn der Nutzer explizit danach fragt. Der eigentliche SMTP-Versand läuft **asynchron im Hintergrund** — das Tool-Ergebnis ist immer sofort `{ "queued": true, "to": string, "status_hint": string }`, nie `{ "error": ... }`, egal ob der Versand am Ende klappt oder nicht (SMTP kann gegen einen langsamen Mailserver legitim lange dauern, das darf den Chat-Turn nie blockieren). Erfolg oder Fehler landen stattdessen ausschließlich als `category: "email"`-Eintrag über `GET /logs` (siehe dort).
+
+### Eingehende E-Mails (autonomer Agent)
+
+Optionale Funktion: der Assistent kann eingehende E-Mails selbstständig lesen und mit **vollem Werkzeugzugriff, ohne Rückfrage** darauf reagieren (explizite Nutzerentscheidung für volle Autonomie statt einer eingeschränkten/bestätigungspflichtigen Variante). Jede verarbeitete E-Mail wird zu einer eigenen neuen `Conversation` (Titel `"E-Mail: <Betreff>"`, `skill: "email_inbox"`) — im Chat normal einsehbar/fortsetzbar, kein separates System. Setzt ein bereits verbundenes SMTP-Konto voraus (`POST /integrations/email`).
+
+### `POST /integrations/email/imap`  *(Bearer)*
+Request: `{ "imap_host": string, "imap_port": int (Standard 993), "imap_username": string, "imap_password": string }`
+Response `200`: `{ "connected": true }`
+Fehler: `409 imap_not_configured` (kein SMTP-Konto verbunden — zuerst `POST /integrations/email`).
+Port 993 wird als implizites TLS behandelt (wie SMTP-Port 465, siehe oben) — jeder andere Port läuft unverschlüsselt.
+
+### `PATCH /integrations/email/inbound-agent`  *(Bearer)*
+Request: `{ "enabled": bool }`
+Response `200`: wie `GET /integrations/email`
+Fehler: `409 imap_not_configured` (kein IMAP-Konto verbunden — zuerst `POST /integrations/email/imap`).
+
+Läuft über einen Scheduler-Poll alle 2 Minuten (`app/services/scheduler.py::_check_inbound_email`), nicht in Echtzeit/per Push.
 
 ## Timer
 

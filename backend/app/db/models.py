@@ -257,6 +257,19 @@ class EmailAccount(Base):
     use_tls: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
+    # Optional IMAP side, for the "eingehende E-Mails" autonomous-agent feature (see
+    # app/services/email_inbox_service.py) - entirely separate from the SMTP fields above since
+    # some providers use different credentials/hosts for sending vs. receiving. All nullable:
+    # a user can keep using send_email without ever setting these up.
+    imap_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    imap_port: Mapped[int | None] = mapped_column(nullable=True)
+    imap_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    encrypted_imap_password: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Inbound mail is checked over the agent's full, unrestricted tool loop (the user explicitly
+    # chose "volle Autonomie mit allen Werkzeugen" over a restricted preset or a confirm-first
+    # flow) - off by default, a user has to deliberately opt in after configuring IMAP.
+    inbound_agent_enabled: Mapped[bool] = mapped_column(default=False)
+
     user: Mapped["User"] = relationship(back_populates="email_account")
 
 

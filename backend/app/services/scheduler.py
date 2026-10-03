@@ -9,6 +9,7 @@ from app.db.session import async_session_maker
 from app.services import (
     automation_service,
     contact_service,
+    email_inbox_service,
     home_assistant_service,
     permanent_agent_service,
     push_service,
@@ -157,16 +158,34 @@ async def _run_permanent_agents() -> None:
                 logger.exception("Permanent agent %s failed to run", agent.id)
 
 
+async def _check_inbound_email() -> None:
+    """Runs every 2 minutes (see start_scheduler) and, for every user with
+    EmailAccount.inbound_agent_enabled, fetches unseen IMAP mail and runs each one through the
+    full chat agent loop (email_inbox_service.process_inbound_emails) - see app/agent/skills.py's
+    "email_inbox" skill for the untrusted-content framing and the full-autonomy tool access the
+    user explicitly chose for this feature. One user's failure (IMAP down, bad credentials,
+    Ollama unreachable) must not block the others - fetch_unseen_emails/process_inbound_emails
+    already contain their own errors and log them, so this loop only guards against something
+    unexpected escaping that."""
+    async with async_session_maker() as db:
+        users = await email_inbox_service.users_with_inbound_agent_enabled(db)
+        for user in users:
+            try:
+                await email_inbox_service.process_inbound_emails(db, user)
+            except Exception:  # noqa: BLE001 - one user's failure must not block the others or the loop
+                logger.exception("Inbound email check failed for user %s", user.id)
+
+
 def start_scheduler() -> AsyncIOScheduler:
     """Starts the background poll for expired timers (see _check_expired_timers), the daily
     birthday check (see _check_birthdays), the per-minute recurring-reminder check (see
     _check_recurring_reminders), the Home-Assistant-triggered automation check (see
-    _check_automations), and the per-minute permanent-agent runner (see _run_permanent_agents).
-    Runs in-process via APScheduler. Known limitation: with multiple worker processes, each would
-    poll independently and could send duplicate notifications - docker-compose.yml runs a single
-    uvicorn process, so this doesn't apply today, but is worth knowing before scaling out to
-    multiple workers/replicas (would need a DB-level lock or moving this to a dedicated worker
-    process)."""
+    _check_automations), the per-minute permanent-agent runner (see _run_permanent_agents), and
+    the inbound-email check (see _check_inbound_email). Runs in-process via APScheduler. Known
+    limitation: with multiple worker processes, each would poll independently and could send
+    duplicate notifications - docker-compose.yml runs a single uvicorn process, so this doesn't
+    apply today, but is worth knowing before scaling out to multiple workers/replicas (would need
+    a DB-level lock or moving this to a dedicated worker process)."""
     global _scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(_check_expired_timers, "interval", seconds=15, id="expired_timers")
@@ -174,6 +193,7 @@ def start_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(_check_recurring_reminders, "cron", second=0, id="recurring_reminders")
     scheduler.add_job(_check_automations, "interval", seconds=30, id="automations")
     scheduler.add_job(_run_permanent_agents, "interval", seconds=60, id="permanent_agents")
+    scheduler.add_job(_check_inbound_email, "interval", seconds=120, id="inbound_email")
     scheduler.start()
     _scheduler = scheduler
     return scheduler

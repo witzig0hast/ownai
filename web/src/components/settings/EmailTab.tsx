@@ -17,6 +17,14 @@ export function EmailTab() {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
 
+  const [imapHost, setImapHost] = useState("");
+  const [imapPort, setImapPort] = useState("993");
+  const [imapUsername, setImapUsername] = useState("");
+  const [imapPassword, setImapPassword] = useState("");
+  const [connectingImap, setConnectingImap] = useState(false);
+  const [imapError, setImapError] = useState<string | null>(null);
+  const [togglingInboundAgent, setTogglingInboundAgent] = useState(false);
+
   const loadStatus = useCallback(() => {
     setStatus("checking");
     emailApi
@@ -50,6 +58,40 @@ export function EmailTab() {
       setConnectError(err instanceof ApiError ? err.message : "Verbindung fehlgeschlagen.");
     } finally {
       setConnecting(false);
+    }
+  }
+
+  async function handleConnectImap(e: FormEvent) {
+    e.preventDefault();
+    setImapError(null);
+    setConnectingImap(true);
+    try {
+      await emailApi.connectImap({
+        imap_host: imapHost,
+        imap_port: Number(imapPort) || 993,
+        imap_username: imapUsername,
+        imap_password: imapPassword,
+      });
+      setImapPassword("");
+      loadStatus();
+    } catch (err) {
+      setImapError(err instanceof ApiError ? err.message : "Verbindung fehlgeschlagen.");
+    } finally {
+      setConnectingImap(false);
+    }
+  }
+
+  async function handleToggleInboundAgent() {
+    if (status === "checking" || status === "error") return;
+    setImapError(null);
+    setTogglingInboundAgent(true);
+    try {
+      const updated = await emailApi.setInboundAgentEnabled(!status.inbound_agent_enabled);
+      setStatus(updated);
+    } catch (err) {
+      setImapError(err instanceof ApiError ? err.message : "Konnte nicht umgeschaltet werden.");
+    } finally {
+      setTogglingInboundAgent(false);
     }
   }
 
@@ -141,6 +183,93 @@ export function EmailTab() {
           {connecting ? "Verbinde..." : "Verbinden"}
         </button>
       </form>
+
+      {status !== "checking" && status !== "error" && status.has_custom_account ? (
+        <div className="animate-fade-in-up mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <h3 className="mb-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            Eingehende E-Mails (autonomer Agent)
+          </h3>
+          <p className="mb-3 text-xs text-zinc-500">
+            Verbinde zusätzlich IMAP, damit der Assistent eingehende E-Mails selbstständig liest und
+            darauf reagiert — mit vollem Werkzeugzugriff und ohne Rückfrage. Jede verarbeitete E-Mail
+            erscheint als eigene Unterhaltung im Chat (Titel &bdquo;E-Mail: ...&ldquo;), dort siehst du
+            genau, was der Agent getan hat.
+          </p>
+          <p className="mb-4 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            Achtung: jeder, der dir eine E-Mail schickt, kann versuchen den Agenten zu manipulieren
+            (Prompt Injection). Der Agent ist angewiesen, misstrauisch zu sein, aber eine Garantie ist
+            das nicht — aktiviere das nur, wenn du damit einverstanden bist.
+          </p>
+
+          {status.has_imap_account ? (
+            <div className="mb-4 flex items-center justify-between rounded-2xl border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+              <span className="text-zinc-900 dark:text-zinc-100">
+                IMAP verbunden —{" "}
+                {status.inbound_agent_enabled ? (
+                  <span className="text-emerald-600 dark:text-emerald-400">Agent aktiv</span>
+                ) : (
+                  <span className="text-zinc-500">Agent pausiert</span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={handleToggleInboundAgent}
+                disabled={togglingInboundAgent}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
+                  status.inbound_agent_enabled
+                    ? "bg-red-600 hover:bg-red-500"
+                    : "bg-emerald-600 hover:bg-emerald-500"
+                }`}
+              >
+                {status.inbound_agent_enabled ? "Pausieren" : "Aktivieren"}
+              </button>
+            </div>
+          ) : null}
+
+          <form onSubmit={handleConnectImap} className="flex flex-col gap-3">
+            <input
+              type="text"
+              required
+              placeholder="IMAP-Host, z.B. imap.gmail.com"
+              value={imapHost}
+              onChange={(e) => setImapHost(e.target.value)}
+              className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <input
+              type="number"
+              required
+              placeholder="Port (993 für SSL/TLS)"
+              value={imapPort}
+              onChange={(e) => setImapPort(e.target.value)}
+              className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Benutzername"
+              value={imapUsername}
+              onChange={(e) => setImapUsername(e.target.value)}
+              className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <input
+              type="password"
+              required
+              placeholder="Passwort"
+              value={imapPassword}
+              onChange={(e) => setImapPassword(e.target.value)}
+              className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <ErrorMessage message={imapError} />
+            <button
+              type="submit"
+              disabled={connectingImap}
+              className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
+            >
+              {connectingImap ? "Verbinde..." : status.has_imap_account ? "IMAP aktualisieren" : "IMAP verbinden"}
+            </button>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

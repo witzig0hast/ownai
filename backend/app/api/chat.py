@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.orchestrator import run_turn
-from app.agent.skills import SKILLS, is_valid_skill_key
+from app.agent.skills import is_valid_skill_key, public_skills
 from app.auth.dependencies import get_current_user, require_not_paused
 from app.db.models import Conversation, Message, User
 from app.db.session import async_session_maker, get_db
@@ -92,7 +92,7 @@ async def update_conversation(
 @router.get("/skills", response_model=SkillsListOut)
 async def list_skills(_user: User = Depends(get_current_user)) -> SkillsListOut:
     return SkillsListOut(
-        skills=[SkillOut(key=s.key, name=s.name, description=s.description) for s in SKILLS.values()]
+        skills=[SkillOut(key=s.key, name=s.name, description=s.description) for s in public_skills()]
     )
 
 

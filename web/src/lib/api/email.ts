@@ -19,8 +19,31 @@ export function connectEmail(credentials: EmailCredentials): Promise<{ connected
 export interface EmailStatus {
   has_custom_account: boolean;
   effective_from_address: string | null;
+  has_imap_account: boolean;
+  inbound_agent_enabled: boolean;
 }
 
 export function getEmailStatus(): Promise<EmailStatus> {
   return apiFetch<EmailStatus>("/integrations/email");
+}
+
+export interface ImapCredentials {
+  imap_host: string;
+  imap_port: number;
+  imap_username: string;
+  imap_password: string;
+}
+
+export function connectImap(credentials: ImapCredentials): Promise<{ connected: true }> {
+  return apiFetch<{ connected: true }>("/integrations/email/imap", {
+    method: "POST",
+    body: credentials,
+  });
+}
+
+export function setInboundAgentEnabled(enabled: boolean): Promise<EmailStatus> {
+  return apiFetch<EmailStatus>("/integrations/email/inbound-agent", {
+    method: "PATCH",
+    body: { enabled },
+  });
 }

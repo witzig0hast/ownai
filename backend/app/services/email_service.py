@@ -1,8 +1,12 @@
 import asyncio
+import email as email_lib
+import imaplib
 import smtplib
 import socket
+from email import policy
 from email.message import EmailMessage
 
+from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +26,11 @@ class EmailNotConfigured(APIError):
 class EmailSendFailed(APIError):
     def __init__(self, message: str):
         super().__init__(502, "email_send_failed", message)
+
+
+class ImapNotConfigured(APIError):
+    def __init__(self, message: str = "Kein SMTP-Konto verbunden - verbinde zuerst POST /integrations/email."):
+        super().__init__(409, "imap_not_configured", message)
 
 
 async def get_account(db: AsyncSession, user: User) -> EmailAccount | None:
@@ -60,6 +69,40 @@ async def connect(
             use_tls=use_tls,
         )
         db.add(account)
+    await db.commit()
+    await db.refresh(account)
+    return account
+
+
+async def connect_imap(
+    db: AsyncSession,
+    user: User,
+    *,
+    imap_host: str,
+    imap_port: int,
+    imap_username: str,
+    imap_password: str,
+) -> EmailAccount:
+    """Sets the IMAP side of the user's EmailAccount (see app/services/email_inbox_service.py) -
+    requires an EmailAccount row to already exist (i.e. SMTP connected first, see connect()
+    above), since smtp_host/smtp_username/etc. are NOT NULL on that row."""
+    account = await get_account(db, user)
+    if account is None:
+        raise ImapNotConfigured()
+    account.imap_host = imap_host
+    account.imap_port = imap_port
+    account.imap_username = imap_username
+    account.encrypted_imap_password = encrypt(imap_password)
+    await db.commit()
+    await db.refresh(account)
+    return account
+
+
+async def set_inbound_agent_enabled(db: AsyncSession, user: User, enabled: bool) -> EmailAccount:
+    account = await get_account(db, user)
+    if account is None or account.imap_host is None:
+        raise ImapNotConfigured("Kein IMAP-Konto verbunden - verbinde zuerst POST /integrations/email/imap.")
+    account.inbound_agent_enabled = enabled
     await db.commit()
     await db.refresh(account)
     return account
@@ -292,3 +335,97 @@ async def send_email_in_background(user_id: str, to: str, subject: str, body: st
             await send_email(db, user, to, subject, body)
         except APIError:
             pass
+
+
+# IMAP, for the "eingehende E-Mails" inbound agent (app/services/email_inbox_service.py). Same
+# IPv4-only-connection rationale as SMTP above, and the same implicit-TLS-vs-STARTTLS lesson:
+# port 993 is implicit TLS by convention, so it gets IMAP4_SSL directly rather than IMAP4 +
+# STARTTLS. Unlike SMTP (587/465 both common), virtually every real-world IMAP server uses 993 -
+# a plaintext/STARTTLS IMAP path is deliberately not implemented here, kept to the already-tested
+# IPv4 plain socket for the rare local/LAN case where 993 isn't used.
+_IMAP_IMPLICIT_TLS_PORT = 993
+_IMAP_FETCH_TIMEOUT_SECONDS = 30
+MAX_EMAIL_BODY_CHARS = 4000
+
+
+class _IPv4IMAP4_SSL(imaplib.IMAP4_SSL):
+    """imaplib.IMAP4_SSL, but its socket connects over IPv4 only (see _connect_ipv4)."""
+
+    def _create_socket(self, timeout):
+        sock = _connect_ipv4(self.host, self.port, timeout if timeout is not None else _IMAP_FETCH_TIMEOUT_SECONDS)
+        return self.ssl_context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _IPv4IMAP4(imaplib.IMAP4):
+    """imaplib.IMAP4 (plaintext, no TLS) with the same IPv4-only connection - only reached for a
+    non-993 port, see _IMAP_IMPLICIT_TLS_PORT above."""
+
+    def _create_socket(self, timeout):
+        return _connect_ipv4(self.host, self.port, timeout if timeout is not None else _IMAP_FETCH_TIMEOUT_SECONDS)
+
+
+def _extract_plain_text(part) -> str:
+    """get_body() can hand back a text/plain or text/html part depending on what the message
+    offers - strip markup for the latter with the same BeautifulSoup-based approach already used
+    for web pages (see clipper_service.py), rather than showing raw HTML to the model."""
+    content = part.get_content()
+    if part.get_content_type() == "text/html":
+        content = BeautifulSoup(content, "html.parser").get_text(separator="\n", strip=True)
+    return content
+
+
+def _parse_email(raw: bytes) -> dict:
+    msg = email_lib.message_from_bytes(raw, policy=policy.default)
+    body_part = msg.get_body(preferencelist=("plain", "html"))
+    body = _extract_plain_text(body_part) if body_part is not None else ""
+    return {
+        "from": str(msg.get("From", "")),
+        "subject": str(msg.get("Subject", "")) or "(kein Betreff)",
+        "body": body[:MAX_EMAIL_BODY_CHARS],
+    }
+
+
+def _fetch_unseen_sync(host: str, port: int, username: str, password: str) -> list[dict]:
+    """Connects, logs in, and returns every UNSEEN message in INBOX as {"from", "subject",
+    "body"} dicts - marks each \\Seen as it's fetched (standard IMAP idiom: imaplib's FETCH
+    implicitly sets \\Seen unless done with BODY.PEEK, which is exactly what we want here so the
+    next poll doesn't see it again). Blocking I/O - runs in a worker thread, see
+    fetch_unseen_emails."""
+    imap_cls = _IPv4IMAP4_SSL if port == _IMAP_IMPLICIT_TLS_PORT else _IPv4IMAP4
+    messages: list[dict] = []
+    with imap_cls(host, port, timeout=_IMAP_FETCH_TIMEOUT_SECONDS) as imap:
+        imap.login(username, password)
+        imap.select("INBOX")
+        status, data = imap.search(None, "UNSEEN")
+        if status != "OK" or not data or not data[0]:
+            return messages
+        for num in data[0].split():
+            status, msg_data = imap.fetch(num, "(RFC822)")
+            if status != "OK" or not msg_data or not isinstance(msg_data[0], tuple):
+                continue
+            messages.append(_parse_email(msg_data[0][1]))
+    return messages
+
+
+async def fetch_unseen_emails(db: AsyncSession, user: User) -> list[dict]:
+    """Returns every unseen inbox message for the user's configured IMAP account as a list of
+    {"from", "subject", "body"} dicts (empty list if IMAP isn't configured - best-effort, not an
+    error, since this runs from a scheduler poll with no one to show an error to)."""
+    account = await get_account(db, user)
+    if account is None or account.imap_host is None or account.imap_port is None:
+        return []
+    password = decrypt(account.encrypted_imap_password) if account.encrypted_imap_password else ""
+    try:
+        return await asyncio.to_thread(
+            _fetch_unseen_sync, account.imap_host, account.imap_port, account.imap_username or "", password
+        )
+    except (imaplib.IMAP4.error, OSError) as exc:
+        await log_service.log(
+            db,
+            category="email",
+            level="error",
+            user=user,
+            message=f"Abruf eingehender E-Mails fehlgeschlagen ({account.imap_host}:{account.imap_port})",
+            detail=str(exc),
+        )
+        return []

@@ -1,4 +1,5 @@
 import socket
+from email.message import EmailMessage as StdlibEmailMessage
 
 from httpx import AsyncClient
 
@@ -6,10 +7,40 @@ from app.services import email_service, ollama_client
 from tests.conftest import drain_background_tasks
 
 
+def _build_raw_email(frm: str, subject: str, body: str, *, html: bool = False) -> bytes:
+    msg = StdlibEmailMessage()
+    msg["From"] = frm
+    msg["Subject"] = subject
+    if html:
+        msg.set_content(body, subtype="html")
+    else:
+        msg.set_content(body)
+    return msg.as_bytes()
+
+
+async def _connect_smtp(client: AsyncClient, auth_headers: dict) -> None:
+    await client.post(
+        "/integrations/email",
+        json={
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "smtp_username": "karim",
+            "smtp_password": "s3cret",
+            "from_address": "karim@example.com",
+        },
+        headers=auth_headers,
+    )
+
+
 async def test_email_status_unconfigured_by_default(client: AsyncClient, auth_headers: dict):
     response = await client.get("/integrations/email", headers=auth_headers)
     assert response.status_code == 200
-    assert response.json() == {"has_custom_account": False, "effective_from_address": None}
+    assert response.json() == {
+        "has_custom_account": False,
+        "effective_from_address": None,
+        "has_imap_account": False,
+        "inbound_agent_enabled": False,
+    }
 
 
 async def test_connect_email_then_status_reflects_it(client: AsyncClient, auth_headers: dict):
@@ -28,7 +59,12 @@ async def test_connect_email_then_status_reflects_it(client: AsyncClient, auth_h
     assert connect.json() == {"connected": True}
 
     status = await client.get("/integrations/email", headers=auth_headers)
-    assert status.json() == {"has_custom_account": True, "effective_from_address": "karim@example.com"}
+    assert status.json() == {
+        "has_custom_account": True,
+        "effective_from_address": "karim@example.com",
+        "has_imap_account": False,
+        "inbound_agent_enabled": False,
+    }
 
 
 async def test_send_email_tool_queues_immediately_then_sends_in_background(
@@ -439,3 +475,128 @@ async def test_send_email_reports_which_phase_failed(client: AsyncClient, auth_h
     entry = logs.json()["logs"][0]
     assert "Anmeldung" in entry["message"]
     assert "bad credentials" in entry["detail"]
+
+
+async def test_connect_imap_requires_smtp_connected_first(client: AsyncClient, auth_headers: dict):
+    response = await client.post(
+        "/integrations/email/imap",
+        json={"imap_host": "imap.example.com", "imap_port": 993, "imap_username": "karim", "imap_password": "s3cret"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "imap_not_configured"
+
+
+async def test_connect_imap_then_status_reflects_it(client: AsyncClient, auth_headers: dict):
+    await _connect_smtp(client, auth_headers)
+
+    connect = await client.post(
+        "/integrations/email/imap",
+        json={"imap_host": "imap.example.com", "imap_port": 993, "imap_username": "karim", "imap_password": "s3cret"},
+        headers=auth_headers,
+    )
+    assert connect.status_code == 200
+    assert connect.json() == {"connected": True}
+
+    status = await client.get("/integrations/email", headers=auth_headers)
+    body = status.json()
+    assert body["has_imap_account"] is True
+    assert body["inbound_agent_enabled"] is False
+
+
+async def test_enable_inbound_agent_requires_imap_connected_first(client: AsyncClient, auth_headers: dict):
+    await _connect_smtp(client, auth_headers)
+
+    response = await client.patch(
+        "/integrations/email/inbound-agent", json={"enabled": True}, headers=auth_headers
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "imap_not_configured"
+
+
+async def test_enable_then_disable_inbound_agent(client: AsyncClient, auth_headers: dict):
+    await _connect_smtp(client, auth_headers)
+    await client.post(
+        "/integrations/email/imap",
+        json={"imap_host": "imap.example.com", "imap_port": 993, "imap_username": "karim", "imap_password": "s3cret"},
+        headers=auth_headers,
+    )
+
+    enabled = await client.patch(
+        "/integrations/email/inbound-agent", json={"enabled": True}, headers=auth_headers
+    )
+    assert enabled.status_code == 200
+    assert enabled.json()["inbound_agent_enabled"] is True
+
+    disabled = await client.patch(
+        "/integrations/email/inbound-agent", json={"enabled": False}, headers=auth_headers
+    )
+    assert disabled.json()["inbound_agent_enabled"] is False
+
+
+def test_parse_email_extracts_plain_text_body():
+    raw = _build_raw_email("Absender <a@example.com>", "Testbetreff", "Hallo Welt")
+    result = email_service._parse_email(raw)
+    assert result["from"] == "Absender <a@example.com>"
+    assert result["subject"] == "Testbetreff"
+    assert "Hallo Welt" in result["body"]
+
+
+def test_parse_email_strips_html_markup_from_html_only_body():
+    raw = _build_raw_email("a@example.com", "HTML-Mail", "<p>Hallo <b>Welt</b></p>", html=True)
+    result = email_service._parse_email(raw)
+    assert "<p>" not in result["body"]
+    assert "<b>" not in result["body"]
+    assert "Hallo" in result["body"]
+    assert "Welt" in result["body"]
+
+
+class _FakeImap:
+    """Minimal stand-in for the subset of imaplib's interface _fetch_unseen_sync uses."""
+
+    instances: list["_FakeImap"] = []
+
+    def __init__(self, host, port, timeout=None):  # noqa: ARG002
+        self.host = host
+        self.port = port
+        _FakeImap.instances.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def login(self, username, password):  # noqa: ARG002
+        pass
+
+    def select(self, mailbox):  # noqa: ARG002
+        return ("OK", [b"1"])
+
+    def search(self, charset, criterion):  # noqa: ARG002
+        return ("OK", [b"1"])
+
+    def fetch(self, num, parts):  # noqa: ARG002
+        raw = _build_raw_email("Absender <a@example.com>", "Testbetreff", "Hallo Welt")
+        return ("OK", [(b"1 (RFC822 {%d}" % len(raw), raw)])
+
+
+def test_fetch_unseen_sync_uses_implicit_tls_class_for_port_993(monkeypatch):
+    _FakeImap.instances = []
+    monkeypatch.setattr(email_service, "_IPv4IMAP4_SSL", _FakeImap)
+
+    messages = email_service._fetch_unseen_sync("imap.example.com", 993, "karim", "s3cret")
+
+    assert len(_FakeImap.instances) == 1
+    assert len(messages) == 1
+    assert messages[0]["subject"] == "Testbetreff"
+
+
+def test_fetch_unseen_sync_uses_plain_class_for_other_ports(monkeypatch):
+    _FakeImap.instances = []
+    monkeypatch.setattr(email_service, "_IPv4IMAP4", _FakeImap)
+
+    messages = email_service._fetch_unseen_sync("imap.example.com", 143, "karim", "s3cret")
+
+    assert len(_FakeImap.instances) == 1
+    assert len(messages) == 1
