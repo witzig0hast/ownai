@@ -138,10 +138,11 @@ async def _send_email(
         "queued": True,
         "to": arguments["to"],
         "note": (
-            "Der Versand läuft jetzt im Hintergrund weiter, ist noch nicht bestätigt erfolgreich. "
-            "Teile dem Nutzer mit, dass die E-Mail losgeschickt wird (z.B. 'Ich schicke die "
-            "E-Mail jetzt los'), nicht dass sie bereits versendet wurde - ein etwaiger Fehler "
-            "erscheint nur noch im Logs-Tab, nicht mehr in dieser Unterhaltung."
+            "Diese Anfrage ist hiermit abgeschlossen. Ruf send_email jetzt NICHT noch einmal für "
+            "dieselbe Anfrage auf, auch nicht zur Bestätigung - der Versand läuft bereits im "
+            "Hintergrund. Antworte dem Nutzer jetzt direkt und kurz, z.B. 'Ich schicke die E-Mail "
+            "jetzt los.' (nicht 'wurde versendet', da der eigentliche Erfolg nicht in dieser "
+            "Unterhaltung bestätigt wird, sondern nur im Logs-Tab sichtbar ist)."
         ),
     }
 
