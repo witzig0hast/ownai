@@ -137,13 +137,7 @@ async def _send_email(
     return {
         "queued": True,
         "to": arguments["to"],
-        "note": (
-            "Diese Anfrage ist hiermit abgeschlossen. Ruf send_email jetzt NICHT noch einmal für "
-            "dieselbe Anfrage auf, auch nicht zur Bestätigung - der Versand läuft bereits im "
-            "Hintergrund. Antworte dem Nutzer jetzt direkt und kurz, z.B. 'Ich schicke die E-Mail "
-            "jetzt los.' (nicht 'wurde versendet', da der eigentliche Erfolg nicht in dieser "
-            "Unterhaltung bestätigt wird, sondern nur im Logs-Tab sichtbar ist)."
-        ),
+        "status_hint": "wird gesendet, nicht wurde gesendet; kein erneuter Aufruf nötig",
     }
 
 
