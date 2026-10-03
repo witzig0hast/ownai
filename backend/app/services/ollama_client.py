@@ -9,6 +9,20 @@ class OllamaError(Exception):
     pass
 
 
+def _keep_alive_payload_value(raw: str) -> int | str:
+    """Ollama's /api/chat accepts `keep_alive` as either a duration string ("30m", "1h") or a
+    bare number of seconds, where a negative number means "never unload" - but only when sent as
+    an actual JSON number. A numeric-looking value sent as a JSON STRING (e.g. "-1") fails
+    server-side: Ollama parses a string keep_alive with Go's time.ParseDuration, which requires a
+    unit suffix ("-1h" works, bare "-1" does not) - the whole /api/chat call then 400s. Converts
+    a plain integer string to a real int so "-1"/"0" (our documented values, see .env.example)
+    work as intended; any real duration string ("30m") passes through unchanged."""
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
 async def chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Calls Ollama's native /api/chat (non-streaming) and returns the response `message` dict.
 
@@ -20,7 +34,7 @@ async def chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | Non
         "model": settings.ollama_chat_model,
         "messages": messages,
         "stream": False,
-        "keep_alive": settings.ollama_keep_alive,
+        "keep_alive": _keep_alive_payload_value(settings.ollama_keep_alive),
     }
     if tools:
         payload["tools"] = tools
@@ -47,7 +61,7 @@ async def warmup() -> None:
     payload = {
         "model": settings.ollama_chat_model,
         "messages": [],
-        "keep_alive": settings.ollama_keep_alive,
+        "keep_alive": _keep_alive_payload_value(settings.ollama_keep_alive),
     }
     async with httpx.AsyncClient(base_url=settings.ollama_base_url, timeout=120.0) as client:
         try:
@@ -74,7 +88,7 @@ async def generate_title(user_message: str, assistant_reply: str) -> str | None:
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
-        "keep_alive": settings.ollama_keep_alive,
+        "keep_alive": _keep_alive_payload_value(settings.ollama_keep_alive),
         "options": {"num_predict": 20},
     }
     async with httpx.AsyncClient(base_url=settings.ollama_base_url, timeout=30.0) as client:
