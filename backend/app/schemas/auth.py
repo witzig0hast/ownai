@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     email: EmailStr
     display_name: str
     is_admin: bool
+    approval_status: str
     created_at: UtcDatetime
 
 

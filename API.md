@@ -16,13 +16,15 @@ Verbindliche Schnittstelle zwischen `backend/` und den drei Clients (`web/`, `mo
 
 ### `POST /auth/register`
 Request: `{ "email": string, "password": string (>=8 Zeichen), "display_name": string }`
-Response `201`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "created_at": datetime }`
-Fehler: `409 email_taken`, `403 registration_closed` (Admin hat Registrierung geschlossen — betrifft nie den allerersten Nutzer überhaupt, der bootstrapt sich immer und wird automatisch `is_admin: true`)
+Response `201`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime }`
+Fehler: `409 email_taken`, `403 registration_closed` (Admin hat Registrierung geschlossen — betrifft nie den allerersten Nutzer überhaupt, der bootstrapt sich immer und wird automatisch `is_admin: true` + `approval_status: "approved"`)
+
+Jeder Nutzer außer dem allerersten startet mit `approval_status: "pending"` und kann sich erst einloggen, nachdem ein Admin die Registrierung freigeschaltet hat (siehe `PATCH /admin/users/{id}/approval`).
 
 ### `POST /auth/login`
 Request: `{ "email": string, "password": string }`
 Response `200`: `{ "access_token": string, "refresh_token": string, "token_type": "bearer", "expires_in": 900 }`
-Fehler: `401 invalid_credentials`
+Fehler: `401 invalid_credentials`, `403 registration_pending` (Registrierung wartet noch auf Admin-Freischaltung), `403 registration_declined` (Admin hat die Registrierung abgelehnt) — beide erst nach erfolgreicher Passwort-Prüfung geprüft, damit der Freischalt-Status keinem Angreifer ohne korrektes Passwort verraten wird
 
 Access-Token-TTL: 15 min. Refresh-Token-TTL: 30 Tage.
 
@@ -32,7 +34,7 @@ Response `200`: gleiche Form wie `/auth/login`
 Fehler: `401 invalid_refresh_token`
 
 ### `GET /users/me`  *(Bearer)*
-Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "created_at": datetime }`
+Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime }`
 
 ## Geräte
 
@@ -672,7 +674,25 @@ Response `200`: wie `GET /admin/settings`
 `system_paused: true` blockiert `POST /chat/conversations/{id}/messages` (der eigentliche Ollama/LLM-Traffic) mit `503 system_paused` für alle Nutzer — alle anderen Endpunkte (Kalender, Home Assistant, Timer, Login, ...) bleiben normal nutzbar.
 
 ### `GET /admin/users`  *(Bearer, Admin)*
-Response `200`: `{ "users": [ { "id": uuid, "email": string, "display_name": string, "is_admin": bool, "created_at": datetime } ] }`
+Response `200`: `{ "users": [ { "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": string, "created_at": datetime } ] }`
+
+### `GET /admin/users/pending`  *(Bearer, Admin)*
+Response `200`: gleiche Form wie `GET /admin/users`, aber nur Nutzer mit `approval_status: "pending"`.
+
+### `PATCH /admin/users/{id}/approval`  *(Bearer, Admin)*
+Request: `{ "approval_status": "approved" | "declined" }`
+Response `200`: gleiche Form wie `GET /admin/users/pending` — die aktualisierte (noch ausstehende) Liste, nicht nur der eine Nutzer.
+Fehler: `404 not_found`
+
+## Logs
+
+Pro-Nutzer-Log für genau die Fälle, in denen der Nutzer selbst sehen soll, was im Hintergrund schiefgegangen ist (z. B. ein fehlgeschlagener E-Mail-Versand), ohne Server-/Container-Zugriff zu brauchen. Kein Ersatz für die internen Container-Logs.
+
+### `GET /logs?category={string}&level={string}&q={string}`  *(Bearer)*
+Alle Parameter optional. `level`: `"info" | "warning" | "error"`. `q`: Freitextsuche über `message` + `detail`.
+Response `200`: `{ "logs": [ { "id": uuid, "category": string, "level": string, "message": string, "detail": string | null, "created_at": datetime } ], "categories": [string] }` — `logs` neueste zuerst, gedeckelt auf 200 Einträge; `categories` sind die beim aufrufenden Nutzer tatsächlich vorkommenden Kategorien (unabhängig vom aktuellen Filter), zum Befüllen eines Kategorie-Dropdowns im Frontend.
+
+Aktuell befüllte Kategorie: `"email"` (jeder Versand-Versuch von `send_email`, Erfolg wie Fehler).
 
 ## Health
 

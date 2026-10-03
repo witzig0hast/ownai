@@ -96,3 +96,13 @@ class TTSNotConfigured(APIError):
 class TTSUnavailable(APIError):
     def __init__(self, message: str = "TTS-Server nicht erreichbar."):
         super().__init__(502, "tts_unavailable", message)
+
+
+class RegistrationPending(APIError):
+    def __init__(self, message: str = "Dein Konto wartet noch auf Freischaltung durch einen Admin."):
+        super().__init__(403, "registration_pending", message)
+
+
+class RegistrationDeclined(APIError):
+    def __init__(self, message: str = "Deine Registrierung wurde abgelehnt."):
+        super().__init__(403, "registration_declined", message)

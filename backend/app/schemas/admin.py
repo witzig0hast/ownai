@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.auth import UserOut
 
@@ -17,3 +17,7 @@ class AppSettingsUpdateRequest(BaseModel):
 
 class AdminUsersListOut(BaseModel):
     users: list[UserOut]
+
+
+class UserApprovalRequest(BaseModel):
+    approval_status: str = Field(pattern="^(approved|declined)$")

@@ -16,3 +16,19 @@ export async function listUsers(): Promise<User[]> {
   const data = await apiFetch<{ users: User[] }>("/admin/users");
   return data.users;
 }
+
+export async function listPendingUsers(): Promise<User[]> {
+  const data = await apiFetch<{ users: User[] }>("/admin/users/pending");
+  return data.users;
+}
+
+export async function setUserApproval(
+  userId: string,
+  approvalStatus: "approved" | "declined",
+): Promise<User[]> {
+  const data = await apiFetch<{ users: User[] }>(`/admin/users/${userId}/approval`, {
+    method: "PATCH",
+    body: { approval_status: approvalStatus },
+  });
+  return data.users;
+}

@@ -16,7 +16,14 @@ from app.auth.security import (
 from app.config import get_settings
 from app.db.models import RefreshToken, User
 from app.db.session import get_db
-from app.errors import EmailTaken, InvalidCredentials, InvalidRefreshToken, RegistrationClosed
+from app.errors import (
+    EmailTaken,
+    InvalidCredentials,
+    InvalidRefreshToken,
+    RegistrationClosed,
+    RegistrationDeclined,
+    RegistrationPending,
+)
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair, UserOut
 from app.services import admin_service
 from app.utils import ensure_utc
@@ -54,6 +61,11 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
         is_admin=is_first_user,  # first-ever registration bootstraps the admin account
+        # ...and is auto-approved along with it - there's no admin yet to approve them.
+        # Everyone after that starts "pending" until an admin approves/declines them (see
+        # app/api/admin.py) - registration_open above only gates whether a request can be
+        # *submitted* at all, this is a second, separate gate on whether it actually works.
+        approval_status="approved" if is_first_user else "pending",
     )
     db.add(user)
     await db.commit()
@@ -67,6 +79,12 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
     user = result.scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise InvalidCredentials()
+    # Checked after the password, not before: don't reveal approval status to someone who
+    # doesn't actually know the password.
+    if user.approval_status == "pending":
+        raise RegistrationPending()
+    if user.approval_status == "declined":
+        raise RegistrationDeclined()
     return await _issue_token_pair(db, user.id)
 
 

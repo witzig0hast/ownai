@@ -1,11 +1,22 @@
 from httpx import AsyncClient
 
 
-async def _register_and_login(client: AsyncClient, email: str) -> dict:
+async def _register_and_login(client: AsyncClient, email: str, *, approver_headers: dict | None = None) -> dict:
+    """Registers + logs in. Every registration after the first-ever (bootstrap admin) starts
+    "pending" and can't log in until approved - pass the admin's headers as `approver_headers`
+    for any second-or-later user in a test."""
     await client.post(
         "/auth/register",
         json={"email": email, "password": "s3cure-password", "display_name": "Someone"},
     )
+    if approver_headers is not None:
+        pending = await client.get("/admin/users/pending", headers=approver_headers)
+        user_id = next(u["id"] for u in pending.json()["users"] if u["email"] == email)
+        await client.patch(
+            f"/admin/users/{user_id}/approval",
+            json={"approval_status": "approved"},
+            headers=approver_headers,
+        )
     login = await client.post("/auth/login", json={"email": email, "password": "s3cure-password"})
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
@@ -32,8 +43,10 @@ async def test_second_registered_user_is_not_admin(client: AsyncClient):
 
 
 async def test_non_admin_cannot_access_admin_endpoints(client: AsyncClient):
-    await _register_and_login(client, "admin@example.com")
-    non_admin_headers = await _register_and_login(client, "regular@example.com")
+    admin_headers = await _register_and_login(client, "admin@example.com")
+    non_admin_headers = await _register_and_login(
+        client, "regular@example.com", approver_headers=admin_headers
+    )
 
     response = await client.get("/admin/settings", headers=non_admin_headers)
     assert response.status_code == 403
@@ -122,9 +135,91 @@ async def test_system_paused_blocks_chat_but_admin_can_still_unpause(client: Asy
 
 async def test_admin_users_list(client: AsyncClient):
     admin_headers = await _register_and_login(client, "admin@example.com")
-    await _register_and_login(client, "regular@example.com")
+    # /admin/users lists everyone regardless of approval status - no need to log the second
+    # user in (and therefore no need to approve them) just to appear in this list.
+    await client.post(
+        "/auth/register",
+        json={"email": "regular@example.com", "password": "s3cure-password", "display_name": "Regular"},
+    )
 
     response = await client.get("/admin/users", headers=admin_headers)
     assert response.status_code == 200
     emails = {u["email"] for u in response.json()["users"]}
     assert emails == {"admin@example.com", "regular@example.com"}
+
+
+async def test_second_registered_user_starts_pending_and_cannot_login(client: AsyncClient):
+    await _register_and_login(client, "admin@example.com")
+    register = await client.post(
+        "/auth/register",
+        json={"email": "pending@example.com", "password": "s3cure-password", "display_name": "Pending"},
+    )
+    assert register.json()["approval_status"] == "pending"
+
+    login = await client.post(
+        "/auth/login", json={"email": "pending@example.com", "password": "s3cure-password"}
+    )
+    assert login.status_code == 403
+    assert login.json()["error"]["code"] == "registration_pending"
+
+
+async def test_admin_can_approve_pending_user(client: AsyncClient):
+    admin_headers = await _register_and_login(client, "admin@example.com")
+    await client.post(
+        "/auth/register",
+        json={"email": "newbie@example.com", "password": "s3cure-password", "display_name": "Newbie"},
+    )
+
+    pending = await client.get("/admin/users/pending", headers=admin_headers)
+    assert pending.status_code == 200
+    assert [u["email"] for u in pending.json()["users"]] == ["newbie@example.com"]
+    user_id = pending.json()["users"][0]["id"]
+
+    approved = await client.patch(
+        f"/admin/users/{user_id}/approval",
+        json={"approval_status": "approved"},
+        headers=admin_headers,
+    )
+    assert approved.status_code == 200
+    assert approved.json()["users"] == []  # no longer pending
+
+    login = await client.post(
+        "/auth/login", json={"email": "newbie@example.com", "password": "s3cure-password"}
+    )
+    assert login.status_code == 200
+
+
+async def test_admin_can_decline_pending_user(client: AsyncClient):
+    admin_headers = await _register_and_login(client, "admin@example.com")
+    await client.post(
+        "/auth/register",
+        json={"email": "nope@example.com", "password": "s3cure-password", "display_name": "Nope"},
+    )
+    pending = await client.get("/admin/users/pending", headers=admin_headers)
+    user_id = pending.json()["users"][0]["id"]
+
+    declined = await client.patch(
+        f"/admin/users/{user_id}/approval",
+        json={"approval_status": "declined"},
+        headers=admin_headers,
+    )
+    assert declined.status_code == 200
+
+    login = await client.post(
+        "/auth/login", json={"email": "nope@example.com", "password": "s3cure-password"}
+    )
+    assert login.status_code == 403
+    assert login.json()["error"]["code"] == "registration_declined"
+
+
+async def test_non_admin_cannot_approve_users(client: AsyncClient):
+    admin_headers = await _register_and_login(client, "admin@example.com")
+    non_admin_headers = await _register_and_login(
+        client, "regular@example.com", approver_headers=admin_headers
+    )
+    response = await client.patch(
+        "/admin/users/some-id/approval",
+        json={"approval_status": "approved"},
+        headers=non_admin_headers,
+    )
+    assert response.status_code == 403

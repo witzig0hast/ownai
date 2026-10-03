@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -21,21 +21,31 @@ function formatDate(iso: string): string {
 function AdminContent() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingRegistration, setSavingRegistration] = useState(false);
   const [savingPause, setSavingPause] = useState(false);
   const [pauseMessage, setPauseMessage] = useState("");
+  const [decidingUserId, setDecidingUserId] = useState<string | null>(null);
+
+  const loadAll = useCallback(async () => {
+    const [settingsData, usersData, pendingData] = await Promise.all([
+      adminApi.getSettings(),
+      adminApi.listUsers(),
+      adminApi.listPendingUsers(),
+    ]);
+    setSettings(settingsData);
+    setPauseMessage(settingsData.system_paused_message ?? "");
+    setUsers(usersData);
+    setPendingUsers(pendingData);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [settingsData, usersData] = await Promise.all([adminApi.getSettings(), adminApi.listUsers()]);
-        if (cancelled) return;
-        setSettings(settingsData);
-        setPauseMessage(settingsData.system_paused_message ?? "");
-        setUsers(usersData);
+        await loadAll();
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Laden fehlgeschlagen.");
       } finally {
@@ -45,7 +55,23 @@ function AdminContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAll]);
+
+  async function decide(userId: string, approvalStatus: "approved" | "declined") {
+    setDecidingUserId(userId);
+    setError(null);
+    try {
+      const stillPending = await adminApi.setUserApproval(userId, approvalStatus);
+      setPendingUsers(stillPending);
+      // The main "Nutzer"-list's approval_status badge also needs to reflect the decision.
+      const refreshedUsers = await adminApi.listUsers();
+      setUsers(refreshedUsers);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Aktion fehlgeschlagen.");
+    } finally {
+      setDecidingUserId(null);
+    }
+  }
 
   async function toggleRegistration() {
     if (!settings) return;
@@ -107,6 +133,55 @@ function AdminContent() {
 
       <section
         style={{ animationDelay: "60ms" }}
+        className="animate-fade-in-up rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800"
+      >
+        <h2 className="mb-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+          Ausstehende Registrierungen {pendingUsers.length > 0 ? `(${pendingUsers.length})` : ""}
+        </h2>
+        <p className="mb-3 text-xs text-zinc-500">
+          Jede Registrierung (außer der allerersten, die automatisch Admin wird) muss hier erst
+          freigegeben werden, bevor sich der Nutzer einloggen kann.
+        </p>
+        {pendingUsers.length === 0 ? (
+          <p className="text-sm text-zinc-500">Keine offenen Registrierungen.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {pendingUsers.map((u, i) => (
+              <li
+                key={u.id}
+                style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                className="animate-fade-in-up flex items-center justify-between gap-3 rounded-xl border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-zinc-900 dark:text-zinc-100">{u.display_name}</p>
+                  <p className="truncate text-xs text-zinc-500">{u.email}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decide(u.id, "approved")}
+                    disabled={decidingUserId === u.id}
+                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-emerald-500 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    Annehmen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decide(u.id, "declined")}
+                    disabled={decidingUserId === u.id}
+                    className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-all hover:scale-105 hover:bg-red-50 hover:text-red-700 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-red-950/40"
+                  >
+                    Ablehnen
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section
+        style={{ animationDelay: "90ms" }}
         className="animate-fade-in-up rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800"
       >
         <h2 className="mb-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300">System pausieren</h2>

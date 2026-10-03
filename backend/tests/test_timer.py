@@ -121,6 +121,14 @@ async def test_timers_are_scoped_per_user(client: AsyncClient, auth_headers: dic
         "/auth/register",
         json={"email": "other@example.com", "password": "s3cure-password", "display_name": "Other"},
     )
+    # auth_headers belongs to the first-ever user in this test (the bootstrap admin, see
+    # conftest.py) - every registration after that starts "pending" and needs approving before
+    # it can log in (see app/api/admin.py).
+    pending = await client.get("/admin/users/pending", headers=auth_headers)
+    other_id = next(u["id"] for u in pending.json()["users"] if u["email"] == "other@example.com")
+    await client.patch(
+        f"/admin/users/{other_id}/approval", json={"approval_status": "approved"}, headers=auth_headers
+    )
     other_login = await client.post(
         "/auth/login", json={"email": "other@example.com", "password": "s3cure-password"}
     )
