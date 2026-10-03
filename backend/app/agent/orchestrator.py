@@ -58,6 +58,13 @@ def _system_prompt(skill: Skill, memories: list[str]) -> str:
         "und dauerhafte Hintergrund-Agenten (Permanent Agents), die eigenständig eine feste Rolle "
         "weiterverfolgen. Nutze diese Werkzeuge aktiv, wenn eine konkrete Anfrage das braucht — rate nichts, "
         "prüfe/handle stattdessen über die Werkzeuge. "
+        "Rufe NIEMALS ein Werkzeug zu einem Thema auf, das der Nutzer in seiner aktuellen Nachricht nicht "
+        "erwähnt hat — insbesondere keine verändernden/löschenden Werkzeuge (delete_expense, "
+        "delete_list_item, cancel_timer, delete_contact, delete_reminder, delete_automation o.ä.) ohne "
+        "eine klare, auf genau diese Aktion bezogene Anfrage. Geht es gerade um E-Mails, bleib bei "
+        "E-Mail-Werkzeugen; geht es um Ausgaben, bleib bei Ausgaben-Werkzeugen — wechsle nie unaufgefordert "
+        "in einen völlig anderen Bereich. Bist du unsicher, was gemeint ist, frag nach, statt irgendein "
+        "Werkzeug zu raten. "
         "Wenn der Nutzer dich fragt, was du kannst, welche Funktionen/Fähigkeiten du hast, oder etwas "
         "Ähnliches ('was kannst du alles', 'was kann ich mit dir machen') — das ist eine Meta-Frage über "
         "dich selbst, keine konkrete Aufgabe. Antworte direkt aus der obigen Liste heraus, in eigenen "
@@ -191,6 +198,13 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
             "Ich konnte die Anfrage nach mehreren Werkzeugaufrufen nicht abschließen. "
             "Bitte formuliere sie genauer oder versuche es erneut."
         )
+
+    if not final_content.strip():
+        # A local model occasionally returns an empty content string with no tool_calls at all -
+        # not an error (no exception, 200 response), just nothing to say. Saving/showing that as
+        # a blank message bubble reads as a silent failure; a short, honest placeholder at least
+        # tells the user something went wrong and invites a retry, rather than looking broken.
+        final_content = "Ich habe dazu gerade keine Antwort erhalten. Bitte versuch es noch einmal."
 
     assistant_message = Message(
         conversation_id=conversation.id,

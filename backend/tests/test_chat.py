@@ -35,6 +35,31 @@ async def test_conversation_and_plain_reply(client: AsyncClient, auth_headers: d
     assert roles == ["user", "assistant"]
 
 
+async def test_empty_model_reply_gets_a_placeholder_instead_of_a_blank_bubble(
+    client: AsyncClient, auth_headers: dict, monkeypatch
+):
+    """A local model occasionally returns content="" with no tool_calls at all - a genuine 200
+    response, not an error. Saving/showing that as-is renders a blank message bubble that looks
+    like a silent failure; there must be a short, honest fallback instead."""
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        return {"role": "assistant", "content": "", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    created = await client.post("/chat/conversations", json={}, headers=auth_headers)
+    conversation_id = created.json()["id"]
+
+    sent = await client.post(
+        f"/chat/conversations/{conversation_id}/messages",
+        json={"content": "Hallo"},
+        headers=auth_headers,
+    )
+    assert sent.status_code == 200
+    content = sent.json()["message"]["content"]
+    assert content.strip() != ""
+
+
 async def test_internal_api_urls_are_stripped_from_reply(client: AsyncClient, auth_headers: dict, monkeypatch):
     """Local models sometimes ignore the "never mention tool-result URLs" instruction and echo
     a create_file download_url back in their reply - this must never leak through, especially
