@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     ollama_title_model: str | None = None
     # How long Ollama keeps the model loaded in (V)RAM after the last request. Applied to every
     # chat call, not just the warmup one (see app/api/chat.py's /chat/warmup), so normal usage
-    # already keeps it warm between messages.
-    ollama_keep_alive: str = "30m"
+    # already keeps it warm between messages. Default "-1" (never unload) assumes a GPU dedicated
+    # to OwnAI, as recommended in .env.example - override to e.g. "30m" if the GPU is shared.
+    ollama_keep_alive: str = "-1"
     # Optional vision-capable model (e.g. "llama3.2-vision", "llava") for image understanding
     # (see app/services/vision_service.py) - unset by default since it's a separate model the
     # user has to pull themselves; OCR (pytesseract) works regardless of this.

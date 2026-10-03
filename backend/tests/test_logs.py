@@ -1,6 +1,7 @@
 from httpx import AsyncClient
 
 from app.services import email_service, ollama_client
+from tests.conftest import drain_background_tasks
 
 
 async def test_logs_empty_by_default(client: AsyncClient, auth_headers: dict):
@@ -52,6 +53,7 @@ async def test_failed_send_email_is_logged_and_filterable(client: AsyncClient, a
         json={"content": "Schick eine Test-Mail"},
         headers=auth_headers,
     )
+    await drain_background_tasks()
 
     all_logs = await client.get("/logs", headers=auth_headers)
     assert all_logs.status_code == 200
@@ -116,6 +118,7 @@ async def test_successful_send_email_is_logged_as_info(client: AsyncClient, auth
         json={"content": "Schick eine Test-Mail"},
         headers=auth_headers,
     )
+    await drain_background_tasks()
 
     logs = await client.get("/logs?level=info", headers=auth_headers)
     entries = logs.json()["logs"]

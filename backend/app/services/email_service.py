@@ -1,7 +1,6 @@
 import asyncio
 import smtplib
 import socket
-import time
 from email.message import EmailMessage
 
 from sqlalchemy import select
@@ -9,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import EmailAccount, User
+from app.db.session import async_session_maker
 from app.errors import APIError
 from app.services import log_service
 from app.services.crypto import decrypt, encrypt
@@ -136,14 +136,6 @@ class _IPv4SMTP(smtplib.SMTP):
         return _connect_ipv4(host, port, timeout)
 
 
-# Phases before the message is actually handed to the server (DATA) are safe to retry - a
-# blip during connect/STARTTLS/AUTH means nothing was sent yet. Never retry "send": if that
-# phase's response is what timed out, the server may already have accepted the message, and
-# retrying could deliver it twice.
-_RETRYABLE_PHASES = {"connect", "starttls", "login"}
-_RETRY_DELAY_SECONDS = 3
-
-
 class _SendPhaseError(Exception):
     """Carries which step of the SMTP conversation failed, so callers can report something more
     useful than a bare exception string - see send_email's error handling."""
@@ -161,41 +153,36 @@ def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> No
     message["Subject"] = subject
     message.set_content(body)
 
-    # One retry for anything before the message is actually sent (see _RETRYABLE_PHASES) - this
-    # server has shown transient, self-resolving slowness/timeouts during debugging (e.g.
-    # deliberate delays for senders it doesn't fully trust yet), so a single retry after a short
-    # pause is worth it before giving up and surfacing an error.
-    for attempt in range(2):
-        # Explicit local_hostname skips smtplib's default behavior of calling socket.getfqdn()
-        # to guess one - a reverse-DNS lookup of the *container's own* address with no timeout
-        # control of its own, unrelated to this connection's target. In a Docker container this
-        # can be slow or hang, eating into the time budget before the actual SMTP conversation
-        # even starts, which then surfaces later as a misleading "Connection unexpectedly
-        # closed: timed out" once the real timeout finally fires (see smtplib.SMTP.getreply(),
-        # which wraps any OSError from reading the socket - including a plain timeout - in that
-        # message). The EHLO hostname is informational only for any well-behaved server, so a
-        # static value is safe here.
-        # 60s, not the previous 15s: some servers deliberately slow down the SMTP dialogue (spam
-        # scoring, greylisting-style delays) for senders they haven't seen before/don't fully
-        # trust yet, rather than rejecting outright - a real "250 OK" can take a while longer
-        # than a normal fast exchange without anything actually being broken.
-        phase = "connect"
-        try:
-            with _IPv4SMTP(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
-                if config.use_tls:
-                    phase = "starttls"
-                    smtp.starttls()
-                if config.username and config.password:
-                    phase = "login"
-                    smtp.login(config.username, config.password)
-                phase = "send"
-                smtp.send_message(message)
-            return
-        except (smtplib.SMTPException, OSError) as exc:
-            if attempt == 0 and phase in _RETRYABLE_PHASES:
-                time.sleep(_RETRY_DELAY_SECONDS)
-                continue
-            raise _SendPhaseError(phase, exc) from exc
+    # Explicit local_hostname skips smtplib's default behavior of calling socket.getfqdn() to
+    # guess one - a reverse-DNS lookup of the *container's own* address with no timeout control
+    # of its own, unrelated to this connection's target. In a Docker container this can be slow
+    # or hang, eating into the time budget before the actual SMTP conversation even starts,
+    # which then surfaces later as a misleading "Connection unexpectedly closed: timed out" once
+    # the real timeout finally fires (see smtplib.SMTP.getreply(), which wraps any OSError from
+    # reading the socket - including a plain timeout - in that message). The EHLO hostname is
+    # informational only for any well-behaved server, so a static value is safe here.
+    # 60s: some servers deliberately slow down the SMTP dialogue (spam scoring,
+    # greylisting-style delays) for senders they haven't seen before/don't fully trust yet,
+    # rather than rejecting outright - a real "250 OK" can take a while longer than a normal
+    # fast exchange without anything actually being broken.
+    #
+    # Deliberately a single attempt, no built-in retry: send_email() now always runs detached in
+    # the background (see send_email_in_background) rather than blocking a chat response, so
+    # there's no user-facing deadline this needs to race against - a failed attempt is simply
+    # logged (Settings -> Logs) and the user/model can ask to retry if they want to.
+    phase = "connect"
+    try:
+        with _IPv4SMTP(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
+            if config.use_tls:
+                phase = "starttls"
+                smtp.starttls()
+            if config.username and config.password:
+                phase = "login"
+                smtp.login(config.username, config.password)
+            phase = "send"
+            smtp.send_message(message)
+    except (smtplib.SMTPException, OSError) as exc:
+        raise _SendPhaseError(phase, exc) from exc
 
 
 _PHASE_LABELS = {
@@ -234,13 +221,12 @@ async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: 
     except _SendPhaseError as exc:
         where = _PHASE_LABELS.get(exc.phase, exc.phase)
         if isinstance(exc.original, TimeoutError):
-            await _log_failure(db, user, config, f"Timeout {where}, auch nach Wiederholungsversuch", str(exc.original))
+            await _log_failure(db, user, config, f"Timeout {where}", str(exc.original))
             raise EmailSendFailed(
                 f"Der Mailserver ({config.host}:{config.port}) hat {where} nicht rechtzeitig "
-                "geantwortet (Timeout, auch nach einem Wiederholungsversuch). Das liegt meist "
-                "am Mailserver selbst, nicht an OwnAI - z.B. absichtliche Verzögerung bei "
-                "neuen/unbekannten Absendern (Spam-Schutz). Erneut versuchen oder beim "
-                "Mailserver-Betreiber nachfragen."
+                "geantwortet (Timeout). Das liegt meist am Mailserver selbst, nicht an OwnAI - "
+                "z.B. absichtliche Verzögerung bei neuen/unbekannten Absendern (Spam-Schutz). "
+                "Erneut versuchen oder beim Mailserver-Betreiber nachfragen."
             ) from exc
         await _log_failure(db, user, config, f"Fehler {where}", str(exc.original))
         raise EmailSendFailed(f"E-Mail konnte nicht gesendet werden ({where}): {exc.original}") from exc
@@ -262,3 +248,21 @@ async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: 
             user=user,
             message=f"E-Mail an {to} erfolgreich gesendet (Betreff: \"{subject}\").",
         )
+
+
+async def send_email_in_background(user_id: str, to: str, subject: str, body: str) -> None:
+    """Runs send_email() fully detached from whatever call queued it (see app/agent/tools.py's
+    send_email tool, fired via app/utils.py's fire_and_forget) - SMTP can legitimately take tens
+    of seconds against a slow/greylisting mail server, and that must never block a chat response.
+    Opens its own DB session since the caller's request-scoped one will already be closed by the
+    time this runs. send_email() already logs every outcome via log_service (success and every
+    failure path) - by the time it raises here, there is no caller left to hand the error to, so
+    this only needs to stop it from propagating as an unretrieved task exception."""
+    async with async_session_maker() as db:
+        user = await db.get(User, user_id)
+        if user is None:
+            return
+        try:
+            await send_email(db, user, to, subject, body)
+        except APIError:
+            pass

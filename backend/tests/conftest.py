@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 
@@ -44,3 +45,15 @@ async def registered_user_tokens(client: AsyncClient) -> dict:
 @pytest_asyncio.fixture
 async def auth_headers(registered_user_tokens: dict) -> dict:
     return {"Authorization": f"Bearer {registered_user_tokens['access_token']}"}
+
+
+async def drain_background_tasks() -> None:
+    """Waits for any app.utils.fire_and_forget() tasks still in flight (e.g. the send_email tool
+    - see app/agent/tools.py). Unlike FastAPI's own BackgroundTasks, a fire_and_forget() task is
+    not tied to the request/response lifecycle, so an HTTP response coming back is no guarantee
+    it already finished - a test asserting on its side effects (a logged outcome, a captured
+    "sent" call) must wait for it explicitly."""
+    from app.utils import _background_tasks
+
+    if _background_tasks:
+        await asyncio.gather(*list(_background_tasks))

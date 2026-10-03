@@ -31,7 +31,7 @@ from app.services import (
     timer_service,
     weather_service,
 )
-from app.utils import ensure_utc
+from app.utils import ensure_utc, fire_and_forget
 
 # Every handler gets the current conversation too (not just db/user) - needed by create_file,
 # which scopes files per-conversation; the others just ignore it (leading underscore).
@@ -122,11 +122,28 @@ async def _create_file(db: AsyncSession, user: User, conversation: Conversation,
     }
 
 
-async def _send_email(db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]) -> Any:
-    await email_service.send_email(
-        db, user, to=arguments["to"], subject=arguments["subject"], body=arguments["body"]
+async def _send_email(
+    _db: AsyncSession, user: User, _conversation: Conversation, arguments: dict[str, Any]
+) -> Any:
+    # Queued, not awaited: SMTP can legitimately take tens of seconds against a slow/greylisting
+    # mail server, and that must never block the chat response itself. The actual outcome
+    # (success or failure, with detail) lands in Settings -> Logs, category "email" - see
+    # email_service.send_email_in_background.
+    fire_and_forget(
+        email_service.send_email_in_background(
+            user.id, arguments["to"], arguments["subject"], arguments["body"]
+        )
     )
-    return {"sent": True, "to": arguments["to"]}
+    return {
+        "queued": True,
+        "to": arguments["to"],
+        "note": (
+            "Der Versand läuft jetzt im Hintergrund weiter, ist noch nicht bestätigt erfolgreich. "
+            "Teile dem Nutzer mit, dass die E-Mail losgeschickt wird (z.B. 'Ich schicke die "
+            "E-Mail jetzt los'), nicht dass sie bereits versendet wurde - ein etwaiger Fehler "
+            "erscheint nur noch im Logs-Tab, nicht mehr in dieser Unterhaltung."
+        ),
+    }
 
 
 async def _agent_bus_send_message(

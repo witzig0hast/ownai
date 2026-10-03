@@ -177,7 +177,7 @@ Das Passwort wird serverseitig **verschlüsselt** (Fernet, Schlüssel aus `SECRE
 ### `GET /integrations/email`  *(Bearer)*
 Response `200`: `{ "has_custom_account": bool, "effective_from_address": string | null }` — `effective_from_address` ist die Absenderadresse, die aktuell tatsächlich verwendet würde (eigenes Konto oder System-Standard), `null` falls weder noch konfiguriert ist.
 
-Versenden läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür das Tool `send_email` auf (siehe `app/agent/tools.py`), nur wenn der Nutzer explizit danach fragt. Fehler (z. B. kein Konto konfiguriert, SMTP-Fehler) kommen als Tool-Ergebnis `{ "error": string }` zurück, nicht als HTTP-Fehler des Chat-Endpunkts — der Chat-Turn selbst schlägt dadurch nie fehl.
+Versenden läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Chat/Voice-Agenten**: das LLM ruft dafür das Tool `send_email` auf (siehe `app/agent/tools.py`), nur wenn der Nutzer explizit danach fragt. Der eigentliche SMTP-Versand läuft **asynchron im Hintergrund** — das Tool-Ergebnis ist immer sofort `{ "queued": true, "to": string, "note": string }`, nie `{ "error": ... }`, egal ob der Versand am Ende klappt oder nicht (SMTP kann gegen einen langsamen Mailserver legitim lange dauern, das darf den Chat-Turn nie blockieren). Erfolg oder Fehler landen stattdessen ausschließlich als `category: "email"`-Eintrag über `GET /logs` (siehe dort).
 
 ## Timer
 
