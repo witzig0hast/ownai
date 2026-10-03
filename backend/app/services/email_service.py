@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.models import EmailAccount, User
 from app.errors import APIError
+from app.services import log_service
 from app.services.crypto import decrypt, encrypt
 
 
@@ -205,9 +206,27 @@ _PHASE_LABELS = {
 }
 
 
+async def _log_failure(db: AsyncSession, user: User, config: _EffectiveConfig, message: str, detail: str) -> None:
+    await log_service.log(
+        db,
+        category="email",
+        level="error",
+        user=user,
+        message=f"{message} ({config.host}:{config.port})",
+        detail=detail,
+    )
+
+
 async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: str) -> None:
     config = await effective_config(db, user)
     if config is None:
+        await log_service.log(
+            db,
+            category="email",
+            level="error",
+            user=user,
+            message="E-Mail nicht gesendet: keine SMTP-Konfiguration vorhanden (weder eigene noch System-Standard).",
+        )
         raise EmailNotConfigured()
     try:
         # smtplib is blocking I/O - runs in a worker thread so it doesn't stall the event loop.
@@ -215,6 +234,7 @@ async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: 
     except _SendPhaseError as exc:
         where = _PHASE_LABELS.get(exc.phase, exc.phase)
         if isinstance(exc.original, TimeoutError):
+            await _log_failure(db, user, config, f"Timeout {where}, auch nach Wiederholungsversuch", str(exc.original))
             raise EmailSendFailed(
                 f"Der Mailserver ({config.host}:{config.port}) hat {where} nicht rechtzeitig "
                 "geantwortet (Timeout, auch nach einem Wiederholungsversuch). Das liegt meist "
@@ -222,12 +242,23 @@ async def send_email(db: AsyncSession, user: User, to: str, subject: str, body: 
                 "neuen/unbekannten Absendern (Spam-Schutz). Erneut versuchen oder beim "
                 "Mailserver-Betreiber nachfragen."
             ) from exc
+        await _log_failure(db, user, config, f"Fehler {where}", str(exc.original))
         raise EmailSendFailed(f"E-Mail konnte nicht gesendet werden ({where}): {exc.original}") from exc
     except TimeoutError as exc:
         # Defense in depth - _send_sync always wraps its own failures in _SendPhaseError, but
         # don't assume it's the only possible source of a bare exception here.
+        await _log_failure(db, user, config, "Timeout", str(exc))
         raise EmailSendFailed(
             f"Der Mailserver ({config.host}:{config.port}) hat nicht rechtzeitig geantwortet (Timeout)."
         ) from exc
     except (smtplib.SMTPException, OSError) as exc:
+        await _log_failure(db, user, config, "Fehler beim Versand", str(exc))
         raise EmailSendFailed(f"E-Mail konnte nicht gesendet werden: {exc}") from exc
+    else:
+        await log_service.log(
+            db,
+            category="email",
+            level="info",
+            user=user,
+            message=f"E-Mail an {to} erfolgreich gesendet (Betreff: \"{subject}\").",
+        )

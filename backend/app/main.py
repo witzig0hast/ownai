@@ -21,6 +21,7 @@ from app.api import (
     health,
     home_assistant,
     lists,
+    logs,
     memory,
     notifications,
     permanent_agents,
@@ -108,6 +109,7 @@ api_v1_routers = (
     clipper.router,
     permanent_agents.router,
     tts.router,
+    logs.router,
     health.router,
 )
 for router in api_v1_routers:

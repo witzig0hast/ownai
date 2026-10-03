@@ -13,6 +13,7 @@ export interface User {
   email: string;
   display_name: string;
   is_admin: boolean;
+  approval_status: "pending" | "approved" | "declined";
   created_at: string;
 }
 
@@ -261,5 +262,14 @@ export interface Suggestion {
   summary: string;
   payload: Record<string, unknown>;
   status: SuggestionStatus;
+  created_at: string;
+}
+
+export interface LogEntry {
+  id: string;
+  category: string;
+  level: "info" | "warning" | "error";
+  message: string;
+  detail: string | null;
   created_at: string;
 }

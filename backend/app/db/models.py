@@ -27,6 +27,10 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False)
+    # "pending" | "approved" | "declined" - see app/api/auth.py. The first-ever registration
+    # bootstraps straight to "approved" (same bootstrap as is_admin above); every later
+    # registration starts "pending" until an admin approves/declines it (app/api/admin.py).
+    approval_status: Mapped[str] = mapped_column(String(16), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     devices: Mapped[list["Device"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -546,3 +550,30 @@ class AgentLogEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     agent: Mapped["PermanentAgent"] = relationship(back_populates="log_entries")
+
+
+class AppLog(Base):
+    """General-purpose structured log entry, queryable via GET /logs (Settings -> Logs tab) so
+    a user can see exactly what happened/went wrong for a given feature (e.g. "zeig mir alle
+    E-Mail-Logs") without needing server/container access. Not a replacement for Python's
+    stdlib `logging` (container stdout) - this is specifically for events worth surfacing to
+    the user themselves, recorded via app/services/log_service.py."""
+
+    __tablename__ = "app_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    # Nullable: most entries belong to the user whose action triggered them, but a handful of
+    # background/system events (e.g. scheduler-level failures not tied to one user) may not.
+    user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Short machine-readable source tag the frontend filters by, e.g. "email", "calendar",
+    # "home_assistant" - deliberately a free string, not an enum, so new categories don't need
+    # a migration.
+    category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(16), default="info")  # info | warning | error
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Optional longer context (e.g. the raw exception text, which phase of an SMTP send failed)
+    # kept separate from `message` so the list view can stay a short one-liner per entry.
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
