@@ -136,6 +136,29 @@ class _IPv4SMTP(smtplib.SMTP):
         return _connect_ipv4(host, port, timeout)
 
 
+# Port 465 is, by long-standing convention (and explicitly in RFC 8314), *implicit* TLS/SMTPS:
+# the server expects a TLS handshake as the very first bytes on the connection, never plaintext
+# SMTP first. That's a different protocol from STARTTLS (587/25: connect in plaintext, send
+# EHLO, then upgrade via the STARTTLS command) - speaking STARTTLS at a server configured for
+# implicit TLS doesn't get rejected with a clear error, it just hangs: the server is waiting for
+# a TLS ClientHello that never comes, and eventually drops the connection. That surfaces as
+# exactly "Connection unexpectedly closed: timed out" - indistinguishable, from the client's
+# side, from a genuinely slow/unreachable server, which is why this went undiagnosed through
+# extensive *network*-level checks (routing, firewall, reachability) that all correctly found
+# nothing wrong: the TCP connection itself was never the problem.
+_IMPLICIT_TLS_PORT = 465
+
+
+class _IPv4SMTP_SSL(smtplib.SMTP_SSL):
+    """smtplib.SMTP_SSL (implicit TLS from the first byte, for _IMPLICIT_TLS_PORT), with the
+    same IPv4-only connection as _IPv4SMTP above."""
+
+    def _get_socket(self, host: str, port: int, timeout: float) -> socket.socket:
+        if timeout is not None and not timeout:
+            raise OSError("nonblocking socket (timeout=0) is not supported")
+        return self.context.wrap_socket(_connect_ipv4(host, port, timeout), server_hostname=self._host)
+
+
 class _SendPhaseError(Exception):
     """Carries which step of the SMTP conversation failed, so callers can report something more
     useful than a bare exception string - see send_email's error handling."""
@@ -170,10 +193,13 @@ def _send_sync(config: _EffectiveConfig, to: str, subject: str, body: str) -> No
     # the background (see send_email_in_background) rather than blocking a chat response, so
     # there's no user-facing deadline this needs to race against - a failed attempt is simply
     # logged (Settings -> Logs) and the user/model can ask to retry if they want to.
+    implicit_tls = config.use_tls and config.port == _IMPLICIT_TLS_PORT
+    smtp_cls = _IPv4SMTP_SSL if implicit_tls else _IPv4SMTP
+
     phase = "connect"
     try:
-        with _IPv4SMTP(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
-            if config.use_tls:
+        with smtp_cls(config.host, config.port, timeout=60, local_hostname="ownai-backend") as smtp:
+            if config.use_tls and not implicit_tls:
                 phase = "starttls"
                 smtp.starttls()
             if config.username and config.password:

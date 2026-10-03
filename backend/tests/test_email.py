@@ -197,6 +197,100 @@ def test_connect_ipv4_raises_last_error_when_all_attempts_fail(monkeypatch):
         assert "Network is unreachable" in str(exc)
 
 
+def test_ipv4_smtp_ssl_wraps_with_tls_immediately(monkeypatch):
+    """_IPv4SMTP_SSL._get_socket must hand back a TLS-wrapped socket directly - no plaintext SMTP
+    exchange ever happens on an implicit-TLS (port 465) connection, unlike STARTTLS."""
+    wrapped = {}
+
+    class FakeContext:
+        def wrap_socket(self, sock, server_hostname=None):
+            wrapped["sock"] = sock
+            wrapped["server_hostname"] = server_hostname
+            return "tls-wrapped-socket"
+
+    fake_plain_socket = object()
+    monkeypatch.setattr(email_service, "_connect_ipv4", lambda host, port, timeout: fake_plain_socket)  # noqa: ARG005
+
+    instance = object.__new__(email_service._IPv4SMTP_SSL)
+    instance.context = FakeContext()
+    instance._host = "smtp.example.com"
+
+    result = instance._get_socket("smtp.example.com", 465, 15)
+
+    assert result == "tls-wrapped-socket"
+    assert wrapped["sock"] is fake_plain_socket
+    assert wrapped["server_hostname"] == "smtp.example.com"
+
+
+def test_send_sync_uses_implicit_tls_for_port_465(monkeypatch):
+    """Port 465 is implicit TLS (SMTPS) by convention (RFC 8314) - speaking plaintext-then-
+    STARTTLS there instead doesn't get a clean rejection, the server just hangs waiting for a TLS
+    handshake that never comes and eventually drops the connection ("Connection unexpectedly
+    closed: timed out" - exactly the symptom that looked like a network/firewall issue for so
+    long, since the TCP connection itself really was fine)."""
+    calls = {"ssl_init": 0, "starttls": 0}
+
+    class FakeSMTPSSL:
+        def __init__(self, host, port, timeout=None, local_hostname=None):  # noqa: ARG002
+            calls["ssl_init"] += 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return False
+
+        def starttls(self):
+            calls["starttls"] += 1
+
+        def login(self, username, password):  # noqa: ARG002
+            pass
+
+        def send_message(self, message):  # noqa: ARG002
+            pass
+
+    monkeypatch.setattr(email_service, "_IPv4SMTP_SSL", FakeSMTPSSL)
+
+    config = email_service._EffectiveConfig("smtp.example.com", 465, "user", "pass", "from@example.com", True)
+    email_service._send_sync(config, "to@example.com", "Subject", "Body")
+
+    assert calls["ssl_init"] == 1
+    assert calls["starttls"] == 0  # never STARTTLS on an implicit-TLS connection
+
+
+def test_send_sync_still_uses_starttls_for_port_587(monkeypatch):
+    """Regression guard: the implicit-TLS path for port 465 must not change behavior for the
+    far more common STARTTLS ports (587/25)."""
+    calls = {"plain_init": 0, "starttls": 0}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None, local_hostname=None):  # noqa: ARG002
+            calls["plain_init"] += 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return False
+
+        def starttls(self):
+            calls["starttls"] += 1
+
+        def login(self, username, password):  # noqa: ARG002
+            pass
+
+        def send_message(self, message):  # noqa: ARG002
+            pass
+
+    monkeypatch.setattr(email_service, "_IPv4SMTP", FakeSMTP)
+
+    config = email_service._EffectiveConfig("smtp.example.com", 587, "user", "pass", "from@example.com", True)
+    email_service._send_sync(config, "to@example.com", "Subject", "Body")
+
+    assert calls["plain_init"] == 1
+    assert calls["starttls"] == 1
+
+
 async def test_send_email_timeout_gets_logged_with_clear_message(
     client: AsyncClient, auth_headers: dict, monkeypatch
 ):
