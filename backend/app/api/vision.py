@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from app.auth.dependencies import get_current_user
@@ -22,6 +24,9 @@ async def describe_image(
     if not image_bytes:
         raise APIError(400, "empty_image", "Keine Bilddaten empfangen.")
 
-    ocr_text = vision_service.ocr_image(image_bytes)
+    # ocr_image is synchronous, CPU-bound Tesseract work - run it off the event loop. The
+    # backend runs as a single Uvicorn worker (see README.md), so calling it directly here would
+    # stall every other concurrent request (any user, any endpoint) for the OCR's full duration.
+    ocr_text = await asyncio.to_thread(vision_service.ocr_image, image_bytes)
     description = await vision_service.describe_image(image_bytes)
     return VisionDescribeResponse(ocr_text=ocr_text, description=description)
