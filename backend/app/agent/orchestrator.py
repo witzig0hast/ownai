@@ -13,6 +13,13 @@ from app.services import memory_service, ollama_client
 
 MAX_TOOL_ITERATIONS = 5
 
+# Caps how much conversation history goes into each Ollama call. Without this, a long-running
+# conversation's prompt (and therefore generation latency) grows without bound on every single
+# turn - on a slower local GPU this eventually exceeds a reverse proxy's response timeout (504),
+# even though the very same model answers quickly early in a fresh conversation. Older messages
+# are simply dropped from the prompt, not from the DB/UI - the user still sees full history.
+MAX_HISTORY_MESSAGES_IN_PROMPT = 40
+
 _INTERNAL_API_PATH_RE = re.compile(r"/api/v1/\S+")
 
 
@@ -113,7 +120,7 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
     history_result = await db.execute(
         select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at)
     )
-    history = history_result.scalars().all()
+    history = history_result.scalars().all()[-MAX_HISTORY_MESSAGES_IN_PROMPT:]
 
     skill = get_skill(conversation.skill)
     memories = await memory_service.memories_for_prompt(db, user)

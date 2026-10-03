@@ -106,3 +106,14 @@ class RegistrationPending(APIError):
 class RegistrationDeclined(APIError):
     def __init__(self, message: str = "Deine Registrierung wurde abgelehnt."):
         super().__init__(403, "registration_declined", message)
+
+
+class LlmUnavailable(APIError):
+    def __init__(
+        self,
+        message: str = (
+            "Das Sprachmodell antwortet nicht oder ist nicht erreichbar. Bitte in ein paar Sekunden "
+            "erneut versuchen."
+        ),
+    ):
+        super().__init__(503, "llm_unavailable", message)

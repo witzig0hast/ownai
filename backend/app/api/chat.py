@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,8 +7,8 @@ from app.agent.orchestrator import run_turn
 from app.agent.skills import SKILLS, is_valid_skill_key
 from app.auth.dependencies import get_current_user, require_not_paused
 from app.db.models import Conversation, Message, User
-from app.db.session import get_db
-from app.errors import APIError, NotFound
+from app.db.session import async_session_maker, get_db
+from app.errors import APIError, LlmUnavailable, NotFound
 from app.schemas.chat import (
     ConversationCreateRequest,
     ConversationOut,
@@ -21,7 +21,8 @@ from app.schemas.chat import (
     SkillsListOut,
 )
 from app.schemas.files import GeneratedFilesListOut
-from app.services import file_service, ollama_client
+from app.services import file_service, log_service, ollama_client
+from app.services.ollama_client import OllamaError
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -127,10 +128,25 @@ async def list_messages(
     return MessagesListOut(messages=list(result.scalars().all()))
 
 
+async def _generate_title_in_background(conversation_id: str, user_content: str, assistant_content: str) -> None:
+    """Runs after the response has already gone to the client (see post_message) - title
+    generation is itself a full extra Ollama call, no reason to make the user wait for it on
+    top of the turn they're actually here for."""
+    title = await ollama_client.generate_title(user_content, assistant_content)
+    if not title:
+        return
+    async with async_session_maker() as db:
+        conversation = await db.get(Conversation, conversation_id)
+        if conversation is not None and conversation.title is None:
+            conversation.title = title
+            await db.commit()
+
+
 @router.post("/conversations/{conversation_id}/messages", response_model=MessageCreateResponse)
 async def post_message(
     conversation_id: str,
     payload: MessageCreateRequest,
+    background_tasks: BackgroundTasks,
     stream: bool = Query(default=False),
     user: User = Depends(require_not_paused),
     db: AsyncSession = Depends(get_db),
@@ -141,13 +157,26 @@ async def post_message(
     conversation = await _get_owned_conversation(db, user, conversation_id)
     needs_title = conversation.title is None and await _message_count(db, conversation.id) == 0
 
-    assistant_message = await run_turn(db, user, conversation, payload.content)
+    try:
+        assistant_message = await run_turn(db, user, conversation, payload.content)
+    except OllamaError as exc:
+        # Visible in Settings -> Logs ("chat") instead of just a dead end for the user - most
+        # often means Ollama is unreachable or took too long to respond (slow/overloaded local
+        # GPU), not a bug in this request itself.
+        await log_service.log(
+            db,
+            category="chat",
+            level="error",
+            user=user,
+            message="Antwort vom Sprachmodell fehlgeschlagen.",
+            detail=str(exc),
+        )
+        raise LlmUnavailable() from exc
 
     if needs_title:
-        title = await ollama_client.generate_title(payload.content, assistant_message.content)
-        if title:
-            conversation.title = title
-            await db.commit()
+        background_tasks.add_task(
+            _generate_title_in_background, conversation.id, payload.content, assistant_message.content
+        )
 
     return MessageCreateResponse(message=assistant_message)
 

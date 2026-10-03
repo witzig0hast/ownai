@@ -94,9 +94,11 @@ Response `200`: `{ "messages": [ Message ] }`
 ### `POST /chat/conversations/{id}/messages`  *(Bearer)*
 Request: `{ "content": string }`
 Response `200`: `{ "message": Message }` — **synchron**, d. h. der Request blockiert bis die Antwort (inkl. aller Tool-Aufrufe) fertig ist. Kein Streaming in v1 (siehe `CONCEPT.md`, bewusst zurückgestellt — SSE-Streaming ist als v2-Erweiterung vorgesehen, ohne Breaking Change an diesem Contract: es kommt ein zusätzlicher `stream=true` Query-Param, der aktuell `501 not_implemented` liefert, falls gesetzt).
-Fehler: `503 system_paused` (Admin hat das System pausiert — `message` enthält ggf. einen vom Admin gesetzten Grund, siehe Admin-Sektion).
+Fehler: `503 system_paused` (Admin hat das System pausiert — `message` enthält ggf. einen vom Admin gesetzten Grund, siehe Admin-Sektion), `503 llm_unavailable` (Ollama nicht erreichbar oder hat nicht innerhalb des erlaubten Zeitfensters geantwortet — auch als `category: "chat"`-Eintrag über `GET /logs` sichtbar).
 
-**Auto-Titel**: ist die Unterhaltung beim ersten Austausch (erste Nutzernachricht) noch unbenannt (`title: null`), generiert das Backend nach der Antwort automatisch einen kurzen Titel (per LLM, best-effort — schlägt die Generierung fehl, bleibt die Unterhaltung unbenannt, kein Fehler nach außen). Eine bereits explizit gesetzte `title` wird dadurch nie überschrieben.
+Das Backend sendet pro Runde nur die letzten `MAX_HISTORY_MESSAGES_IN_PROMPT=40` Nachrichten der Unterhaltung an Ollama (unabhängig davon, wie lang die Unterhaltung insgesamt schon ist) — verhindert, dass die Antwortzeit mit jeder weiteren Nachricht einer langen Unterhaltung immer weiter wächst. `GET /chat/conversations/{id}/messages` liefert davon unabhängig immer den vollständigen Verlauf.
+
+**Auto-Titel**: ist die Unterhaltung beim ersten Austausch (erste Nutzernachricht) noch unbenannt (`title: null`), generiert das Backend **nach** der Antwort an den Client, asynchron im Hintergrund, einen kurzen Titel (per LLM, best-effort — schlägt die Generierung fehl, bleibt die Unterhaltung unbenannt, kein Fehler nach außen). Der Titel kann deshalb ein paar Sekunden nach dieser Response noch `null` sein — ein erneutes `GET /chat/conversations` kurz danach zeigt ihn. Eine bereits explizit gesetzte `title` wird dadurch nie überschrieben.
 
 **Code Interpreter**: kein eigener Endpunkt — das LLM schreibt einfach einen ` ```python ` -Codeblock in seine normale Textantwort (System-Prompt weist es dazu an). Das Web-Frontend erkennt solche Blöcke clientseitig und führt sie auf Wunsch **komplett im Browser** aus (Pyodide/WASM, siehe `web/README.md`) — der Code erreicht den Server nie, egal was er tut.
 

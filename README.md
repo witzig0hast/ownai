@@ -49,6 +49,10 @@ laufenden eigenen Reverse Proxy kollidiert).
   Caddy nicht — richte dort einen Server-Block ein, der `/api/*` an `backend:8000` und alles
   andere an `web:3000` weiterleitet (die exakte Routing-Logik steht zum Abgleich in
   [`infra/caddy/Caddyfile`](./infra/caddy/Caddyfile)), inklusive TLS-Terminierung dort.
+  **Wichtig bei Nginx**: der Standard-`proxy_read_timeout` (meist 60s) ist für eine lokale LLM-Antwort
+  oft zu kurz, besonders bei langen Unterhaltungen oder Werkzeug-Aufrufen — zu knapp eingestellt
+  äußert sich das als `504 Gateway Timeout` im Chat, obwohl das Backend selbst noch arbeitet. Setze
+  `proxy_read_timeout 300s;` (und `proxy_connect_timeout 300s;`) im `location /api/`-Block.
 - **Hast du noch keinen eigenen Reverse Proxy?** Dann starte Caddy zusätzlich mit:
   ```bash
   docker compose --profile caddy up -d

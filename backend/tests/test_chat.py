@@ -1,6 +1,7 @@
 from httpx import AsyncClient
 
 from app.services import ollama_client
+from app.services.ollama_client import OllamaError
 
 
 async def test_conversation_and_plain_reply(client: AsyncClient, auth_headers: dict, monkeypatch):
@@ -232,6 +233,72 @@ async def test_archive_hides_conversation_from_default_list(client: AsyncClient,
 
     default_list = await client.get("/chat/conversations", headers=auth_headers)
     assert default_list.json()["conversations"] == []
+
+
+async def test_unreachable_ollama_surfaces_as_llm_unavailable_and_is_logged(
+    client: AsyncClient, auth_headers: dict, monkeypatch
+):
+    """An unreachable/too-slow Ollama previously bubbled up as a bare, unhandled 500 - now it's a
+    clear 503 the frontend can show, and a "chat" log entry the user can see themselves in
+    Settings -> Logs instead of needing another debugging session for it."""
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        raise OllamaError("Ollama request failed: timed out")
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    created = await client.post("/chat/conversations", json={}, headers=auth_headers)
+    conversation_id = created.json()["id"]
+
+    sent = await client.post(
+        f"/chat/conversations/{conversation_id}/messages",
+        json={"content": "Hallo"},
+        headers=auth_headers,
+    )
+    assert sent.status_code == 503
+    assert sent.json()["error"]["code"] == "llm_unavailable"
+
+    logs = await client.get("/logs?category=chat", headers=auth_headers)
+    entries = logs.json()["logs"]
+    assert len(entries) == 1
+    assert entries[0]["level"] == "error"
+    assert "timed out" in entries[0]["detail"]
+
+
+async def test_old_history_is_dropped_from_the_prompt_but_kept_in_the_ui(
+    client: AsyncClient, auth_headers: dict, monkeypatch
+):
+    """MAX_HISTORY_MESSAGES_IN_PROMPT caps the prompt so a long-running conversation doesn't keep
+    getting slower turn after turn - but the user must still see their full history via GET
+    .../messages, only what's sent to Ollama is windowed."""
+    from app.agent import orchestrator
+
+    monkeypatch.setattr(orchestrator, "MAX_HISTORY_MESSAGES_IN_PROMPT", 2)
+
+    seen_message_counts = []
+
+    async def fake_chat(messages, tools=None):  # noqa: ARG001
+        seen_message_counts.append(len(messages))
+        return {"role": "assistant", "content": "Ok.", "tool_calls": []}
+
+    monkeypatch.setattr(ollama_client, "chat", fake_chat)
+
+    created = await client.post("/chat/conversations", json={}, headers=auth_headers)
+    conversation_id = created.json()["id"]
+
+    for i in range(4):
+        await client.post(
+            f"/chat/conversations/{conversation_id}/messages",
+            json={"content": f"Nachricht {i}"},
+            headers=auth_headers,
+        )
+
+    # 8 user+assistant messages exist, but each call only ever saw the system prompt + the
+    # last 2 history messages (not the full, ever-growing history).
+    assert all(count <= 3 for count in seen_message_counts)
+
+    history = await client.get(f"/chat/conversations/{conversation_id}/messages", headers=auth_headers)
+    assert len(history.json()["messages"]) == 8
 
     with_archived = await client.get("/chat/conversations?include_archived=true", headers=auth_headers)
     assert len(with_archived.json()["conversations"]) == 1
