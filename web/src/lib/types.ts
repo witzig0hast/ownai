@@ -273,3 +273,12 @@ export interface LogEntry {
   detail: string | null;
   created_at: string;
 }
+
+export interface PendingAction {
+  id: string;
+  conversation_id: string;
+  tool_name: string;
+  summary: string;
+  status: "pending" | "approved" | "declined";
+  created_at: string;
+}

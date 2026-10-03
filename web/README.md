@@ -291,6 +291,15 @@ the `{"error":{"code","message"}}` envelope).
   by design — only fires while the tab is open; see `mobile/android/README.md`'s
   `alarm/` section for how Android covers the "app isn't open" case via a local
   `AlarmManager` alarm instead.
+- **Pending Actions** (`src/components/PendingActionsGate.tsx`, also shown in the nav bar
+  on every page): the inbound-email agent (see `API.md`'s "Eingehende E-Mails"/"Ausstehende
+  Aktionen" sections) proposes consequential tool calls instead of running them outright —
+  this component polls `GET /pending-actions` every 30s and, the moment it sees an id it
+  hasn't shown before, auto-opens a `Modal` listing every open proposal with Bestätigen/
+  Ablehnen buttons (`POST .../approve` / `.../decline`). Tracks already-seen ids in a ref so
+  it doesn't reopen the popup on every poll once the user has dismissed it, but still
+  reopens for a genuinely new proposal that arrives later. A small amber badge stays visible
+  whenever anything is still pending, so closing the popup never loses track of an open item.
 - Shared nav (Voice / Chat / Calendar / Suggestions / Settings, plus Admin for admins) +
   logout, route protection via a client-side `ProtectedRoute` guard that redirects
   unauthenticated users to `/login`.

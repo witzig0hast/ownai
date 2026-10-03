@@ -181,7 +181,9 @@ Versenden läuft nicht über einen eigenen REST-Endpunkt, sondern **über den Ch
 
 ### Eingehende E-Mails (autonomer Agent)
 
-Optionale Funktion: der Assistent kann eingehende E-Mails selbstständig lesen und mit **vollem Werkzeugzugriff, ohne Rückfrage** darauf reagieren (explizite Nutzerentscheidung für volle Autonomie statt einer eingeschränkten/bestätigungspflichtigen Variante). Jede verarbeitete E-Mail wird zu einer eigenen neuen `Conversation` (Titel `"E-Mail: <Betreff>"`, `skill: "email_inbox"`) — im Chat normal einsehbar/fortsetzbar, kein separates System. Setzt ein bereits verbundenes SMTP-Konto voraus (`POST /integrations/email`).
+Optionale Funktion: der Assistent kann eingehende E-Mails selbstständig lesen und mit **vollem Werkzeugzugriff** darauf reagieren. Jede verarbeitete E-Mail wird zu einer eigenen neuen `Conversation` (Titel `"E-Mail: <Betreff>"`, `skill: "email_inbox"`) — im Chat normal einsehbar/fortsetzbar, kein separates System. Setzt ein bereits verbundenes SMTP-Konto voraus (`POST /integrations/email`).
+
+**Bestätigung vor konsequenten Aktionen**: lesende/Low-Stakes-Werkzeuge (Kalender/Kontakte/Listen ansehen, Wetter, Web-Suche, Timer, ...) führt der Agent direkt aus. Alles andere (E-Mail senden, etwas löschen/anlegen/ändern, ein Smart-Home-Gerät steuern, ...) wird **nicht** sofort ausgeführt, sondern als `PendingAction` vorgelegt — siehe „Ausstehende Aktionen" unten.
 
 ### `POST /integrations/email/imap`  *(Bearer)*
 Request: `{ "imap_host": string, "imap_port": int (Standard 993), "imap_username": string, "imap_password": string }`
@@ -195,6 +197,23 @@ Response `200`: wie `GET /integrations/email`
 Fehler: `409 imap_not_configured` (kein IMAP-Konto verbunden — zuerst `POST /integrations/email/imap`).
 
 Läuft über einen Scheduler-Poll alle 2 Minuten (`app/services/scheduler.py::_check_inbound_email`), nicht in Echtzeit/per Push.
+
+## Ausstehende Aktionen (Pending Actions)
+
+Konsequente Werkzeug-Aufrufe aus einem autonomen Agenten-Lauf (aktuell: eingehende E-Mails, siehe oben) landen hier zur Bestätigung, statt direkt ausgeführt zu werden — betrifft **nicht** normale, vom Nutzer selbst geführte Chats (dort führt der Agent weiterhin sofort aus, der Nutzer ist ja bereits live dabei).
+
+### `GET /pending-actions`  *(Bearer)*
+Response `200`: `{ "pending_actions": [ { "id": uuid, "conversation_id": uuid, "tool_name": string, "summary": string, "status": "pending", "created_at": datetime } ] }` — nur offene (`status: "pending"`), neueste zuletzt. `summary` ist ein vorformulierter, lesbarer Satz (z. B. „E-Mail an x@example.com senden (Betreff: \"...\")"), kein rohes Werkzeug/Argumente-Tupel.
+
+### `POST /pending-actions/{id}/approve`  *(Bearer)*
+Führt den zurückgehaltenen Werkzeug-Aufruf jetzt tatsächlich aus und hängt eine Notiz („✓ Bestätigt und ausgeführt: ...") an die ursprüngliche Unterhaltung an.
+Response `200`: `{ "id", "conversation_id", "tool_name", "summary", "status": "approved", "created_at" }`
+Fehler: `404 not_found`, `409 pending_action_already_resolved`.
+
+### `POST /pending-actions/{id}/decline`  *(Bearer)*
+Verwirft den Vorschlag ohne Ausführung, hängt eine Notiz („✗ Abgelehnt: ...") an die ursprüngliche Unterhaltung an.
+Response `200`: wie oben, `status: "declined"`.
+Fehler: `404 not_found`, `409 pending_action_already_resolved`.
 
 ## Timer
 

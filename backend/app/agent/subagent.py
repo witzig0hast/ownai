@@ -5,8 +5,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.skills import get_skill
+from app.agent.tool_execution import execute_tool_call
 from app.db.models import Conversation, User
-from app.errors import APIError
 from app.services import ollama_client
 
 MAX_SUBAGENT_ITERATIONS = 5
@@ -18,7 +18,7 @@ async def run_subagent(db: AsyncSession, user: User, conversation: Conversation,
     the subagent's own loop, so it can never spawn a further subagent. Its own tool calls aren't
     persisted as Messages in the conversation - only its final answer + a trace of what it did
     comes back as the parent tool call's result, so the main history stays readable."""
-    from app.agent.tools import TOOL_HANDLERS, TOOL_SCHEMAS  # lazy: tools.py imports this module too
+    from app.agent.tools import TOOL_SCHEMAS  # lazy: tools.py imports this module too
 
     skill = get_skill(conversation.skill)
     allowed_names = skill.tool_names
@@ -61,19 +61,17 @@ async def run_subagent(db: AsyncSession, user: User, conversation: Conversation,
             function = call.get("function", {})
             name = function.get("name")
             arguments = function.get("arguments") or {}
-            handler = TOOL_HANDLERS.get(name)
 
-            if name not in tool_name_set:
-                result: object = {"error": f"Werkzeug '{name}' ist für Sub-Agents nicht verfügbar."}
-            elif handler is None:
-                result = {"error": f"Unbekanntes Werkzeug: {name}"}
-            else:
-                try:
-                    result = await handler(db, user, conversation, arguments)
-                except APIError as exc:
-                    result = {"error": exc.message}
-                except Exception as exc:  # noqa: BLE001 - tool failures must not crash the subagent loop
-                    result = {"error": str(exc)}
+            result = await execute_tool_call(
+                db,
+                user,
+                conversation,
+                name=name,
+                arguments=arguments,
+                allowed_tool_names=tool_name_set,
+                not_available_message=f"Werkzeug '{name}' ist für Sub-Agents nicht verfügbar.",
+                gate_consequential=skill.requires_approval,
+            )
 
             steps.append({"tool": name, "arguments": arguments, "result": result})
             messages.append({"role": "tool", "tool_name": name, "content": json.dumps(result, default=str)})

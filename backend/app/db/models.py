@@ -590,3 +590,30 @@ class AppLog(Base):
     # kept separate from `message` so the list view can stay a short one-liner per entry.
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class PendingAction(Base):
+    """A consequential tool call an autonomous agent run (currently: the "email_inbox" skill,
+    see app/agent/skills.py) wanted to make, held here instead of executed immediately - the
+    user explicitly asked for a confirm-before-acting step for autonomous runs, even though they
+    chose full tool access otherwise (see DECISIONS.md #15/#16). See
+    app/agent/tool_execution.py for where this gets created instead of a direct call, and
+    app/services/pending_action_service.py for approve/decline."""
+
+    __tablename__ = "pending_actions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conversation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    tool_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    arguments: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # Human-readable one-liner generated at creation time (see tool_execution.py's
+    # summarize_action) - shown in the approval UI instead of raw tool_name/arguments.
+    summary: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | approved | declined
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

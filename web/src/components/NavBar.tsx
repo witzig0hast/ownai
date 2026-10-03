@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { PendingActionsGate } from "@/components/PendingActionsGate";
 import { TimerBadge } from "@/components/TimerBadge";
 import * as devicesApi from "@/lib/api/devices";
 import { useAuth } from "@/lib/auth-context";
@@ -89,6 +90,7 @@ export function NavBar() {
           </nav>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          <PendingActionsGate />
           <TimerBadge />
           {user ? (
             <span className="hidden text-sm text-zinc-500 sm:inline">{user.display_name}</span>

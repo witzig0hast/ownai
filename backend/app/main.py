@@ -24,6 +24,7 @@ from app.api import (
     logs,
     memory,
     notifications,
+    pending_actions,
     permanent_agents,
     push,
     reminders,
@@ -110,6 +111,7 @@ api_v1_routers = (
     permanent_agents.router,
     tts.router,
     logs.router,
+    pending_actions.router,
     health.router,
 )
 for router in api_v1_routers:

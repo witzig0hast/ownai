@@ -6,9 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.skills import Skill, get_skill
-from app.agent.tools import TOOL_HANDLERS, TOOL_SCHEMAS
+from app.agent.tool_execution import execute_tool_call
+from app.agent.tools import TOOL_SCHEMAS
 from app.db.models import Conversation, Message, User
-from app.errors import APIError
 from app.services import memory_service, ollama_client
 
 MAX_TOOL_ITERATIONS = 5
@@ -159,35 +159,17 @@ async def run_turn(db: AsyncSession, user: User, conversation: Conversation, use
             function = call.get("function", {})
             name = function.get("name")
             arguments = function.get("arguments") or {}
-            handler = TOOL_HANDLERS.get(name)
 
-            if skill.tool_names is not None and name not in skill.tool_names:
-                # The model tried a tool outside this conversation's skill - refuse rather than
-                # execute, even though the handler exists, since we deliberately didn't offer
-                # its schema (a model can still "remember" a tool name from earlier turns).
-                result: object = {"error": f"Werkzeug '{name}' ist im Skill '{skill.name}' nicht verfügbar."}
-            elif handler is None:
-                result = {"error": f"Unbekanntes Werkzeug: {name}"}
-            else:
-                try:
-                    result = await handler(db, user, conversation, arguments)
-                except APIError as exc:
-                    result = {"error": exc.message}
-                except KeyError as exc:
-                    # A tool handler indexed a required argument the model didn't include
-                    # (arguments["foo"], not .get("foo")) - str(KeyError) is just the quoted
-                    # key name ("'foo'"), which reads as a cryptic, meaningless error to the
-                    # model rather than something it can act on. Spell out what's actually
-                    # wrong so it can immediately retry with a complete tool call instead of
-                    # getting stuck relaying the raw exception text to the user.
-                    result = {
-                        "error": (
-                            f"Pflicht-Parameter '{exc.args[0]}' fehlt beim Aufruf von '{name}'. "
-                            "Rufe das Werkzeug erneut mit allen benötigten Angaben auf."
-                        )
-                    }
-                except Exception as exc:  # noqa: BLE001 - tool failures must not crash the chat turn
-                    result = {"error": str(exc)}
+            result = await execute_tool_call(
+                db,
+                user,
+                conversation,
+                name=name,
+                arguments=arguments,
+                allowed_tool_names=skill.tool_names,
+                not_available_message=f"Werkzeug '{name}' ist im Skill '{skill.name}' nicht verfügbar.",
+                gate_consequential=skill.requires_approval,
+            )
 
             collected_tool_calls.append({"tool": name, "arguments": arguments, "result": result})
             ollama_messages.append(
