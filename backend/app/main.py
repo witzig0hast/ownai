@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -42,6 +43,7 @@ from app.errors import APIError
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -65,7 +67,14 @@ app.add_middleware(
 
 
 @app.exception_handler(APIError)
-async def api_error_handler(_request: Request, exc: APIError) -> JSONResponse:
+async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
+    if exc.status_code >= 500:
+        # A 4xx APIError (wrong password, not found, ...) is routine and already visible to the
+        # caller via the JSON body - a 5xx one means something OwnAI itself depends on (an
+        # external provider, typically) failed, which is worth `docker compose logs backend`
+        # showing directly. Without this, diagnosing e.g. an SSO callback failure meant digging
+        # the JSON error body out of a browser's redirect chain instead of just reading the logs.
+        logger.warning("%s %s -> %s %s: %s", request.method, request.url.path, exc.status_code, exc.code, exc.message)
     return JSONResponse(status_code=exc.status_code, content={"error": {"code": exc.code, "message": exc.message}})
 
 

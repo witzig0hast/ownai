@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import parse_qs, urlparse
 
 import jwt as pyjwt
@@ -252,3 +253,36 @@ async def test_sso_callback_respects_registration_closed(client: AsyncClient, au
     response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "registration_closed"
+
+
+async def test_sso_callback_logs_sso_error_server_side(client: AsyncClient, monkeypatch, caplog):
+    """A 5xx APIError like SsoError is otherwise only visible as a JSON body at the end of a
+    browser redirect chain - app/main.py's api_error_handler must also log it, so the real cause
+    (provider unreachable, bad id_token, ...) shows up directly in `docker compose logs backend`."""
+    _configure_sso(monkeypatch)
+    state = create_sso_state_token("the-nonce")
+
+    async def fake_exchange(code, *, nonce):  # noqa: ARG001
+        raise sso_service.SsoError("SSO-Provider nicht erreichbar: boom")
+
+    monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange)
+
+    with caplog.at_level(logging.WARNING):
+        response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "sso_error"
+    assert any("SSO-Provider nicht erreichbar: boom" in record.message for record in caplog.records)
+
+
+async def test_sso_callback_rejects_invalid_state_without_logging(client: AsyncClient, monkeypatch, caplog):
+    """A 4xx APIError (wrong state, routine client error) must NOT trigger the 5xx-only warning
+    log - that log exists specifically to surface unexpected server/dependency failures, not
+    every ordinary rejection."""
+    _configure_sso(monkeypatch)
+
+    with caplog.at_level(logging.WARNING):
+        response = await client.get("/auth/sso/callback", params={"code": "abc", "state": "not-a-real-token"})
+
+    assert response.status_code == 401
+    assert caplog.records == []
