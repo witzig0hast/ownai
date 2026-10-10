@@ -1,6 +1,7 @@
 import logging
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 import jwt as pyjwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -253,6 +254,46 @@ async def test_sso_callback_respects_registration_closed(client: AsyncClient, au
     response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "registration_closed"
+
+
+async def test_exchange_code_for_claims_wrong_issuer_names_both_values(monkeypatch):
+    """The #1 real-world SSO misconfiguration (confirmed live against a user's Authentik
+    instance): OIDC_ISSUER_URL doesn't match the "iss" the provider actually puts in the
+    id_token (e.g. Authentik appends "/application/o/<slug>/"). PyJWT's own "Invalid issuer"
+    gives no hint which value is wrong, so exchange_code_for_claims must say both."""
+    _configure_sso(monkeypatch)
+    monkeypatch.setattr(sso_service, "_discovery_cache", None)
+    private_key, public_key = _generate_rsa_keypair()
+
+    token = _sign_id_token(private_key, iss="https://auth.example.com/application/o/ownai/")
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/.well-known/openid-configuration":
+            return httpx.Response(
+                200,
+                json={
+                    "authorization_endpoint": "https://auth.example.com/authorize",
+                    "token_endpoint": "https://auth.example.com/token",
+                    "jwks_uri": "https://auth.example.com/jwks",
+                },
+            )
+        if request.url.path == "/token":
+            return httpx.Response(200, json={"id_token": token})
+        if request.url.path == "/jwks":
+            return httpx.Response(200, json=_build_jwks(public_key))
+        return httpx.Response(404)
+
+    def fake_client() -> httpx.AsyncClient:
+        return httpx.AsyncClient(transport=httpx.MockTransport(_handler))
+
+    monkeypatch.setattr(sso_service, "_client", fake_client)
+
+    with pytest.raises(sso_service.SsoError) as exc_info:
+        await sso_service.exchange_code_for_claims("abc", nonce="the-nonce")
+
+    message = str(exc_info.value)
+    assert "iss='https://auth.example.com/application/o/ownai/'" in message
+    assert "iss='https://auth.example.com'" in message
 
 
 async def test_sso_callback_logs_sso_error_server_side(client: AsyncClient, monkeypatch, caplog):

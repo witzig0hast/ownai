@@ -137,7 +137,17 @@ async def exchange_code_for_claims(code: str, *, nonce: str) -> dict[str, Any]:
     try:
         claims = _verify_id_token(id_token, jwks)
     except jwt.PyJWTError as exc:
-        raise SsoError(f"id_token ungültig: {exc}") from exc
+        # Include the token's own (unverified-signature, just for display) "iss"/"aud" alongside
+        # what we expect - a bare "Invalid issuer"/"Invalid audience" from PyJWT gives no hint
+        # which value is wrong, and this is the single most common OIDC misconfiguration
+        # (Authentik, for instance, issues "https://host/application/o/<slug>/", not just the
+        # bare host some people put in OIDC_ISSUER_URL).
+        unverified = jwt.decode(id_token, options={"verify_signature": False})
+        raise SsoError(
+            f"id_token ungültig: {exc} "
+            f"(erhalten: iss={unverified.get('iss')!r} aud={unverified.get('aud')!r}; "
+            f"erwartet: iss={(settings.oidc_issuer_url or '').rstrip('/')!r} aud={settings.oidc_client_id!r})"
+        ) from exc
 
     # Checked ourselves on top of signature/audience/issuer (already enforced by jwt.decode
     # above) - the nonce ties this specific id_token back to the authorization request *we*
