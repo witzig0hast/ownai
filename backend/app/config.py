@@ -66,6 +66,24 @@ class Settings(BaseSettings):
     # the Web Push protocol, has to be a "mailto:" or "https:" URI.
     vapid_subject: str = "mailto:admin@example.com"
 
+    # Optional SSO login via any OIDC-compliant identity provider (e.g. a self-hosted Authentik
+    # instance) - added alongside the existing email/password login, never replacing it. All
+    # four below unset (the default) means SSO is simply off: GET /auth/sso/login then responds
+    # with 404 sso_not_configured and the frontend doesn't show the button at all.
+    oidc_issuer_url: str | None = None  # e.g. "https://auth.example.com/application/o/ownai/"
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    # Must exactly match a "Redirect URI" configured on the provider side. Points at this
+    # backend's own callback endpoint (GET /auth/sso/callback), not the frontend.
+    oidc_redirect_uri: str | None = None
+    oidc_scopes: str = "openid email profile"
+    # Where the browser ends up once the backend has finished the token exchange - the
+    # frontend's own callback page, which reads the issued OwnAI tokens from the URL fragment
+    # and stores them exactly like a normal password login (see
+    # web/src/app/sso-callback/page.tsx). Fragment, not query string, so the tokens never hit
+    # this backend's or any proxy's access logs on that final redirect.
+    oidc_frontend_callback_url: str = "http://localhost:3000/sso-callback"
+
     cors_origins: str = "http://localhost:3000"
 
     @property

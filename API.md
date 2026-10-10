@@ -36,6 +36,21 @@ Fehler: `401 invalid_refresh_token`
 ### `GET /users/me`  *(Bearer)*
 Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime }`
 
+### SSO-Login (optional)
+
+Zusätzlicher Login-Weg über einen beliebigen OIDC-kompatiblen Identity Provider (z.B. ein selbst gehostetes Authentik) — ersetzt `POST /auth/login` nicht, läuft parallel dazu. Komplett serverseitig per Redirect, nichts davon ist ein normaler JSON-API-Aufruf des Frontends.
+
+### `GET /auth/sso/status`
+Response `200`: `{ "enabled": bool }` — ob der Server überhaupt mit SSO konfiguriert ist (alle vier `OIDC_*`-Variablen gesetzt). Unauthentifiziert, da die Login-Seite das noch vor jedem Login wissen muss.
+
+### `GET /auth/sso/login`
+Kein JSON — `307`-Redirect zur Autorisierungs-URL des konfigurierten Providers.
+Fehler: `404 sso_not_configured`.
+
+### `GET /auth/sso/callback?code={string}&state={string}`
+Vom Provider aufgerufen, nicht direkt vom Frontend. Tauscht `code` gegen ein `id_token`, verifiziert es, löst es auf einen `User` auf (neu angelegt nach demselben Erster-Nutzer-wird-Admin/Freischaltungs-Gate wie `POST /auth/register`, oder — bei vorhandener Mail-Adresse — mit einem bestehenden Account verknüpft) und `307`-redirected mit den ausgestellten Tokens **im URL-Fragment** zu `OIDC_FRONTEND_CALLBACK_URL`: `#access_token=...&refresh_token=...` (Fragment, nicht Query-String — landet dadurch in keinem Server-/Proxy-Log).
+Fehler: `404 sso_not_configured`, `401 invalid_sso_state` (abgelaufener/manipulierter `state`), `502 sso_error` (Provider nicht erreichbar oder `id_token` ungültig), plus dieselben `403 registration_closed`/`registration_pending`/`registration_declined` wie Registrierung/Login.
+
 ## Geräte
 
 ### `POST /devices/register`  *(Bearer)*

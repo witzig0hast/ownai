@@ -18,6 +18,9 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  /** Stores an already-issued token pair (e.g. from the SSO callback page, see
+   * app/sso-callback/page.tsx) and loads the profile - the shared second half of login(). */
+  loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
 }
@@ -60,13 +63,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const tokens = await authApi.login(email, password);
-    setTokens({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token });
+  const loginWithTokens = useCallback(async (accessToken: string, refreshToken: string) => {
+    setTokens({ accessToken, refreshToken });
     const freshUser = await authApi.me();
     setUserState(freshUser);
     persistUser(freshUser);
   }, []);
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const tokens = await authApi.login(email, password);
+      await loginWithTokens(tokens.access_token, tokens.refresh_token);
+    },
+    [loginWithTokens],
+  );
 
   const register = useCallback(
     async (email: string, password: string, displayName: string) => {
@@ -90,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated: user !== null, login, register, logout }}
+      value={{ user, isLoading, isAuthenticated: user !== null, login, loginWithTokens, register, logout }}
     >
       {children}
     </AuthContext.Provider>

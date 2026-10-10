@@ -48,6 +48,16 @@ the `{"error":{"code","message"}}` envelope).
 
 - **Auth**: `/login`, `/register`. `POST /auth/register` then `/auth/login`,
   tokens stored client-side, `GET /users/me` to hydrate the profile.
+- **SSO login (optional)**: `/login` calls `GET /auth/sso/status` on mount and only shows
+  a "Mit SSO anmelden" button when the backend actually has it configured - clicking it is a
+  plain `<a href>` full-page navigation (not a `fetch()`) to `GET /auth/sso/login`, which
+  307-redirects the browser to the configured OIDC provider. After the provider redirects back,
+  the backend's own callback lands the browser on `/sso-callback` with the issued OwnAI tokens
+  in the URL *fragment* (`#access_token=...&refresh_token=...`, never sent to any server,
+  readable by this page's JS only). That page reads the fragment once and calls
+  `useAuth().loginWithTokens()` - the same second half `login()` itself uses after a password
+  login - so both paths converge on identical state/storage handling (`src/lib/auth-storage.ts`,
+  see below).
 - **Fetch wrapper** (`src/lib/api-client.ts`): attaches
   `Authorization: Bearer <token>`, and on a `401` calls `POST /auth/refresh`
   once (de-duplicated across concurrent requests) and retries the original

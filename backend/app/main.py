@@ -30,6 +30,7 @@ from app.api import (
     reminders,
     rss,
     searxng,
+    sso,
     timer,
     tts,
     vision,
@@ -86,6 +87,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 api_v1_routers = (
     auth.router,
+    sso.router,
     devices.router,
     chat.router,
     calendar.router,

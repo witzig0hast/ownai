@@ -24,9 +24,17 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    # Always set, even for an SSO-only account (a random, never-shared value - see
+    # sso_service.py) so every other password-login code path stays simple (no "| None"
+    # branches to check); such an account just can never match it via POST /auth/login.
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False)
+    # The OIDC provider's "sub" claim, set once this account is linked to an SSO identity (on
+    # first SSO login, see app/services/sso_service.py) - None for an account that has only
+    # ever used email/password. Unique: the same external identity always maps to exactly one
+    # OwnAI account.
+    oidc_subject: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
     # "pending" | "approved" | "declined" - see app/api/auth.py. The first-ever registration
     # bootstraps straight to "approved" (same bootstrap as is_admin above); every later
     # registration starts "pending" until an admin approves/declines it (app/api/admin.py).

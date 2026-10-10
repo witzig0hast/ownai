@@ -58,6 +58,28 @@ def decode_token(token: str, expected_type: Literal["access", "refresh"]) -> dic
     return payload
 
 
+# SSO's `state` param (see app/services/sso_service.py) is this same self-signed JWT pattern
+# instead of a server-side session/cookie store - this backend has none (pure bearer-token API)
+# and adding one just for a single login flow isn't worth it. The provider hands `state` back
+# unmodified on the callback, so verifying our own signature on it is equivalent to looking up a
+# server-side record, without needing one.
+SSO_STATE_TTL_MINUTES = 10
+
+
+def create_sso_state_token(nonce: str) -> str:
+    return _encode({"type": "sso_state", "nonce": nonce}, timedelta(minutes=SSO_STATE_TTL_MINUTES))
+
+
+def decode_sso_state_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError as exc:
+        raise TokenError(str(exc)) from exc
+    if payload.get("type") != "sso_state":
+        raise TokenError("not an sso_state token")
+    return payload
+
+
 def _generate_prefixed_api_key(prefix: str) -> tuple[str, str]:
     """Returns (raw_key_shown_once, sha256_hash_to_store)."""
     raw_key = f"{prefix}_{secrets.token_urlsafe(32)}"

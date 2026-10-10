@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
+import * as authApi from "@/lib/api/auth";
 import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
@@ -14,12 +15,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Only shown once we actually know the server has SSO configured - most self-hosted
+  // instances won't, and a button that just 404s would be confusing.
+  const [ssoEnabled, setSsoEnabled] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       router.replace("/voice");
     }
   }, [isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    authApi
+      .ssoStatus()
+      .then((status) => setSsoEnabled(status.enabled))
+      .catch(() => setSsoEnabled(false));
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -74,6 +85,21 @@ export default function LoginPage() {
             {submitting ? "Logging in..." : "Log in"}
           </button>
         </form>
+        {ssoEnabled ? (
+          <>
+            <div className="my-4 flex items-center gap-3 text-xs text-zinc-400">
+              <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+              oder
+              <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <a
+              href={authApi.SSO_LOGIN_URL}
+              className="flex items-center justify-center rounded-xl border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:scale-[1.03] hover:bg-zinc-50 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              Mit SSO anmelden
+            </a>
+          </>
+        ) : null}
         <p className="mt-4 text-sm text-zinc-500">
           No account yet?{" "}
           <Link href="/register" className="font-medium text-zinc-900 underline dark:text-zinc-100">

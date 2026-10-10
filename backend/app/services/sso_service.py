@@ -1,0 +1,179 @@
+import asyncio
+import secrets
+from typing import Any
+from urllib.parse import urlencode
+
+import httpx
+import jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.security import hash_password
+from app.config import get_settings
+from app.db.models import User
+from app.errors import RegistrationClosed, RegistrationDeclined, RegistrationPending, SsoError
+from app.services import admin_service
+
+
+def _client() -> httpx.AsyncClient:
+    """Separate factory purely so tests can monkeypatch it - same pattern as the other external
+    services (weather_service._client, home_assistant_service._client, ...)."""
+    return httpx.AsyncClient(timeout=10.0)
+
+
+def is_configured() -> bool:
+    settings = get_settings()
+    return bool(
+        settings.oidc_issuer_url
+        and settings.oidc_client_id
+        and settings.oidc_client_secret
+        and settings.oidc_redirect_uri
+    )
+
+
+# The discovery document (authorization/token/jwks endpoints) almost never changes for a given
+# issuer - cached per process rather than re-fetched on every login. Module-level, not
+# get_settings()-cached, because it needs an actual network round trip, unlike Settings itself.
+_discovery_cache: dict[str, Any] | None = None
+
+
+async def _discovery_document() -> dict[str, Any]:
+    global _discovery_cache
+    if _discovery_cache is not None:
+        return _discovery_cache
+    settings = get_settings()
+    issuer = (settings.oidc_issuer_url or "").rstrip("/")
+    async with _client() as client:
+        try:
+            response = await client.get(f"{issuer}/.well-known/openid-configuration")
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise SsoError(f"SSO-Provider nicht erreichbar: {exc}") from exc
+    _discovery_cache = response.json()
+    return _discovery_cache
+
+
+async def authorization_url(*, state: str, nonce: str) -> str:
+    settings = get_settings()
+    discovery = await _discovery_document()
+    params = {
+        "response_type": "code",
+        "client_id": settings.oidc_client_id,
+        "redirect_uri": settings.oidc_redirect_uri,
+        "scope": settings.oidc_scopes,
+        "state": state,
+        "nonce": nonce,
+    }
+    return f"{discovery['authorization_endpoint']}?{urlencode(params)}"
+
+
+def _verify_id_token(id_token: str, jwks_uri: str) -> dict[str, Any]:
+    """Blocking (PyJWKClient does its own synchronous HTTP fetch of the signing keys, cached
+    internally) - called via asyncio.to_thread, see exchange_code_for_claims."""
+    settings = get_settings()
+    signing_key = jwt.PyJWKClient(jwks_uri).get_signing_key_from_jwt(id_token)
+    return jwt.decode(
+        id_token,
+        signing_key.key,
+        algorithms=["RS256", "ES256"],
+        audience=settings.oidc_client_id,
+        issuer=(settings.oidc_issuer_url or "").rstrip("/"),
+    )
+
+
+async def exchange_code_for_claims(code: str, *, nonce: str) -> dict[str, Any]:
+    settings = get_settings()
+    discovery = await _discovery_document()
+
+    async with _client() as client:
+        try:
+            response = await client.post(
+                discovery["token_endpoint"],
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": settings.oidc_redirect_uri,
+                    "client_id": settings.oidc_client_id,
+                    "client_secret": settings.oidc_client_secret,
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise SsoError(f"Code-Austausch beim SSO-Provider fehlgeschlagen: {exc}") from exc
+
+    id_token = response.json().get("id_token")
+    if not id_token:
+        raise SsoError("SSO-Provider hat kein id_token zurückgegeben (scope 'openid' fehlt?).")
+
+    try:
+        claims = await asyncio.to_thread(_verify_id_token, id_token, discovery["jwks_uri"])
+    except jwt.PyJWTError as exc:
+        raise SsoError(f"id_token ungültig: {exc}") from exc
+
+    # Checked ourselves on top of signature/audience/issuer (already enforced by jwt.decode
+    # above) - the nonce ties this specific id_token back to the authorization request *we*
+    # started, so a stolen/replayed id_token from a different login attempt is rejected even if
+    # its signature is otherwise perfectly valid.
+    if claims.get("nonce") != nonce:
+        raise SsoError("nonce im id_token stimmt nicht überein (möglicher Replay-Versuch).")
+    if not claims.get("email"):
+        raise SsoError("SSO-Provider hat keine E-Mail-Adresse geliefert (scope 'email' fehlt?).")
+
+    return claims
+
+
+def _check_approval(user: User) -> User:
+    # Same gate as the password login path (app/api/auth.py) - an SSO identity gets no special
+    # treatment around the approval-before-login policy (see DECISIONS.md #13).
+    if user.approval_status == "pending":
+        raise RegistrationPending()
+    if user.approval_status == "declined":
+        raise RegistrationDeclined()
+    return user
+
+
+async def resolve_or_create_user(db: AsyncSession, claims: dict[str, Any]) -> User:
+    """Maps verified OIDC claims to an OwnAI account: an existing link (oidc_subject) wins: then
+    an existing password-based account with the same email gets linked (no duplicate account for
+    one person); otherwise a brand-new account is bootstrapped - deliberately mirroring
+    POST /auth/register's own first-user-is-admin/approval-gate logic (app/api/auth.py) rather
+    than sharing a helper with it, since the two differ in what happens on an email collision
+    (register rejects it, SSO links to it)."""
+    subject = claims["sub"]
+    email = claims["email"]
+    display_name = claims.get("name") or claims.get("preferred_username") or email.split("@")[0]
+
+    result = await db.execute(select(User).where(User.oidc_subject == subject))
+    user = result.scalar_one_or_none()
+    if user is not None:
+        return _check_approval(user)
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is not None:
+        user.oidc_subject = subject
+        await db.commit()
+        await db.refresh(user)
+        return _check_approval(user)
+
+    is_first_user = await admin_service.user_count(db) == 0
+    if not is_first_user:
+        app_settings = await admin_service.get_settings(db)
+        if not app_settings.registration_open:
+            raise RegistrationClosed()
+
+    user = User(
+        email=email,
+        # Random and never shared with anyone - an SSO-only account simply can never match this
+        # via POST /auth/login, so every other password-login code path stays a plain,
+        # non-nullable password_hash check with no "| None" branches to carry.
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        display_name=display_name,
+        oidc_subject=subject,
+        is_admin=is_first_user,
+        approval_status="approved" if is_first_user else "pending",
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _check_approval(user)

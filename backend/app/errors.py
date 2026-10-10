@@ -108,6 +108,21 @@ class RegistrationDeclined(APIError):
         super().__init__(403, "registration_declined", message)
 
 
+class SsoNotConfigured(APIError):
+    def __init__(self, message: str = "SSO ist auf diesem Server nicht eingerichtet."):
+        super().__init__(404, "sso_not_configured", message)
+
+
+class InvalidSsoState(APIError):
+    def __init__(self, message: str = "Ungültiger oder abgelaufener Anmeldevorgang. Bitte erneut versuchen."):
+        super().__init__(401, "invalid_sso_state", message)
+
+
+class SsoError(APIError):
+    def __init__(self, message: str):
+        super().__init__(502, "sso_error", message)
+
+
 class LlmUnavailable(APIError):
     def __init__(
         self,
