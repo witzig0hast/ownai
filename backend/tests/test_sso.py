@@ -83,6 +83,19 @@ def test_verify_id_token_rejects_wrong_issuer(monkeypatch):
         sso_service._verify_id_token(token, _build_jwks(public_key))
 
 
+def test_verify_id_token_tolerates_trailing_slash_mismatch(monkeypatch):
+    """Authentik (and others) put a trailing slash on "iss" that isn't in OIDC_ISSUER_URL (or
+    vice versa) - this must not be treated as a different issuer. Regression test for a real
+    production failure: a correctly configured OIDC_ISSUER_URL was rejected because the token's
+    "iss" carried a trailing slash that our own comparison didn't account for."""
+    _configure_sso(monkeypatch, oidc_issuer_url="https://auth.example.com/application/o/ownai/")
+    private_key, public_key = _generate_rsa_keypair()
+
+    token = _sign_id_token(private_key, iss="https://auth.example.com/application/o/ownai")
+    claims = sso_service._verify_id_token(token, _build_jwks(public_key))
+    assert claims["sub"] == "oidc-subject-123"
+
+
 def test_verify_id_token_rejects_signature_from_a_different_key(monkeypatch):
     _configure_sso(monkeypatch)
     _, real_public_key = _generate_rsa_keypair()

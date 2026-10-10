@@ -100,13 +100,24 @@ def _verify_id_token(id_token: str, jwks: dict[str, Any]) -> dict[str, Any]:
         raise SsoError("Kein passender Signaturschlüssel beim SSO-Provider gefunden (kid-Mismatch).")
 
     signing_key = jwt.PyJWK(matching_jwk).key
-    return jwt.decode(
+    claims = jwt.decode(
         id_token,
         signing_key,
         algorithms=["RS256", "ES256"],
         audience=settings.oidc_client_id,
-        issuer=(settings.oidc_issuer_url or "").rstrip("/"),
+        # Verified manually below instead of passing issuer= to jwt.decode(): PyJWT compares the
+        # "iss" claim with byte-exact equality, but providers are inconsistent about a trailing
+        # slash (Authentik's own issuer ends in "/", e.g. ".../application/o/<slug>/") while
+        # OIDC_ISSUER_URL is also used (rstrip()'d) to build the discovery-document URL elsewhere
+        # in this file - trusting jwt.decode's exact match here rejected a correctly configured
+        # issuer just because of that slash.
+        options={"verify_iss": False},
     )
+    expected_issuer = (settings.oidc_issuer_url or "").rstrip("/")
+    actual_issuer = (claims.get("iss") or "").rstrip("/")
+    if actual_issuer != expected_issuer:
+        raise jwt.InvalidIssuerError("Invalid issuer")
+    return claims
 
 
 async def exchange_code_for_claims(code: str, *, nonce: str) -> dict[str, Any]:
