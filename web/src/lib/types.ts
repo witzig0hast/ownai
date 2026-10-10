@@ -15,6 +15,7 @@ export interface User {
   is_admin: boolean;
   approval_status: "pending" | "approved" | "declined";
   created_at: string;
+  sso_linked: boolean;
 }
 
 export interface AuthTokens {

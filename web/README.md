@@ -58,6 +58,22 @@ the `{"error":{"code","message"}}` envelope).
   `useAuth().loginWithTokens()` - the same second half `login()` itself uses after a password
   login - so both paths converge on identical state/storage handling (`src/lib/auth-storage.ts`,
   see below).
+- **Linking an existing account to SSO** (Settings → Konto → `SsoCard` in
+  `components/settings/AccountTab.tsx`, only rendered once `ssoStatus()` confirms SSO is
+  configured): unlike the login button above, this one *is* a `fetch()` call
+  (`authApi.ssoLinkUrl()`, `GET /auth/sso/link`) because the backend needs the caller's
+  `Authorization` header to know *which* account to link - a header a plain navigation can't
+  carry. The JSON response's `url` is then handed to `window.location.href` for the actual
+  provider round trip. The backend's callback recognizes this flow from the `state` it issued and
+  redirects back to `/sso-callback?linked=1` (no tokens - the existing session is untouched), vs.
+  `?error=<code>&message=<text>[&context=link]` on failure. `/sso-callback` branches on these
+  three shapes (tokens in the fragment / `linked=1` / `error=`) and renders a proper screen for
+  each - including the error case, which used to be a raw JSON body at the end of the redirect
+  chain before this was added. Unlinking is `DELETE /auth/sso/link`, no confirmation flow beyond
+  a `window.confirm()` (same pattern as `AgentBusTab`/`PermanentAgentsTab`). `User.sso_linked`
+  drives which of the two button states (`SsoCard`) is shown; after linking/unlinking, the
+  profile is refreshed via `useAuth().refreshUser()` rather than the full `loginWithTokens()`
+  path, since no new tokens were issued.
 - **Fetch wrapper** (`src/lib/api-client.ts`): attaches
   `Authorization: Bearer <token>`, and on a `401` calls `POST /auth/refresh`
   once (de-duplicated across concurrent requests) and retries the original

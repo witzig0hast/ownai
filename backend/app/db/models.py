@@ -41,6 +41,12 @@ class User(Base):
     approval_status: Mapped[str] = mapped_column(String(16), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
+    @property
+    def sso_linked(self) -> bool:
+        """Whether this account is linked to an SSO identity - exposed via UserOut so the
+        frontend can show "Konto verknüpfen" vs. "Verknüpfung trennen" without a separate call."""
+        return self.oidc_subject is not None
+
     devices: Mapped[list["Device"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     calendar_account: Mapped["CalendarAccount | None"] = relationship(

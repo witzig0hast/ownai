@@ -18,6 +18,7 @@ class UserOut(BaseModel):
     is_admin: bool
     approval_status: str
     created_at: UtcDatetime
+    sso_linked: bool
 
 
 class LoginRequest(BaseModel):

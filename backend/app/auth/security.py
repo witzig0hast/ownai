@@ -66,8 +66,14 @@ def decode_token(token: str, expected_type: Literal["access", "refresh"]) -> dic
 SSO_STATE_TTL_MINUTES = 10
 
 
-def create_sso_state_token(nonce: str) -> str:
-    return _encode({"type": "sso_state", "nonce": nonce}, timedelta(minutes=SSO_STATE_TTL_MINUTES))
+def create_sso_state_token(nonce: str, *, link_user_id: str | None = None) -> str:
+    # link_user_id turns this into an "account linking" flow instead of a login: present, the
+    # callback links the returned SSO identity to that already-authenticated user's existing
+    # account instead of logging in as (or creating) a separate one - see app/api/sso.py.
+    claims = {"type": "sso_state", "nonce": nonce}
+    if link_user_id is not None:
+        claims["link_user_id"] = link_user_id
+    return _encode(claims, timedelta(minutes=SSO_STATE_TTL_MINUTES))
 
 
 def decode_sso_state_token(token: str) -> dict:

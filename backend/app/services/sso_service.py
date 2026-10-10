@@ -10,7 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.security import hash_password
 from app.config import get_settings
 from app.db.models import User
-from app.errors import RegistrationClosed, RegistrationDeclined, RegistrationPending, SsoError
+from app.errors import (
+    RegistrationClosed,
+    RegistrationDeclined,
+    RegistrationPending,
+    SsoError,
+    SsoIdentityAlreadyLinked,
+)
 from app.services import admin_service
 
 
@@ -227,3 +233,25 @@ async def resolve_or_create_user(db: AsyncSession, claims: dict[str, Any]) -> Us
     await db.commit()
     await db.refresh(user)
     return _check_approval(user)
+
+
+async def link_existing_user(db: AsyncSession, user_id: str, claims: dict[str, Any]) -> User:
+    """The explicit "Konto verknüpfen" flow (app/api/sso.py's /auth/sso/link), as opposed to
+    resolve_or_create_user's implicit by-email linking during a normal login - lets an already
+    logged-in user attach an SSO identity to their account even when its email differs from the
+    one IdP returns, without relying on that email coincidentally matching."""
+    subject = claims["sub"]
+
+    result = await db.execute(select(User).where(User.oidc_subject == subject))
+    other = result.scalar_one_or_none()
+    if other is not None and other.id != user_id:
+        raise SsoIdentityAlreadyLinked()
+
+    user = await db.get(User, user_id)
+    if user is None:
+        raise SsoError("Konto nicht gefunden.")
+
+    user.oidc_subject = subject
+    await db.commit()
+    await db.refresh(user)
+    return user

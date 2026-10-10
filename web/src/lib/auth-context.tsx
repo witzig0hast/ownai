@@ -23,6 +23,10 @@ interface AuthContextValue {
   loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
+  /** Re-fetches /users/me and updates the cached profile - for a change made via another
+   * endpoint (e.g. linking/unlinking SSO in AccountTab.tsx) that the backend doesn't return a
+   * fresh User for itself. */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -70,6 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistUser(freshUser);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const freshUser = await authApi.me();
+    setUserState(freshUser);
+    persistUser(freshUser);
+  }, []);
+
   const login = useCallback(
     async (email: string, password: string) => {
       const tokens = await authApi.login(email, password);
@@ -100,7 +110,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated: user !== null, login, loginWithTokens, register, logout }}
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: user !== null,
+        login,
+        loginWithTokens,
+        register,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

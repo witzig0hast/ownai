@@ -34,11 +34,11 @@ Response `200`: gleiche Form wie `/auth/login`
 Fehler: `401 invalid_refresh_token`
 
 ### `GET /users/me`  *(Bearer)*
-Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime }`
+Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime, "sso_linked": bool }`
 
 ### SSO-Login (optional)
 
-Zusätzlicher Login-Weg über einen beliebigen OIDC-kompatiblen Identity Provider (z.B. ein selbst gehostetes Authentik) — ersetzt `POST /auth/login` nicht, läuft parallel dazu. Komplett serverseitig per Redirect, nichts davon ist ein normaler JSON-API-Aufruf des Frontends.
+Zusätzlicher Login-Weg über einen beliebigen OIDC-kompatiblen Identity Provider (z.B. ein selbst gehostetes Authentik) — ersetzt `POST /auth/login` nicht, läuft parallel dazu. Komplett serverseitig per Redirect, nichts davon ist ein normaler JSON-API-Aufruf des Frontends — **außer** `GET /auth/sso/link`, siehe dort.
 
 ### `GET /auth/sso/status`
 Response `200`: `{ "enabled": bool }` — ob der Server überhaupt mit SSO konfiguriert ist (alle vier `OIDC_*`-Variablen gesetzt). Unauthentifiziert, da die Login-Seite das noch vor jedem Login wissen muss.
@@ -47,9 +47,19 @@ Response `200`: `{ "enabled": bool }` — ob der Server überhaupt mit SSO konfi
 Kein JSON — `307`-Redirect zur Autorisierungs-URL des konfigurierten Providers.
 Fehler: `404 sso_not_configured`.
 
+### `GET /auth/sso/link`  *(Bearer)*
+Response `200`: `{ "url": string }` — Autorisierungs-URL des Providers, diesmal für den "bestehendes Konto verknüpfen"-Flow (`state` trägt das aktuell eingeloggte Konto). Anders als `/login` ein normaler JSON-Aufruf (nicht selbst ein Redirect), weil der `Authorization`-Header nur so zum Server kommt — der Client navigiert danach selbst per `window.location.href = url` weiter.
+Fehler: `404 sso_not_configured`.
+
+### `DELETE /auth/sso/link`  *(Bearer)*
+Trennt die SSO-Verknüpfung des eingeloggten Kontos (`oidc_subject` wird gelöscht). Response `204`.
+
 ### `GET /auth/sso/callback?code={string}&state={string}`
-Vom Provider aufgerufen, nicht direkt vom Frontend. Tauscht `code` gegen ein `id_token`, verifiziert es, löst es auf einen `User` auf (neu angelegt nach demselben Erster-Nutzer-wird-Admin/Freischaltungs-Gate wie `POST /auth/register`, oder — bei vorhandener Mail-Adresse — mit einem bestehenden Account verknüpft) und `307`-redirected mit den ausgestellten Tokens **im URL-Fragment** zu `OIDC_FRONTEND_CALLBACK_URL`: `#access_token=...&refresh_token=...` (Fragment, nicht Query-String — landet dadurch in keinem Server-/Proxy-Log).
-Fehler: `404 sso_not_configured`, `401 invalid_sso_state` (abgelaufener/manipulierter `state`), `502 sso_error` (Provider nicht erreichbar oder `id_token` ungültig), plus dieselben `403 registration_closed`/`registration_pending`/`registration_declined` wie Registrierung/Login.
+Vom Provider aufgerufen, nicht direkt vom Frontend. Tauscht `code` gegen ein `id_token` und verifiziert es. Zwei Flows, je nachdem was in `state` steckt:
+- **Login** (`state` ohne verknüpftes Konto, von `/auth/sso/login`): löst die Claims auf einen `User` auf (neu angelegt nach demselben Erster-Nutzer-wird-Admin/Freischaltungs-Gate wie `POST /auth/register`, oder — bei vorhandener Mail-Adresse — mit einem bestehenden Account verknüpft) und `307`-redirected mit den ausgestellten Tokens **im URL-Fragment** zu `OIDC_FRONTEND_CALLBACK_URL`: `#access_token=...&refresh_token=...` (Fragment, nicht Query-String — landet dadurch in keinem Server-/Proxy-Log).
+- **Link** (`state` von `/auth/sso/link`): verknüpft die SSO-Identität mit dem Konto aus `state`, `307`-redirected ohne Tokens zu `OIDC_FRONTEND_CALLBACK_URL?linked=1` (die bestehende Session bleibt unverändert).
+
+Jeder Fehler (egal welcher Flow) wird **nicht** als JSON-Body zurückgegeben, sondern ebenfalls per `307` zu `OIDC_FRONTEND_CALLBACK_URL?error={code}&message={text}` redirected (bei einem fehlgeschlagenen Link-Flow zusätzlich `&context=link`) — am Ende einer Browser-Redirect-Kette würde ein JSON-Body ungelesen bleiben; das Frontend rendert daraus stattdessen einen echten Fehlerbildschirm (`web/src/app/sso-callback/page.tsx`). Mögliche `code`-Werte: `sso_not_configured`, `invalid_sso_state` (abgelaufener/manipulierter `state`), `sso_error` (Provider nicht erreichbar oder `id_token` ungültig — serverseitig auch als `WARNING` geloggt), `sso_identity_already_linked` (nur Link-Flow: diese SSO-Identität gehört schon zu einem anderen Konto), plus dieselben `registration_closed`/`registration_pending`/`registration_declined` wie Registrierung/Login (nur Login-Flow).
 
 ## Geräte
 

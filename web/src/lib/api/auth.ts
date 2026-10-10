@@ -29,3 +29,15 @@ export function ssoStatus(): Promise<{ enabled: boolean }> {
 // Full-page navigation target, not a fetch() call - the backend 307-redirects the browser
 // itself to the SSO provider's own login page (see app/api/sso.py).
 export const SSO_LOGIN_URL = `${API_BASE_URL}/auth/sso/login`;
+
+// Unlike SSO_LOGIN_URL, GET /auth/sso/link needs the caller's Authorization header (it's the
+// account to link), which only survives a fetch() call, not a full-page navigation - so this
+// returns the provider's authorization URL as JSON, and the caller does the navigation itself
+// (see AccountTab.tsx).
+export function ssoLinkUrl(): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>("/auth/sso/link");
+}
+
+export function ssoUnlink(): Promise<void> {
+  return apiFetch<void>("/auth/sso/link", { method: "DELETE" });
+}

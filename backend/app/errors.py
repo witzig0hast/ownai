@@ -123,6 +123,11 @@ class SsoError(APIError):
         super().__init__(502, "sso_error", message)
 
 
+class SsoIdentityAlreadyLinked(APIError):
+    def __init__(self, message: str = "Diese SSO-Identität ist bereits mit einem anderen Konto verknüpft."):
+        super().__init__(409, "sso_identity_already_linked", message)
+
+
 class LlmUnavailable(APIError):
     def __init__(
         self,

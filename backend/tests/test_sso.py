@@ -23,6 +23,16 @@ def _configure_sso(monkeypatch, **overrides):
         monkeypatch.setattr(settings, key, value)
 
 
+def _redirect_params(response) -> dict[str, str]:
+    """GET /auth/sso/callback always redirects (see app/api/sso.py) - success carries tokens in
+    the fragment, failure carries error=/message=[/context=] in the query string. Flattens
+    whichever one's present into a single dict of first-values for easy assertions."""
+    location = urlparse(response.headers["location"])
+    params = parse_qs(location.query)
+    params.update(parse_qs(location.fragment))
+    return {k: v[0] for k, v in params.items()}
+
+
 def _generate_rsa_keypair():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     return private_key, private_key.public_key()
@@ -174,11 +184,45 @@ async def test_sso_login_redirects_to_provider_with_state_and_nonce(client: Asyn
     assert "nonce" in params
 
 
+async def test_sso_link_requires_auth(client: AsyncClient, monkeypatch):
+    _configure_sso(monkeypatch)
+    response = await client.get("/auth/sso/link")
+    assert response.status_code == 401
+
+
+async def test_sso_link_returns_404_when_not_configured(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/auth/sso/link", headers=auth_headers)
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "sso_not_configured"
+
+
+async def test_sso_link_returns_authorization_url_with_state(client: AsyncClient, auth_headers: dict, monkeypatch):
+    _configure_sso(monkeypatch)
+
+    async def fake_discovery():
+        return {
+            "authorization_endpoint": "https://auth.example.com/authorize",
+            "token_endpoint": "https://auth.example.com/token",
+            "jwks_uri": "https://auth.example.com/jwks",
+        }
+
+    monkeypatch.setattr(sso_service, "_discovery_document", fake_discovery)
+
+    response = await client.get("/auth/sso/link", headers=auth_headers)
+    assert response.status_code == 200
+    location = urlparse(response.json()["url"])
+    params = parse_qs(location.query)
+    assert params["client_id"] == ["ownai-client"]
+    assert "state" in params
+
+
 async def test_sso_callback_rejects_invalid_state(client: AsyncClient, monkeypatch):
     _configure_sso(monkeypatch)
     response = await client.get("/auth/sso/callback", params={"code": "abc", "state": "not-a-real-token"})
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "invalid_sso_state"
+    assert response.status_code == 307
+    params = _redirect_params(response)
+    assert params["error"] == "invalid_sso_state"
+    assert "context" not in params
 
 
 async def test_sso_callback_bootstraps_first_user_as_admin(client: AsyncClient, monkeypatch):
@@ -195,17 +239,17 @@ async def test_sso_callback_bootstraps_first_user_as_admin(client: AsyncClient, 
     assert response.status_code == 307
     location = response.headers["location"]
     assert location.startswith("https://ownai.example.com/sso-callback#")
-    fragment = urlparse(location).fragment
-    params = parse_qs(fragment)
-    assert "access_token" in params
+    params = _redirect_params(response)
+    access_token = params["access_token"]
     assert "refresh_token" in params
 
-    me = await client.get("/users/me", headers={"Authorization": f"Bearer {params['access_token'][0]}"})
+    me = await client.get("/users/me", headers={"Authorization": f"Bearer {access_token}"})
     assert me.status_code == 200
     body = me.json()
     assert body["email"] == "karim@example.com"
     assert body["is_admin"] is True
     assert body["approval_status"] == "approved"
+    assert body["sso_linked"] is True
 
 
 async def test_sso_callback_second_user_starts_pending(client: AsyncClient, auth_headers: dict, monkeypatch):
@@ -219,8 +263,8 @@ async def test_sso_callback_second_user_starts_pending(client: AsyncClient, auth
     monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange)
 
     response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "registration_pending"
+    assert response.status_code == 307
+    assert _redirect_params(response)["error"] == "registration_pending"
 
     pending = await client.get("/admin/users/pending", headers=auth_headers)
     assert any(u["email"] == "other@example.com" for u in pending.json()["users"])
@@ -239,8 +283,7 @@ async def test_sso_callback_links_existing_password_account_by_email(
 
     response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
     assert response.status_code == 307
-    fragment = urlparse(response.headers["location"]).fragment
-    access_token = parse_qs(fragment)["access_token"][0]
+    access_token = _redirect_params(response)["access_token"]
 
     me = await client.get("/users/me", headers={"Authorization": f"Bearer {access_token}"})
     assert me.status_code == 200
@@ -265,8 +308,85 @@ async def test_sso_callback_respects_registration_closed(client: AsyncClient, au
     monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange)
 
     response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "registration_closed"
+    assert response.status_code == 307
+    assert _redirect_params(response)["error"] == "registration_closed"
+
+
+async def test_sso_callback_links_account_via_link_flow(client: AsyncClient, auth_headers: dict, monkeypatch):
+    """The explicit "Konto verknüpfen" flow from Settings (AccountTab.tsx): the state token
+    carries link_user_id, so the callback must attach the SSO identity to that specific account
+    and redirect with ?linked=1 - no tokens issued, the user's existing session is untouched."""
+    _configure_sso(monkeypatch)
+    me_before = await client.get("/users/me", headers=auth_headers)
+    user_id = me_before.json()["id"]
+    assert me_before.json()["sso_linked"] is False
+
+    state = create_sso_state_token("the-nonce", link_user_id=user_id)
+
+    async def fake_exchange(code, *, nonce):  # noqa: ARG001
+        return {"sub": "oidc-subject-999", "email": "completely-different@example.com"}
+
+    monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange)
+
+    response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
+    assert response.status_code == 307
+    assert response.headers["location"] == "https://ownai.example.com/sso-callback?linked=1"
+
+    me_after = await client.get("/users/me", headers=auth_headers)
+    assert me_after.json()["sso_linked"] is True
+    assert me_after.json()["email"] == "karim@example.com"  # unchanged - only oidc_subject was set
+
+    users = await client.get("/admin/users", headers=auth_headers)
+    assert len(users.json()["users"]) == 1  # no second account was created
+
+
+async def test_sso_callback_link_flow_rejects_identity_already_linked_elsewhere(
+    client: AsyncClient, auth_headers: dict, monkeypatch
+):
+    _configure_sso(monkeypatch)
+
+    # A second, already-SSO-linked account via the normal login flow.
+    state1 = create_sso_state_token("nonce-1")
+
+    async def fake_exchange_1(code, *, nonce):  # noqa: ARG001
+        return {"sub": "oidc-subject-other", "email": "someoneelse@example.com"}
+
+    monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange_1)
+    first_response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state1})
+    # Still pending approval (auth_headers' user already took the first-user-is-admin slot) - the
+    # account, and its oidc_subject, were nonetheless already persisted (see
+    # sso_service.resolve_or_create_user), which is exactly what's being linked against below.
+    assert _redirect_params(first_response)["error"] == "registration_pending"
+
+    # Now the original (password) user tries to link that same already-claimed SSO identity.
+    me = await client.get("/users/me", headers=auth_headers)
+    state2 = create_sso_state_token("nonce-2", link_user_id=me.json()["id"])
+
+    async def fake_exchange_2(code, *, nonce):  # noqa: ARG001
+        return {"sub": "oidc-subject-other", "email": "someoneelse@example.com"}
+
+    monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange_2)
+    response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state2})
+    params = _redirect_params(response)
+    assert params["error"] == "sso_identity_already_linked"
+    assert params["context"] == "link"
+
+
+async def test_sso_unlink_clears_oidc_subject(client: AsyncClient, auth_headers: dict, monkeypatch):
+    _configure_sso(monkeypatch)
+    me = await client.get("/users/me", headers=auth_headers)
+    state = create_sso_state_token("the-nonce", link_user_id=me.json()["id"])
+
+    async def fake_exchange(code, *, nonce):  # noqa: ARG001
+        return {"sub": "oidc-subject-123", "email": "someone@example.com"}
+
+    monkeypatch.setattr(sso_service, "exchange_code_for_claims", fake_exchange)
+    await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
+    assert (await client.get("/users/me", headers=auth_headers)).json()["sso_linked"] is True
+
+    response = await client.delete("/auth/sso/link", headers=auth_headers)
+    assert response.status_code == 204
+    assert (await client.get("/users/me", headers=auth_headers)).json()["sso_linked"] is False
 
 
 async def test_exchange_code_for_claims_wrong_issuer_names_both_values(monkeypatch):
@@ -311,8 +431,8 @@ async def test_exchange_code_for_claims_wrong_issuer_names_both_values(monkeypat
 
 async def test_sso_callback_logs_sso_error_server_side(client: AsyncClient, monkeypatch, caplog):
     """A 5xx APIError like SsoError is otherwise only visible as a JSON body at the end of a
-    browser redirect chain - app/main.py's api_error_handler must also log it, so the real cause
-    (provider unreachable, bad id_token, ...) shows up directly in `docker compose logs backend`."""
+    browser redirect chain - the callback must also log it, so the real cause (provider
+    unreachable, bad id_token, ...) shows up directly in `docker compose logs backend`."""
     _configure_sso(monkeypatch)
     state = create_sso_state_token("the-nonce")
 
@@ -324,8 +444,9 @@ async def test_sso_callback_logs_sso_error_server_side(client: AsyncClient, monk
     with caplog.at_level(logging.WARNING):
         response = await client.get("/auth/sso/callback", params={"code": "abc", "state": state})
 
-    assert response.status_code == 502
-    assert response.json()["error"]["code"] == "sso_error"
+    params = _redirect_params(response)
+    assert params["error"] == "sso_error"
+    assert "SSO-Provider nicht erreichbar: boom" in params["message"]
     assert any("SSO-Provider nicht erreichbar: boom" in record.message for record in caplog.records)
 
 
@@ -338,5 +459,5 @@ async def test_sso_callback_rejects_invalid_state_without_logging(client: AsyncC
     with caplog.at_level(logging.WARNING):
         response = await client.get("/auth/sso/callback", params={"code": "abc", "state": "not-a-real-token"})
 
-    assert response.status_code == 401
+    assert _redirect_params(response)["error"] == "invalid_sso_state"
     assert caplog.records == []
