@@ -26,6 +26,9 @@ def _generate_rsa_keypair():
     return private_key, private_key.public_key()
 
 
+TEST_KID = "test-key-1"
+
+
 def _sign_id_token(private_key, **claim_overrides) -> str:
     claims = {
         "sub": "oidc-subject-123",
@@ -36,31 +39,25 @@ def _sign_id_token(private_key, **claim_overrides) -> str:
         "nonce": "the-nonce",
     }
     claims.update(claim_overrides)
-    return pyjwt.encode(claims, private_key, algorithm="RS256")
+    return pyjwt.encode(claims, private_key, algorithm="RS256", headers={"kid": TEST_KID})
 
 
-def _patch_jwk_client(monkeypatch, public_key):
-    class _FakeSigningKey:
-        def __init__(self, key):
-            self.key = key
-
-    class _FakeJwkClient:
-        def __init__(self, jwks_uri):  # noqa: ARG002
-            pass
-
-        def get_signing_key_from_jwt(self, token):  # noqa: ARG002
-            return _FakeSigningKey(public_key)
-
-    monkeypatch.setattr(sso_service.jwt, "PyJWKClient", _FakeJwkClient)
+def _build_jwks(public_key) -> dict:
+    """A JWKS document (see sso_service._fetch_jwks's return shape) containing just the one
+    public key, built the same way a real OIDC provider's own JWKS endpoint would describe it."""
+    jwk_dict = pyjwt.algorithms.RSAAlgorithm.to_jwk(public_key, as_dict=True)
+    jwk_dict["kid"] = TEST_KID
+    jwk_dict["use"] = "sig"
+    jwk_dict["alg"] = "RS256"
+    return {"keys": [jwk_dict]}
 
 
 def test_verify_id_token_accepts_a_validly_signed_token(monkeypatch):
     _configure_sso(monkeypatch)
     private_key, public_key = _generate_rsa_keypair()
-    _patch_jwk_client(monkeypatch, public_key)
 
     token = _sign_id_token(private_key)
-    claims = sso_service._verify_id_token(token, "https://auth.example.com/jwks")
+    claims = sso_service._verify_id_token(token, _build_jwks(public_key))
 
     assert claims["sub"] == "oidc-subject-123"
     assert claims["email"] == "karim@example.com"
@@ -69,32 +66,58 @@ def test_verify_id_token_accepts_a_validly_signed_token(monkeypatch):
 def test_verify_id_token_rejects_wrong_audience(monkeypatch):
     _configure_sso(monkeypatch)
     private_key, public_key = _generate_rsa_keypair()
-    _patch_jwk_client(monkeypatch, public_key)
 
     token = _sign_id_token(private_key, aud="someone-elses-client")
     with pytest.raises(pyjwt.PyJWTError):
-        sso_service._verify_id_token(token, "https://auth.example.com/jwks")
+        sso_service._verify_id_token(token, _build_jwks(public_key))
 
 
 def test_verify_id_token_rejects_wrong_issuer(monkeypatch):
     _configure_sso(monkeypatch)
     private_key, public_key = _generate_rsa_keypair()
-    _patch_jwk_client(monkeypatch, public_key)
 
     token = _sign_id_token(private_key, iss="https://not-my-provider.example.com")
     with pytest.raises(pyjwt.PyJWTError):
-        sso_service._verify_id_token(token, "https://auth.example.com/jwks")
+        sso_service._verify_id_token(token, _build_jwks(public_key))
 
 
 def test_verify_id_token_rejects_signature_from_a_different_key(monkeypatch):
     _configure_sso(monkeypatch)
     _, real_public_key = _generate_rsa_keypair()
     attacker_private_key, _ = _generate_rsa_keypair()
-    _patch_jwk_client(monkeypatch, real_public_key)
 
     forged_token = _sign_id_token(attacker_private_key)
     with pytest.raises(pyjwt.PyJWTError):
-        sso_service._verify_id_token(forged_token, "https://auth.example.com/jwks")
+        sso_service._verify_id_token(forged_token, _build_jwks(real_public_key))
+
+
+def test_verify_id_token_rejects_unknown_kid(monkeypatch):
+    """No key in the JWKS matches the token's kid, and there's more than one key to guess from -
+    must be a clear SsoError, not an obscure KeyError/AttributeError."""
+    _configure_sso(monkeypatch)
+    private_key, public_key = _generate_rsa_keypair()
+    _, other_public_key = _generate_rsa_keypair()
+
+    jwks = _build_jwks(public_key)
+    other_jwk = pyjwt.algorithms.RSAAlgorithm.to_jwk(other_public_key, as_dict=True)
+    other_jwk["kid"] = "a-different-key"
+    jwks["keys"].append(other_jwk)
+
+    token = pyjwt.encode(
+        {
+            "sub": "oidc-subject-123",
+            "email": "karim@example.com",
+            "aud": "ownai-client",
+            "iss": "https://auth.example.com",
+            "nonce": "the-nonce",
+        },
+        private_key,
+        algorithm="RS256",
+        headers={"kid": "yet-another-unknown-key"},
+    )
+
+    with pytest.raises(sso_service.SsoError):
+        sso_service._verify_id_token(token, jwks)
 
 
 async def test_sso_status_reflects_configuration(client: AsyncClient, monkeypatch):

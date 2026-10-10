@@ -1,4 +1,3 @@
-import asyncio
 import secrets
 from typing import Any
 from urllib.parse import urlencode
@@ -17,8 +16,16 @@ from app.services import admin_service
 
 def _client() -> httpx.AsyncClient:
     """Separate factory purely so tests can monkeypatch it - same pattern as the other external
-    services (weather_service._client, home_assistant_service._client, ...)."""
-    return httpx.AsyncClient(timeout=10.0)
+    services (weather_service._client, home_assistant_service._client, ...).
+
+    local_address="0.0.0.0" forces outbound connections over IPv4 only - the same fix already
+    needed for SMTP (email_service._connect_ipv4) and IMAP (same file): this container can carry
+    a non-routable IPv6 address on its interface, and without this, a connection to a host whose
+    DNS has an AAAA record tries IPv6 first and hangs/fails - even though IPv4 would work fine.
+    Binding the local socket to the IPv4 wildcard address rules out IPv6 the same way those two
+    did by restricting getaddrinfo() to AF_INET."""
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+    return httpx.AsyncClient(timeout=10.0, transport=transport)
 
 
 def is_configured() -> bool:
@@ -67,14 +74,35 @@ async def authorization_url(*, state: str, nonce: str) -> str:
     return f"{discovery['authorization_endpoint']}?{urlencode(params)}"
 
 
-def _verify_id_token(id_token: str, jwks_uri: str) -> dict[str, Any]:
-    """Blocking (PyJWKClient does its own synchronous HTTP fetch of the signing keys, cached
-    internally) - called via asyncio.to_thread, see exchange_code_for_claims."""
+async def _fetch_jwks(jwks_uri: str) -> dict[str, Any]:
+    async with _client() as client:
+        try:
+            response = await client.get(jwks_uri)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise SsoError(f"Signaturschlüssel (JWKS) nicht abrufbar: {exc}") from exc
+    return response.json()
+
+
+def _verify_id_token(id_token: str, jwks: dict[str, Any]) -> dict[str, Any]:
+    """Finds the matching key in an already-fetched JWKS document (see _fetch_jwks - fetched
+    through our own IPv4-forced client, not PyJWT's built-in PyJWKClient, which does its own
+    separate, un-forced network fetch and would reintroduce exactly the IPv6-hang risk _client()
+    above exists to avoid) and verifies the token's signature/audience/issuer against it."""
     settings = get_settings()
-    signing_key = jwt.PyJWKClient(jwks_uri).get_signing_key_from_jwt(id_token)
+    kid = jwt.get_unverified_header(id_token).get("kid")
+    keys = jwks.get("keys", [])
+    matching_jwk = next((k for k in keys if k.get("kid") == kid), None)
+    if matching_jwk is None and len(keys) == 1:
+        # Some providers omit "kid" entirely when they only ever sign with one key.
+        matching_jwk = keys[0]
+    if matching_jwk is None:
+        raise SsoError("Kein passender Signaturschlüssel beim SSO-Provider gefunden (kid-Mismatch).")
+
+    signing_key = jwt.PyJWK(matching_jwk).key
     return jwt.decode(
         id_token,
-        signing_key.key,
+        signing_key,
         algorithms=["RS256", "ES256"],
         audience=settings.oidc_client_id,
         issuer=(settings.oidc_issuer_url or "").rstrip("/"),
@@ -105,8 +133,9 @@ async def exchange_code_for_claims(code: str, *, nonce: str) -> dict[str, Any]:
     if not id_token:
         raise SsoError("SSO-Provider hat kein id_token zurückgegeben (scope 'openid' fehlt?).")
 
+    jwks = await _fetch_jwks(discovery["jwks_uri"])
     try:
-        claims = await asyncio.to_thread(_verify_id_token, id_token, discovery["jwks_uri"])
+        claims = _verify_id_token(id_token, jwks)
     except jwt.PyJWTError as exc:
         raise SsoError(f"id_token ungültig: {exc}") from exc
 
