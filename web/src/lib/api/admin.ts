@@ -32,3 +32,17 @@ export async function setUserApproval(
   });
   return data.users;
 }
+
+export interface DependencyStatus {
+  key: string;
+  label: string;
+  status: "ok" | "error" | "not_configured";
+  detail: string | null;
+  optional: boolean;
+  latency_ms: number | null;
+}
+
+export async function getSystemStatus(): Promise<DependencyStatus[]> {
+  const data = await apiFetch<{ dependencies: DependencyStatus[] }>("/admin/system-status");
+  return data.dependencies;
+}

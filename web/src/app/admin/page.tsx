@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { SystemStatusCard } from "@/components/admin/SystemStatusCard";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { PageHeader } from "@/components/PageHeader";
@@ -112,6 +113,8 @@ function AdminContent() {
   return (
     <div className="flex flex-col gap-6">
       <ErrorMessage message={error} />
+
+      <SystemStatusCard />
 
       <section className="animate-fade-in-up rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800">
         <h2 className="mb-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Registrierung</h2>

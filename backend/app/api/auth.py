@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import rate_limit
 from app.auth.dependencies import get_current_user
 from app.auth.security import (
     create_access_token,
@@ -74,11 +75,18 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/auth/login", response_model=TokenPair)
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenPair:
+async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)) -> TokenPair:
+    ip = rate_limit.client_ip(request)
+    # Checked before the password, so a locked-out caller can't keep probing - and regardless of
+    # whether the email exists, so the 429 itself doesn't reveal which accounts are real.
+    rate_limit.check_allowed(payload.email, ip)
+
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):
+        rate_limit.record_failure(payload.email, ip)
         raise InvalidCredentials()
+    rate_limit.record_success(payload.email, ip)
     # Checked after the password, not before: don't reveal approval status to someone who
     # doesn't actually know the password.
     if user.approval_status == "pending":

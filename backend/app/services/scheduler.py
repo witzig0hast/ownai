@@ -199,6 +199,10 @@ def start_scheduler() -> AsyncIOScheduler:
     return scheduler
 
 
+def is_running() -> bool:
+    return _scheduler is not None and _scheduler.running
+
+
 def stop_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:

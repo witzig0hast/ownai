@@ -23,6 +23,17 @@ class EmailTaken(APIError):
         super().__init__(409, "email_taken", message)
 
 
+class TooManyLoginAttempts(APIError):
+    def __init__(self, retry_after_seconds: int):
+        minutes = max(1, (retry_after_seconds + 59) // 60)
+        super().__init__(
+            429,
+            "too_many_login_attempts",
+            f"Zu viele fehlgeschlagene Anmeldeversuche. Bitte in {minutes} Minute(n) erneut versuchen.",
+        )
+        self.retry_after_seconds = retry_after_seconds
+
+
 class NotAuthenticated(APIError):
     def __init__(self, message: str = "Nicht authentifiziert."):
         super().__init__(401, "not_authenticated", message)

@@ -75,7 +75,13 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
         # showing directly. Without this, diagnosing e.g. an SSO callback failure meant digging
         # the JSON error body out of a browser's redirect chain instead of just reading the logs.
         logger.warning("%s %s -> %s %s: %s", request.method, request.url.path, exc.status_code, exc.code, exc.message)
-    return JSONResponse(status_code=exc.status_code, content={"error": {"code": exc.code, "message": exc.message}})
+    retry_after = getattr(exc, "retry_after_seconds", None)
+    headers = {"Retry-After": str(retry_after)} if retry_after is not None else None
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": exc.code, "message": exc.message}},
+        headers=headers,
+    )
 
 
 @app.exception_handler(HTTPException)

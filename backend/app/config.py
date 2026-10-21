@@ -86,6 +86,19 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
+    # Brute-force protection for POST /auth/login (see app/auth/rate_limit.py). Failed attempts
+    # are counted per (email, client IP) within a sliding window, plus a looser per-email cap
+    # across all IPs so a distributed guess run is throttled too.
+    login_max_failures: int = 5
+    login_max_failures_per_email: int = 20
+    login_failure_window_minutes: int = 15
+    # Header carrying the real client IP when running behind a reverse proxy / Cloudflare (e.g.
+    # "CF-Connecting-IP" or "X-Forwarded-For"). Unset means the TCP peer address is used - which
+    # behind Docker's bridge is the same gateway IP for everyone, so the per-IP limit then
+    # effectively becomes per-email. Only set this if that header is actually set by your proxy;
+    # a client could otherwise send it itself.
+    trusted_client_ip_header: str | None = None
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

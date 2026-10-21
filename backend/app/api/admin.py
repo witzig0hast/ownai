@@ -5,7 +5,8 @@ from app.auth.dependencies import require_admin
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.admin import AdminUsersListOut, AppSettingsOut, AppSettingsUpdateRequest, UserApprovalRequest
-from app.services import admin_service
+from app.services import admin_service, system_status_service
+from app.services.system_status_service import DependencyStatus
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -72,3 +73,11 @@ async def set_user_approval(
     # replace its list from the response, same shape as GET /admin/users/pending.
     users = await admin_service.list_pending_users(db)
     return AdminUsersListOut(users=users)
+
+
+@router.get("/system-status")
+async def system_status(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, list[DependencyStatus]]:
+    return {"dependencies": await system_status_service.collect(db)}

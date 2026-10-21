@@ -18,6 +18,9 @@ from app.main import app  # noqa: E402
 
 @pytest_asyncio.fixture(autouse=True)
 async def _reset_db():
+    from app.auth import rate_limit
+
+    rate_limit.reset()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
