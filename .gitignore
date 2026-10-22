@@ -35,3 +35,6 @@ mobile/ios/.swiftpm/
 *.swp
 .vscode/
 .idea/
+
+# --- Backups (enthalten .env-Kopie mit Geheimnissen) ---
+backups/
