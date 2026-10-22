@@ -99,8 +99,14 @@ async def _check_push() -> tuple[Status, str | None]:
 async def _check_sso() -> tuple[Status, str | None]:
     if not sso_service.is_configured():
         return "not_configured", None
-    discovery = await sso_service._discovery_document()
-    return "ok", discovery.get("issuer")
+    # Fetched fresh rather than via sso_service._discovery_document(), which caches the first
+    # successful response for the process lifetime and would keep reporting "ok" after the
+    # provider went down.
+    issuer = (get_settings().oidc_issuer_url or "").rstrip("/")
+    async with sso_service._client() as client:
+        response = await client.get(f"{issuer}/.well-known/openid-configuration")
+        response.raise_for_status()
+    return "ok", response.json().get("issuer")
 
 
 async def _check_scheduler() -> tuple[Status, str | None]:

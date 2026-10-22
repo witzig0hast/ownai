@@ -87,3 +87,19 @@ async def test_per_email_cap_applies_across_ips(client: AsyncClient, monkeypatch
 
     response = await _login(client, "wrong-password", headers={"CF-Connecting-IP": "203.0.113.99"})
     assert response.status_code == 429
+
+
+def test_stale_buckets_are_swept(monkeypatch):
+    """Guessing with endless random emails must not grow the counters forever."""
+    from app.auth import rate_limit
+
+    monkeypatch.setattr(rate_limit, "_SWEEP_THRESHOLD", 3)
+    clock = [1000.0]
+    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: clock[0])
+
+    for i in range(3):
+        rate_limit.record_failure(f"user{i}@example.com", "1.2.3.4")
+    clock[0] += get_settings().login_failure_window_minutes * 60 + 1
+    rate_limit.record_failure("fresh@example.com", "1.2.3.4")
+
+    assert set(rate_limit._failures_by_email) == {"fresh@example.com"}

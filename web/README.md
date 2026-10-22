@@ -158,12 +158,15 @@ the `{"error":{"code","message"}}` envelope).
   on `GET /devices` returning at least one `platform: "android"` device — a
   web-only account sees neither the nav link nor a confusing "always empty"
   page, just a short explanation instead.
-- **Settings** (`/settings`): a tabbed page (`src/app/settings/page.tsx`) — room to grow
-  as more per-user configuration gets added (the user explicitly asked for "alles
-  einstellen können" in one place). Currently fifteen tabs (Integrations, Kalender, E-Mail, Agent
-  Bus, Gedächtnis, Kontakte, Erinnerungen, Automatisierungen, Listen, Ausgaben, Wetter, News,
-  Web-Clipper, Agenten, Konto) via a `TAB_COMPONENTS` lookup map - the tab bar scrolls horizontally
-  on narrow screens rather than wrapping, since more tabs keep getting added:
+- **Settings / Einstellungen** (`/settings`, `src/app/settings/page.tsx`): sixteen tabs in four
+  groups (`GROUPS`: Verbindungen, Assistent, Persönliches, System), each with a one-line
+  description shown above the tab content. Desktop gets a grouped sidebar, phones a single
+  grouped `<select>` (a 16-pill horizontal scroller was unusable at phone width). The active tab
+  lives in the URL as `?tab=<key>` (read via `useSearchParams`, hence the `<Suspense>` wrapper
+  the production build requires), so the setup checklist, the help page and plain-text hints
+  inside tabs can deep-link to a tab - tab keys are therefore part of the contract with
+  `GET /users/me/setup-status`'s `settings_tab` and must stay stable even if labels change.
+  The `integrations` tab is labelled "Dienste" in the UI:
   - **Integrations** tab (`src/components/settings/IntegrationsTab.tsx`, the former
     `/integrations` page): a small grid of tiles (icon, name, status dot), one per
     connectable service — Calendar (CalDAV, `POST /integrations/caldav`), Home
@@ -298,7 +301,21 @@ the `{"error":{"code","message"}}` envelope).
     (`public/sw.js`), subscribes via the Push API and registers the subscription with the
     backend (`POST /push/subscribe`). States the iOS "must be installed to Home Screen"
     caveat directly in the UI.
-- **Admin** (`/admin`, only shown/reachable for `user.is_admin`): the first user ever to
+- **Setup checklist** (`src/components/SetupChecklist.tsx`): driven by
+  `GET /users/me/setup-status`, shown collapsed above the mic on `/voice` and expanded at the top
+  of `/settings` (re-fetched whenever the settings tab changes, so finishing a step ticks it off
+  without a reload). Each open item links to its settings tab or route. "Ausblenden" is
+  `PUT /users/me/setup-status {dismissed: true}` - server-side, so it's hidden on every device -
+  and the help page can bring it back. Disappears by itself once everything is done.
+- **Help** (`/help`, "Hilfe" in the nav): static explanations of every area (modes, what to ask,
+  memory, push, automations/agents, inbound mail + confirmations, clipper/RSS/agent bus, Android
+  suggestions, SSO and the login lockout, troubleshooting), linking into the matching settings
+  tabs. Admins additionally see a pointer to the system status and backups.
+- **Admin** (`/admin`, only shown/reachable for `user.is_admin`): the page opens with a **Systemstatus**
+  card (`src/components/admin/SystemStatusCard.tsx`, `GET /admin/system-status`): one row per
+  dependency (DB, Ollama incl. missing models, scheduler, Whisper, Kokoro, SMTP, push, SSO) with
+  a status dot, detail text and latency, plus a red banner if a non-optional one is down. Below
+  that: the first user ever to
   register becomes admin automatically (see `API.md`'s Admin section) and gets a toggle
   for open registration (`PATCH /admin/settings`), a global "pause the system" switch with
   an optional reason shown to users (blocks only `POST .../messages`, i.e. actual LLM

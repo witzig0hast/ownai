@@ -70,3 +70,26 @@ async def test_a_hanging_check_becomes_a_timeout_error(monkeypatch):
     result = await system_status_service._run("x", "X", True, never_returns)
     assert result.status == "error"
     assert "Zeitüberschreitung" in result.detail
+
+
+async def test_sso_check_is_live_not_cached(monkeypatch):
+    from app.services import sso_service
+
+    settings = get_settings()
+    for key, value in {
+        "oidc_issuer_url": "https://auth.example.com/application/o/ownai/",
+        "oidc_client_id": "c",
+        "oidc_client_secret": "s",
+        "oidc_redirect_uri": "https://x/cb",
+    }.items():
+        monkeypatch.setattr(settings, key, value)
+    # A stale cached discovery doc from an earlier successful login must not mask an outage.
+    monkeypatch.setattr(sso_service, "_discovery_cache", {"issuer": "cached"})
+
+    def down(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503)
+
+    monkeypatch.setattr(sso_service, "_client", lambda: httpx.AsyncClient(transport=httpx.MockTransport(down)))
+
+    result = await system_status_service._run("sso", "SSO", True, system_status_service._check_sso)
+    assert result.status == "error"

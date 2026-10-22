@@ -71,20 +71,22 @@ Erstmal **ohne Caddy**, direkt per IP:Port — reicht völlig zum Testen im eige
 docker compose up -d web
 ```
 
-Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen — du landest direkt auf dem neuen „Voice"-Screen (Live Talk); für den ersten Test reicht aber auch einfach eine Text-Nachricht im „Chat"-Tab. Das ist der erste echte End-to-End-Test des ganzen Systems.
+Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen — du landest direkt auf dem „Sprechen"-Screen (Live Talk) mit der Einrichtungs-Checkliste obendrüber; für den ersten Test reicht aber auch einfach eine Text-Nachricht im „Chat"-Tab. Das ist der erste echte End-to-End-Test des ganzen Systems.
 
-Live Talk (der Mikro-Kreis auf „Voice") braucht zusätzlich HTTPS oder `localhost` — siehe „Sprachsteuerung testen" weiter unten.
+Live Talk (der Mikro-Kreis auf „Sprechen") braucht zusätzlich HTTPS oder `localhost` — siehe „Sprachsteuerung testen" weiter unten.
+
+**Systemstatus prüfen:** Der erste registrierte Nutzer ist automatisch Admin. Unter „Admin → Systemstatus" siehst du live, ob Datenbank, Sprachmodell (inkl. Hinweis, welches Modell noch `ollama pull` braucht), Hintergrund-Jobs, Spracherkennung, Sprachausgabe, System-Mail, Push und SSO erreichbar bzw. eingerichtet sind — der schnellste Weg, Konfigurationsfehler zu finden.
 
 Falls etwas schiefgeht: `docker compose logs backend` bzw. `docker compose logs web`. Kommt beim Laden der Seite ein CORS-Fehler in der Browser-Konsole: `CORS_ORIGINS` in `.env` passt nicht zur URL, unter der du die Seite öffnest (siehe `.env.example`) — anpassen und `docker compose up -d backend` neu starten.
 
 ## 5. Kalender und Home Assistant verbinden (optional, aber empfohlen zum Testen)
 
-In der Web-App unter „Integrations" — einer Seite für alle Integrationen — deine echten Zugangsdaten eintragen:
+In der Web-App unter „Einstellungen → Dienste" deine echten Zugangsdaten eintragen (die Einrichtungs-Checkliste verlinkt direkt dorthin):
 
 - **Kalender**: CalDAV-URL, Benutzername, Passwort (Apple/Google/Nextcloud-CalDAV). Danach im Chat z. B. fragen: „Habe ich heute noch was vor?" — das testet den kompletten Tool-Calling-Pfad (LLM → Kalender-Tool → Antwort).
 - **Home Assistant**: URL deiner Home-Assistant-Instanz (z. B. `http://homeassistant.local:8123`) plus ein Long-Lived Access Token (in Home Assistant: Profil → unten „Long-Lived Access Tokens" → „Token erstellen"). Danach im Chat z. B. fragen: „Welche Geräte hab ich?" oder „Mach das Wohnzimmerlicht an" — testet den gleichen Tool-Calling-Pfad, nur mit den Home-Assistant-Tools. Wichtig: **jeder OwnAI-Nutzer verbindet seine eigene Home-Assistant-Instanz** — es gibt keine geteilte/globale Konfiguration.
 
-Falls du nicht weißt, wo du eine dieser Angaben findest, frag einfach den eingebauten Hilfe-Chat direkt auf der Integrations-Seite — der beantwortet genau solche Setup-Fragen.
+Falls du nicht weißt, wo du eine dieser Angaben findest, frag einfach den eingebauten Hilfe-Chat direkt auf der „Dienste"-Seite — der beantwortet genau solche Setup-Fragen.
 
 ## 6. Netzwerkzugriff für deine Geräte einrichten
 
@@ -144,15 +146,38 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 (USB-Debugging vorher aktivieren: Einstellungen → Über das Telefon → 7x auf „Build-Nummer" tippen → Entwickleroptionen → USB-Debugging.)
 
-App öffnen, einloggen, dann **„Notification access" gewähren**, wenn die App danach fragt — ohne diese Berechtigung liest sie keine Benachrichtigungen. Danach: eine WhatsApp-Nachricht mit einer Zeitangabe schicken lassen, kurz warten, in der Web-App unter „Suggestions" nachschauen, ob ein Terminvorschlag auftaucht — das testet den kompletten Notification-Pfad.
+App öffnen, einloggen, dann **„Notification access" gewähren**, wenn die App danach fragt — ohne diese Berechtigung liest sie keine Benachrichtigungen. Danach: eine WhatsApp-Nachricht mit einer Zeitangabe schicken lassen, kurz warten, in der Web-App unter „Vorschläge" nachschauen, ob ein Terminvorschlag auftaucht — das testet den kompletten Notification-Pfad.
 
 Details: [`mobile/android/README.md`](./mobile/android/README.md).
+
+## 9. Backups einrichten
+
+Datenbank (Unterhaltungen, Gedächtnis, Kontakte, Ausgaben, ...), vom Assistenten erzeugte Dateien und eine Kopie der `.env` sichern — die `.env` ist wichtig, weil gespeicherte Zugangsdaten (CalDAV, Home Assistant, SMTP/IMAP) mit einem aus `SECRET_KEY` abgeleiteten Schlüssel verschlüsselt sind:
+
+```bash
+scripts/backup.sh                    # -> ./backups/<zeitstempel>/
+scripts/backup.sh /mnt/nas/ownai     # oder auf ein anderes Laufwerk/NAS
+```
+
+Behält standardmäßig die 14 neuesten Sicherungen (`BACKUP_KEEP=30 scripts/backup.sh ...` für mehr). Täglich automatisch per `crontab -e`:
+
+```
+15 3 * * * /pfad/zu/ownai/scripts/backup.sh /mnt/nas/ownai >> /var/log/ownai-backup.log 2>&1
+```
+
+Wiederherstellen (überschreibt die aktuelle Datenbank, fragt vorher nach):
+
+```bash
+scripts/restore.sh backups/2026-10-22_031500
+```
+
+Das Sicherungsverzeichnis enthält mit `env.backup` alle Geheimnisse — entsprechend geschützt ablegen.
 
 ## Sprachsteuerung testen
 
 - **Android**: Mikrofon-Button im Chat antippen, „Notification access"-artige Berechtigungsabfrage für Mikrofon bestätigen (einmalig), kurz sprechen, Button erneut antippen — der erkannte Text landet im Eingabefeld zum Prüfen/Bearbeiten vor dem Senden. Antworten werden automatisch vorgelesen, wenn du „Vorlesen" oben rechts im Chat aktivierst (oder tippe das Lautsprecher-Symbol an einer einzelnen Antwort an).
-- **Web/PWA — „Voice" (Live Talk, vollautomatisch)**: der Mikro-Kreis-Screen, den du nach dem Login siehst. Einmal antippen zum Starten — danach läuft alles von selbst: sprechen, kurz Pause machen (~1,2s), die App transkribiert und schickt automatisch, die Antwort wird vorgelesen, danach hört sie automatisch wieder zu. Kein erneutes Antippen nötig, bis du auf „Beenden" tippst.
-- **Stimme auswählen**: klingt die Standardstimme deines Browsers/Betriebssystems schlecht (z. B. eine Piper/espeak-artige Offline-Stimme unter Linux), wähl unter „Stimme" auf dem Voice-Screen (oder im Chat-Fenster unten) eine andere aus der Liste — welche Stimmen zur Auswahl stehen, hängt vom Gerät/Browser ab. Auswahl wird gespeichert und danach überall angewendet, wo Antworten vorgelesen werden (Chat, Voice/Live Talk).
+- **Web/PWA — „Sprechen" (Live Talk, vollautomatisch)**: der Mikro-Kreis-Screen, den du nach dem Login siehst. Einmal antippen zum Starten — danach läuft alles von selbst: sprechen, kurz Pause machen (~1,2s), die App transkribiert und schickt automatisch, die Antwort wird vorgelesen, danach hört sie automatisch wieder zu. Kein erneutes Antippen nötig, bis du auf „Beenden" tippst.
+- **Stimme auswählen**: klingt die Standardstimme deines Browsers/Betriebssystems schlecht (z. B. eine Piper/espeak-artige Offline-Stimme unter Linux), wähl unter „Stimme" auf dem „Sprechen"-Screen (oder im Chat-Fenster unten) eine andere aus der Liste — welche Stimmen zur Auswahl stehen, hängt vom Gerät/Browser ab. Auswahl wird gespeichert und danach überall angewendet, wo Antworten vorgelesen werden (Chat, Voice/Live Talk).
 - **Web/PWA — Push-to-Talk im „Chat"-Tab**: Mikro-Button antippen → sprechen → nochmal antippen zum Stoppen → Text erscheint zur Kontrolle im Eingabefeld vor dem Senden. Eher für kurze, gezielte Nachrichten als für ein Gespräch.
 - **Beides (Web) braucht HTTPS oder `localhost`** — Browser blockieren Mikrofonzugriff auf normalem `http://<ip>:<port>`. Du brauchst also entweder Schritt 6's Caddy-Option (echte Domain + HTTPS) oder Zugriff direkt über `http://localhost:<WEB_PORT>` (z. B. per SSH-Portweiterleitung vom PC aus). Ohne HTTPS ist das kein Bug, sondern eine Browser-Sicherheitsregel — der Rest der Web-App funktioniert trotzdem ganz normal, nur die Mikro-Funktionen bleiben ausgeblendet/inaktiv.
 - Die Erkennung, wann du aufhörst zu reden (Live Talk), ist noch nicht an ein echtes Mikrofon/deinen Raum angepasst — falls Turns zu früh oder zu spät abgeschnitten werden, sag Bescheid, das lässt sich in `web/src/lib/useLiveTalk.ts` fein einstellen.
@@ -174,13 +199,15 @@ Im Chat oder per Voice einfach fragen, z. B. „Stell mir einen Timer auf 2 Minu
 - [ ] Modelle auf deiner bestehenden Ollama-Instanz gepullt, `curl localhost:11434/api/tags` erreichbar
 - [ ] `docker compose up -d postgres redis backend`, `/health` zeigt `"ollama":"ok"`
 - [ ] `docker compose up -d web`, Web-App im Browser getestet (Registrierung, Chat)
-- [ ] CalDAV unter „Integrations" verbunden, Kalender-Tool im Chat getestet
-- [ ] Home Assistant unter „Integrations" verbunden (eigene Instanz + Long-Lived Token), Geräte-Tool im Chat getestet
+- [ ] CalDAV unter „Einstellungen → Dienste" verbunden, Kalender-Tool im Chat getestet
+- [ ] Home Assistant unter „Einstellungen → Dienste" verbunden (eigene Instanz + Long-Lived Token), Geräte-Tool im Chat getestet
 - [ ] Bessere Stimme unter „Stimme" ausgewählt, falls die Standardstimme schlecht klingt
 - [ ] Tailscale auf Server + allen Geräten, `NEXT_PUBLIC_API_BASE_URL`/`CORS_ORIGINS` auf Tailscale-Adresse gesetzt, `web` neu gebaut
 - [ ] Web-App auf iPad und PC als App installiert
 - [ ] Android-App gebaut, per `adb install` aufs S25 Ultra, Notification-Zugriff gewährt, ein Vorschlag erfolgreich erzeugt
 - [ ] Sprachsteuerung getestet: Android-Mikrofon-Button + Vorlesen; Web nur falls HTTPS/localhost verfügbar
+- [ ] Systemstatus unter „Admin" komplett grün (bzw. Optionales bewusst „nicht eingerichtet")
+- [ ] `scripts/backup.sh` einmal ausgeführt und als Cronjob eingerichtet
 - [ ] Timer getestet: per Chat/Voice gestellt, Countdown-Badge im Web gesehen, Android-Benachrichtigung bei Ablauf bekommen
 
 Wenn du an einem Punkt hängen bleibst: einfach den Fehler/die Ausgabe hier reinkopieren, dann schauen wir's uns zusammen an.

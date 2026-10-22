@@ -22,6 +22,7 @@ ownai/
 │   ├── ollama/          Ollama-Setup-Doku für die P40
 │   ├── kokoro/          Setup-Doku für den optionalen neuralen TTS-Server
 │   └── searxng/         Setup-Doku für die optionale eigene SearXNG-Instanz (Web-Suche)
+├── scripts/            backup.sh / restore.sh (Datenbank, erzeugte Dateien, .env)
 ├── docker-compose.yml   Orchestriert postgres, redis, backend, web (+ optional caddy) —
 │                        Ollama läuft separat auf deinem Server, siehe infra/ollama/README.md
 └── .env.example
@@ -62,15 +63,33 @@ laufenden eigenen Reverse Proxy kollidiert).
 Details zur GPU/Modellwahl und wie OwnAI deine Ollama-Instanz erreicht: [`infra/ollama/README.md`](./infra/ollama/README.md).
 Backend-Entwicklung/Tests lokal ohne Docker: [`backend/README.md`](./backend/README.md).
 
-## Status dieses Durchgangs
+## Was drin ist
 
-Vollständiger Code-Stand über alle vier Bausteine (Backend, Web, Android, iPad) gemäß `CONCEPT.md`/`DECISIONS.md`.
+- **Sprechen** (Live Talk, freihändig) und **Chat** (Text, Bilder, Spracheingabe) mit drei Modi (Allgemein, Zuhause, Organisation)
+- Werkzeuge für Kalender (CalDAV), Home Assistant, Timer, Erinnerungen, Listen, Ausgaben, Kontakte, Wetter, Web-Suche (SearXNG), RSS, Dateien, E-Mail
+- **Gedächtnis** über Unterhaltungen hinweg, **Automatisierungen** (Home-Assistant-Regeln), dauerhafte **Agenten**, **Agent Bus** für externe Programme
+- **Eingehende E-Mails** mit Bestätigungspflicht für alles mit Folgen
+- Mehrbenutzer mit Admin-Freischaltung, optional **SSO** (beliebiger OIDC-Provider, z.B. Authentik), Login-Sperre gegen Passwort-Raten
+- Web-Push, Einrichtungs-Checkliste für neue Nutzer, Hilfe-Seite in der App
+- Admin: Registrierung/Freischaltung, System-Pause, **Systemstatus** aller Abhängigkeiten
+- Betrieb: `scripts/backup.sh` / `scripts/restore.sh`, Logs-Tab für Nutzer
 
-| Baustein | In dieser Session verifiziert | Noch zu tun bei dir |
+## Backups
+
+```bash
+scripts/backup.sh /mnt/nas/ownai     # Datenbank + erzeugte Dateien + .env, behält die 14 neuesten
+scripts/restore.sh /mnt/nas/ownai/<zeitstempel>
+```
+
+Details und Cronjob-Beispiel: [`GETTING_STARTED.md`](./GETTING_STARTED.md#9-backups-einrichten). Die `.env` gehört zwingend ins Backup — gespeicherte Zugangsdaten sind mit einem aus `SECRET_KEY` abgeleiteten Schlüssel verschlüsselt.
+
+## Stand
+
+| Baustein | Stand | Verifiziert |
 |---|---|---|
-| `backend/` | 15 Tests grün (Auth, Chat/Tool-Loop, Kalender, Notifications, gemockt), `ruff` sauber, echter `alembic upgrade head`-Lauf, App bootet und beantwortet `/health` | Einmal gegen echtes Ollama + echten CalDAV-Account testen |
-| `web/` | `npm run build` + `npm run lint` grün, dabei einen echten `docker-compose`-Bug gefunden/gefixt | `docker compose build web` einmal auf deiner Maschine (kein Docker-Daemon hier verfügbar) |
-| `mobile/android/` | Alle 41 Kotlin-Dateien klammerbalanciert, Paketdeklarationen geprüft, Gradle-Wrapper ist eine echte Gradle-8.9-Distribution, Abhängigkeits-IDs gegen Maven Central geprüft (soweit erreichbar) | Einmal in Android Studio öffnen und bauen (kein Android SDK hier verfügbar); `dl.google.com` war vom Netzwerk-Proxy dieser Session blockiert, d.h. die Google-Maven-Versionspins (Compose BOM, androidx.security etc.) sind plausibel, aber nicht live gegen das Repository verifiziert |
-| `mobile/ios/` | Alle Swift-Dateien klammerbalanciert, `project.yml` als YAML validiert, zwei echte Bugs beim Review gefunden und gefixt (nicht-optionaler `title`, großgeschriebene UUIDs in URL-Pfaden) | Einmal `xcodegen generate` + Xcode-Build (kein Xcode/Swift-Toolchain hier verfügbar) |
+| `backend/` | Voll ausgebaut, aktiv genutzt | 263 Tests grün, `ruff` sauber, Migrationen gegen frische DB geprüft, live gegen echtes Ollama/Authentik betrieben |
+| `web/` (PWA, auch fürs iPad) | Voll ausgebaut, **primärer Client** | `npm run build` + `lint` + `tsc` grün, live im Einsatz |
+| `mobile/android/` | Grundfunktionen: Chat, Kalender, Sprache, Timer-Alarme, Benachrichtigungs-Weiterleitung für „Vorschläge" | Seit den frühen Ausbaustufen nicht mitgezogen — SSO, Bestätigungen, Gedächtnis, Listen, Agenten usw. gibt es nur im Web. Für alles darüber hinaus die Web-App als PWA auf dem Handy installieren. In dieser Umgebung nie kompiliert (kein Android SDK) |
+| `mobile/ios/` | Eingefroren (siehe `DECISIONS.md` #7) | Das iPad nutzt die Web-App als PWA |
 
 Details und bewusste Scope-Cuts stehen jeweils in `backend/README.md`, `web/README.md`, `mobile/android/README.md`, `mobile/ios/README.md`.

@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/voice", label: "Sprechen" },
   { href: "/chat", label: "Chat" },
   { href: "/settings", label: "Einstellungen" },
+  { href: "/help", label: "Hilfe" },
 ];
 
 function Logo() {
@@ -100,7 +101,7 @@ export function NavBar() {
             onClick={logout}
             className="hidden rounded-full border border-zinc-300 px-4 py-1.5 text-sm font-medium text-zinc-700 transition-all hover:scale-105 hover:bg-zinc-100 sm:inline-block dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
-            Log out
+            Abmelden
           </button>
           <button
             type="button"
@@ -138,7 +139,7 @@ export function NavBar() {
             onClick={logout}
             className="mt-1 rounded-xl border border-zinc-300 px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
-            Log out
+            Abmelden
           </button>
         </nav>
       ) : null}

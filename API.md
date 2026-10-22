@@ -24,9 +24,11 @@ Jeder Nutzer außer dem allerersten startet mit `approval_status: "pending"` und
 ### `POST /auth/login`
 Request: `{ "email": string, "password": string }`
 Response `200`: `{ "access_token": string, "refresh_token": string, "token_type": "bearer", "expires_in": 900 }`
-Fehler: `401 invalid_credentials`, `403 registration_pending` (Registrierung wartet noch auf Admin-Freischaltung), `403 registration_declined` (Admin hat die Registrierung abgelehnt) — beide erst nach erfolgreicher Passwort-Prüfung geprüft, damit der Freischalt-Status keinem Angreifer ohne korrektes Passwort verraten wird
+Fehler: `401 invalid_credentials`, `429 too_many_login_attempts` (zu viele Fehlversuche, siehe unten), `403 registration_pending` (Registrierung wartet noch auf Admin-Freischaltung), `403 registration_declined` (Admin hat die Registrierung abgelehnt) — beide erst nach erfolgreicher Passwort-Prüfung geprüft, damit der Freischalt-Status keinem Angreifer ohne korrektes Passwort verraten wird
 
 Access-Token-TTL: 15 min. Refresh-Token-TTL: 30 Tage.
+
+**Schutz gegen Passwort-Raten:** Fehlversuche werden pro (E-Mail, Client-IP) gezählt (Standard: 5 in 15 min) plus eine lockerere Obergrenze pro E-Mail über alle IPs (Standard: 20). Darüber antwortet der Endpunkt mit `429 too_many_login_attempts` und `Retry-After`-Header (Sekunden) — auch bei richtigem Passwort, und unabhängig davon, ob die E-Mail existiert (verrät also keine Konten). Ein erfolgreicher Login setzt den Zähler für diese E-Mail+IP zurück. Grenzen und vertrauenswürdiger IP-Header (`TRUSTED_CLIENT_IP_HEADER`, z.B. `CF-Connecting-IP`) per `.env`.
 
 ### `POST /auth/refresh`
 Request: `{ "refresh_token": string }`
@@ -60,6 +62,15 @@ Vom Provider aufgerufen, nicht direkt vom Frontend. Tauscht `code` gegen ein `id
 - **Link** (`state` von `/auth/sso/link`): verknüpft die SSO-Identität mit dem Konto aus `state`, `307`-redirected ohne Tokens zu `OIDC_FRONTEND_CALLBACK_URL?linked=1` (die bestehende Session bleibt unverändert).
 
 Jeder Fehler (egal welcher Flow) wird **nicht** als JSON-Body zurückgegeben, sondern ebenfalls per `307` zu `OIDC_FRONTEND_CALLBACK_URL?error={code}&message={text}` redirected (bei einem fehlgeschlagenen Link-Flow zusätzlich `&context=link`) — am Ende einer Browser-Redirect-Kette würde ein JSON-Body ungelesen bleiben; das Frontend rendert daraus stattdessen einen echten Fehlerbildschirm (`web/src/app/sso-callback/page.tsx`). Mögliche `code`-Werte: `sso_not_configured`, `invalid_sso_state` (abgelaufener/manipulierter `state`), `sso_error` (Provider nicht erreichbar oder `id_token` ungültig — serverseitig auch als `WARNING` geloggt), `sso_identity_already_linked` (nur Link-Flow: diese SSO-Identität gehört schon zu einem anderen Konto), plus dieselben `registration_closed`/`registration_pending`/`registration_declined` wie Registrierung/Login (nur Login-Flow).
+
+### `GET /users/me/setup-status`  *(Bearer)*
+Einrichtungs-Checkliste für neue Nutzer.
+Response `200`: `{ "items": [ { "key": string, "title": string, "description": string, "settings_tab": string | null, "href": string | null, "done": bool } ], "completed": int, "total": int, "dismissed": bool }`
+
+`key`: `first_conversation`, `memory`, `calendar`, `email`, `home_assistant`, `web_search`, plus `push` (nur wenn VAPID auf dem Server konfiguriert ist) und `sso` (nur wenn SSO konfiguriert ist) — der Server bietet nur an, was auf ihm überhaupt möglich ist. `settings_tab` ist der `?tab=`-Wert der Web-Einstellungsseite, `href` eine App-Route; genau eins von beiden ist gesetzt.
+
+### `PUT /users/me/setup-status`  *(Bearer)*
+Request: `{ "dismissed": bool }` — Checkliste aus-/wieder einblenden (serverseitig gespeichert, gilt also auf allen Geräten). Response `200`: wie `GET`.
 
 ## Geräte
 
@@ -746,6 +757,12 @@ Response `200`: gleiche Form wie `GET /admin/users`, aber nur Nutzer mit `approv
 Request: `{ "approval_status": "approved" | "declined" }`
 Response `200`: gleiche Form wie `GET /admin/users/pending` — die aktualisierte (noch ausstehende) Liste, nicht nur der eine Nutzer.
 Fehler: `404 not_found`
+
+### `GET /admin/system-status`  *(Bearer, Admin)*
+Prüft live und parallel (je max. ~5 s) alle Abhängigkeiten.
+Response `200`: `{ "dependencies": [ { "key": string, "label": string, "status": "ok" | "error" | "not_configured", "detail": string | null, "optional": bool, "latency_ms": int | null } ] }`
+
+`key`: `database`, `ollama` (inkl. Prüfung, ob die konfigurierten Modelle gepullt sind — `detail` nennt dann den fehlenden `ollama pull`-Befehl), `scheduler`, `whisper`, `tts`, `smtp`, `push`, `sso`. `optional: false` heißt, ohne diesen Baustein funktioniert OwnAI insgesamt nicht; `not_configured` ist für optionale Bausteine kein Fehler.
 
 ## Logs
 

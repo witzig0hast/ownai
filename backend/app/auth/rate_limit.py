@@ -46,11 +46,24 @@ def check_allowed(email: str, ip: str) -> None:
             raise TooManyLoginAttempts(retry_after)
 
 
+_SWEEP_THRESHOLD = 5000
+
+
+def _sweep(buckets: dict, now: float, window: float) -> None:
+    # Guessing with many random emails would otherwise grow these dicts forever.
+    for key in [k for k, bucket in buckets.items() if not bucket or now - bucket[-1] > window]:
+        del buckets[key]
+
+
 def record_failure(email: str, ip: str) -> None:
     now = time.monotonic()
     email = email.lower()
     _failures_by_key.setdefault((email, ip), deque()).append(now)
     _failures_by_email.setdefault(email, deque()).append(now)
+    if len(_failures_by_key) > _SWEEP_THRESHOLD or len(_failures_by_email) > _SWEEP_THRESHOLD:
+        window = get_settings().login_failure_window_minutes * 60
+        _sweep(_failures_by_key, now, window)
+        _sweep(_failures_by_email, now, window)
 
 
 def record_success(email: str, ip: str) -> None:
