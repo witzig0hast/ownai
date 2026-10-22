@@ -156,7 +156,7 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto p-4">
-        <PageHeader title="Settings" />
+        <PageHeader title="Einstellungen" />
         <Suspense fallback={<p className="text-sm text-zinc-500">Lade...</p>}>
           <SettingsContent />
         </Suspense>

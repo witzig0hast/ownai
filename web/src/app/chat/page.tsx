@@ -143,14 +143,14 @@ function ConversationSidebar({
       }`}
     >
       <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
-        <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Conversations</h2>
+        <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Unterhaltungen</h2>
         <button
           type="button"
           onClick={onCreate}
           disabled={creating}
           className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-all hover:scale-105 hover:bg-zinc-700 hover:shadow-sm active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
         >
-          {creating ? "Creating..." : "+ New chat"}
+          {creating ? "Erstelle..." : "+ Neuer Chat"}
         </button>
       </div>
       <label className="flex items-center gap-1.5 border-b border-zinc-200 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
@@ -159,9 +159,9 @@ function ConversationSidebar({
       </label>
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? (
-          <p className="p-3 text-sm text-zinc-500">Loading...</p>
+          <p className="p-3 text-sm text-zinc-500">Lade...</p>
         ) : conversations.length === 0 ? (
-          <p className="p-3 text-sm text-zinc-500">No conversations yet. Start one above.</p>
+          <p className="p-3 text-sm text-zinc-500">Noch keine Unterhaltungen. Starte oben eine neue.</p>
         ) : (
           <ul className="space-y-0.5">
             {conversations.map((c, i) => (
@@ -180,7 +180,7 @@ function ConversationSidebar({
                   }`}
                 >
                   <span className="block truncate">
-                    {c.title || "Untitled conversation"}
+                    {c.title || "Unbenannte Unterhaltung"}
                     {c.archived ? " (archiviert)" : ""}
                   </span>
                   <span className="block truncate text-xs text-zinc-400">
@@ -417,7 +417,7 @@ export default function ChatPage() {
         }
       } catch (err) {
         if (cancelled) return;
-        setListError(err instanceof ApiError ? err.message : "Failed to load conversations.");
+        setListError(err instanceof ApiError ? err.message : "Unterhaltungen konnten nicht geladen werden.");
       } finally {
         if (!cancelled) setConversationsLoading(false);
       }
@@ -446,7 +446,7 @@ export default function ChatPage() {
         const updated = await chatApi.updateConversation(conversation.id, { skill });
         setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       } catch (err) {
-        setListError(err instanceof ApiError ? err.message : "Failed to switch skill.");
+        setListError(err instanceof ApiError ? err.message : "Modus konnte nicht gewechselt werden.");
       } finally {
         setSkillUpdating(false);
       }
@@ -469,7 +469,7 @@ export default function ChatPage() {
         if (!cancelled) setMessages(list);
       } catch (err) {
         if (!cancelled) {
-          setMessagesError(err instanceof ApiError ? err.message : "Failed to load messages.");
+          setMessagesError(err instanceof ApiError ? err.message : "Nachrichten konnten nicht geladen werden.");
         }
       } finally {
         if (!cancelled) setMessagesLoading(false);
@@ -503,7 +503,7 @@ export default function ChatPage() {
       setConversations((prev) => [conversation, ...prev]);
       setSelectedId(conversation.id);
     } catch (err) {
-      setListError(err instanceof ApiError ? err.message : "Failed to create conversation.");
+      setListError(err instanceof ApiError ? err.message : "Unterhaltung konnte nicht erstellt werden.");
     } finally {
       setCreatingConversation(false);
     }
@@ -524,7 +524,7 @@ export default function ChatPage() {
           setSelectedId(null);
         }
       } catch (err) {
-        setListError(err instanceof ApiError ? err.message : "Failed to update conversation.");
+        setListError(err instanceof ApiError ? err.message : "Unterhaltung konnte nicht aktualisiert werden.");
       }
     },
     [showArchived, selectedId],
@@ -542,7 +542,7 @@ export default function ChatPage() {
           setSelectedId(null);
         }
       } catch (err) {
-        setListError(err instanceof ApiError ? err.message : "Failed to delete conversation.");
+        setListError(err instanceof ApiError ? err.message : "Unterhaltung konnte nicht gelöscht werden.");
       }
     },
     [selectedId],
@@ -589,7 +589,7 @@ export default function ChatPage() {
         }
         if (autoRead) speak(assistantMessage.content);
       } catch (err) {
-        setSendError(err instanceof ApiError ? err.message : "Failed to send message.");
+        setSendError(err instanceof ApiError ? err.message : "Nachricht konnte nicht gesendet werden.");
       } finally {
         setSending(false);
       }
@@ -621,7 +621,7 @@ export default function ChatPage() {
 
           {!selectedId ? (
             <div className="flex flex-1 items-center justify-center p-8 text-sm text-zinc-500">
-              {conversationsLoading ? "Loading..." : "Select or start a conversation to begin."}
+              {conversationsLoading ? "Lade..." : "Wähle eine Unterhaltung aus oder starte eine neue."}
             </div>
           ) : (
             <>
@@ -633,7 +633,7 @@ export default function ChatPage() {
                 <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
                   <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Conversations
+                Unterhaltungen
               </button>
               {skills.length > 0 ? (
                 <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
@@ -668,10 +668,19 @@ export default function ChatPage() {
                 className="flex-1 space-y-3 overflow-y-auto p-4"
               >
                 {messagesLoading ? (
-                  <p className="text-sm text-zinc-500">Loading messages...</p>
+                  <p className="text-sm text-zinc-500">Lade Nachrichten...</p>
                 ) : (
                   <ErrorMessage message={messagesError} />
                 )}
+                {!messagesLoading && !messagesError && !sending && messages.length === 0 ? (
+                  <div className="mx-auto mt-8 max-w-sm text-center text-sm text-zinc-500">
+                    <p className="mb-2 font-medium text-zinc-700 dark:text-zinc-300">Neue Unterhaltung</p>
+                    <p>
+                      Frag z.B. &quot;Was steht diese Woche in meinem Kalender?&quot;, &quot;Merk dir, dass
+                      ich vegetarisch esse&quot; oder &quot;Erinnere mich morgen um 9 an den Arzttermin&quot;.
+                    </p>
+                  </div>
+                ) : null}
                 {messages.map((m) => (
                   <MessageBubble key={m.id} message={m} conversationId={selectedId} />
                 ))}

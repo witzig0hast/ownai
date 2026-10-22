@@ -85,7 +85,7 @@ export function CalendarTab() {
         if (err instanceof ApiError && err.code === "calendar_not_connected") {
           setNotConnected(true);
         } else {
-          setEventsError(err instanceof ApiError ? err.message : "Failed to load events.");
+          setEventsError(err instanceof ApiError ? err.message : "Termine konnten nicht geladen werden.");
         }
       })
       .finally(() => setEventsLoading(false));
@@ -112,7 +112,7 @@ export function CalendarTab() {
     e.preventDefault();
     setCreateError(null);
     if (!title || !start || !end) {
-      setCreateError("Title, start and end are required.");
+      setCreateError("Titel, Beginn und Ende sind Pflichtfelder.");
       return;
     }
     setCreating(true);
@@ -129,7 +129,7 @@ export function CalendarTab() {
       setEnd("");
       setLocation("");
     } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : "Failed to create event.");
+      setCreateError(err instanceof ApiError ? err.message : "Termin konnte nicht erstellt werden.");
     } finally {
       setCreating(false);
     }
@@ -152,7 +152,7 @@ export function CalendarTab() {
           <section className="flex-1 rounded-2xl border border-zinc-200 dark:border-zinc-800">
             <div className="flex flex-wrap items-end gap-3 border-b border-zinc-200 p-3 dark:border-zinc-800">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">From</span>
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">Von</span>
                 <input
                   type="date"
                   value={rangeStart}
@@ -161,7 +161,7 @@ export function CalendarTab() {
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">To</span>
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">Bis</span>
                 <input
                   type="date"
                   value={rangeEnd}
@@ -226,7 +226,7 @@ export function CalendarTab() {
                 <input
                   type="text"
                   required
-                  placeholder="Title"
+                  placeholder="Titel"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
@@ -253,7 +253,7 @@ export function CalendarTab() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Location (optional)"
+                  placeholder="Ort (optional)"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   className="rounded-xl border border-zinc-300 px-3 py-2 text-sm transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
@@ -264,7 +264,7 @@ export function CalendarTab() {
                   disabled={creating}
                   className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900"
                 >
-                  {creating ? "Creating..." : "Create event"}
+                  {creating ? "Erstelle..." : "Termin anlegen"}
                 </button>
               </form>
             </div>

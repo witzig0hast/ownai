@@ -40,7 +40,7 @@ export default function LoginPage() {
       await login(email, password);
       router.replace("/voice");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed. Please try again.");
+      setError(err instanceof ApiError ? err.message : "Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
     } finally {
       setSubmitting(false);
     }
@@ -50,12 +50,12 @@ export default function LoginPage() {
     <div className="flex flex-1 items-center justify-center overflow-y-auto p-4">
       <div className="animate-scale-in w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
         <h1 className="mb-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-          Log in to OwnAI
+          Bei OwnAI anmelden
         </h1>
-        <p className="mb-6 text-sm text-zinc-500">Your personal assistant, self-hosted.</p>
+        <p className="mb-6 text-sm text-zinc-500">Dein persönlicher Assistent, auf deinem eigenen Server.</p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">Email</span>
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">E-Mail</span>
             <input
               type="email"
               required
@@ -66,7 +66,7 @@ export default function LoginPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">Password</span>
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">Passwort</span>
             <input
               type="password"
               required
@@ -82,7 +82,7 @@ export default function LoginPage() {
             disabled={submitting}
             className="rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:scale-[1.03] hover:bg-zinc-700 hover:shadow active:scale-95 disabled:opacity-50 disabled:hover:scale-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
           >
-            {submitting ? "Logging in..." : "Log in"}
+            {submitting ? "Melde an..." : "Anmelden"}
           </button>
         </form>
         {ssoEnabled ? (
@@ -101,9 +101,9 @@ export default function LoginPage() {
           </>
         ) : null}
         <p className="mt-4 text-sm text-zinc-500">
-          No account yet?{" "}
+          Noch kein Konto?{" "}
           <Link href="/register" className="font-medium text-zinc-900 underline dark:text-zinc-100">
-            Register
+            Registrieren
           </Link>
         </p>
       </div>

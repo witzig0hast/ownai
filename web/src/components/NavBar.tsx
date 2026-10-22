@@ -9,9 +9,9 @@ import * as devicesApi from "@/lib/api/devices";
 import { useAuth } from "@/lib/auth-context";
 
 const LINKS = [
-  { href: "/voice", label: "Voice" },
+  { href: "/voice", label: "Sprechen" },
   { href: "/chat", label: "Chat" },
-  { href: "/settings", label: "Settings" },
+  { href: "/settings", label: "Einstellungen" },
 ];
 
 function Logo() {
@@ -54,7 +54,7 @@ export function NavBar() {
 
   const links = [
     ...LINKS.slice(0, 2),
-    ...(hasAndroidDevice ? [{ href: "/suggestions", label: "Suggestions" }] : []),
+    ...(hasAndroidDevice ? [{ href: "/suggestions", label: "Vorschläge" }] : []),
     ...LINKS.slice(2),
     ...(user?.is_admin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
