@@ -33,7 +33,7 @@ export default function SsoCallbackPage() {
       const errorCode = search.get("error");
       if (errorCode) {
         setError(search.get("message") || "Unbekannter Fehler.");
-        setBackHref(search.get("context") === "link" ? "/settings" : "/login");
+        setBackHref(search.get("context") === "link" ? "/settings?tab=account" : "/login");
         setStatus("error");
         return;
       }
@@ -73,7 +73,7 @@ export default function SsoCallbackPage() {
           <>
             <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
             <a href={backHref} className="text-sm font-medium text-zinc-900 underline dark:text-zinc-100">
-              {backHref === "/settings" ? "Zurück zu den Einstellungen" : "Zurück zum Login"}
+              {backHref.startsWith("/settings") ? "Zurück zu den Einstellungen" : "Zurück zum Login"}
             </a>
           </>
         ) : status === "linked" ? (
@@ -81,7 +81,7 @@ export default function SsoCallbackPage() {
             <p className="mb-4 text-sm text-zinc-900 dark:text-zinc-100">
               Konto erfolgreich mit SSO verknüpft.
             </p>
-            <a href="/settings" className="text-sm font-medium text-zinc-900 underline dark:text-zinc-100">
+            <a href="/settings?tab=account" className="text-sm font-medium text-zinc-900 underline dark:text-zinc-100">
               Zurück zu den Einstellungen
             </a>
           </>

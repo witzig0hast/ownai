@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import * as authApi from "@/lib/api/auth";
@@ -189,7 +190,11 @@ export function AccountTab() {
       <PushNotificationsCard />
       <SsoCard />
       <p className="mt-3 text-xs text-zinc-400">
-        Eine eigene E-Mail-Adresse für den Assistenten kannst du im Tab &quot;E-Mail&quot; hinterlegen.
+        Eine eigene E-Mail-Adresse für den Assistenten kannst du unter{" "}
+        <Link href="/settings?tab=email" className="underline">
+          E-Mail
+        </Link>{" "}
+        hinterlegen.
       </p>
     </div>
   );

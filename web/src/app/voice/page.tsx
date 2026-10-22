@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { SetupChecklist } from "@/components/SetupChecklist";
 import { VoicePicker } from "@/components/VoicePicker";
 import { useArtifactPanel } from "@/lib/artifactPanel";
 import { parseMessageContent } from "@/lib/parseMessageContent";
@@ -127,6 +128,7 @@ export default function VoicePage() {
   return (
     <AppShell>
       <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto p-8">
+        <SetupChecklist variant="voice" />
         {!isSupported ? (
           <ErrorMessage message="Live Talk braucht Mikrofonzugriff (getUserMedia) und Web Audio - dein Browser oder diese Verbindung unterstützt das nicht. Läuft die Seite über http:// statt https:// oder localhost, blockieren Browser den Mikrofonzugriff komplett." />
         ) : (

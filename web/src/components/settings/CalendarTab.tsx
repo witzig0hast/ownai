@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
@@ -183,7 +184,11 @@ export function CalendarTab() {
               <ErrorMessage message={eventsError} />
               {notConnected ? (
                 <p className="text-sm text-zinc-500">
-                  Kein Kalender verbunden. Verbinde ihn oben im Tab &quot;Integrations&quot;.
+                  Kein Kalender verbunden. Verbinde ihn unter{" "}
+                  <Link href="/settings?tab=integrations" className="underline">
+                    Dienste
+                  </Link>
+                  .
                 </p>
               ) : eventsLoading ? (
                 <p className="text-sm text-zinc-500">Loading...</p>

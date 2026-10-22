@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -40,6 +40,9 @@ class User(Base):
     # registration starts "pending" until an admin approves/declines it (app/api/admin.py).
     approval_status: Mapped[str] = mapped_column(String(16), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # Whether the user hid the "Einrichtung" checklist (see app/services/onboarding_service.py).
+    # Stored server-side rather than in the browser so hiding it once hides it on every device.
+    onboarding_dismissed: Mapped[bool] = mapped_column(default=False, server_default=false())
 
     @property
     def sso_linked(self) -> bool:
