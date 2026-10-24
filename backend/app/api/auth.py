@@ -25,7 +25,7 @@ from app.errors import (
     RegistrationDeclined,
     RegistrationPending,
 )
-from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair, UserOut
+from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair, UserOut, UserUpdateRequest
 from app.services import admin_service
 from app.utils import ensure_utc
 
@@ -115,4 +115,20 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -
 
 @router.get("/users/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)) -> User:
+    return user
+
+
+@router.patch("/users/me", response_model=UserOut)
+async def update_me(
+    payload: UserUpdateRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> User:
+    changes = payload.model_dump(exclude_unset=True)
+    if "home_city" in changes:
+        changes["home_city"] = (changes["home_city"] or "").strip() or None
+    for field, value in changes.items():
+        if value is None and field != "home_city":
+            continue
+        setattr(user, field, value)
+    await db.commit()
+    await db.refresh(user)
     return user

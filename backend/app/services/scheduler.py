@@ -13,6 +13,7 @@ from app.services import (
     contact_service,
     email_inbox_service,
     home_assistant_service,
+    overview_service,
     permanent_agent_service,
     push_service,
     reminder_service,
@@ -139,6 +140,41 @@ async def _check_automations() -> None:
         await db.commit()
 
 
+async def send_due_briefings(now: datetime) -> list[str]:
+    """Pushes the morning briefing (overview_service.briefing_text) to every user whose briefing
+    time is `now` (wall-clock, settings.timezone) and who hasn't had one today. Returns the ids of
+    the users it was sent to (for tests/logging). The push body is the full briefing text; tapping
+    it opens the Übersicht, which has a button to read it aloud."""
+    today_iso = now.date().isoformat()
+    sent: list[str] = []
+    async with async_session_maker() as db:
+        result = await db.execute(
+            select(User).where(
+                User.briefing_enabled.is_(True),
+                User.briefing_hour == now.hour,
+                User.briefing_minute == now.minute,
+            )
+        )
+        for user in result.scalars().all():
+            if user.briefing_last_sent_date == today_iso:
+                continue
+            user.briefing_last_sent_date = today_iso
+            try:
+                overview = await overview_service.build(db, user)
+                await push_service.send_push(
+                    db, user, title="Guten Morgen", body=overview_service.briefing_text(overview), url="/overview"
+                )
+                sent.append(user.id)
+            except Exception:  # noqa: BLE001 - one user's failure must not block the others
+                logger.exception("Failed to send morning briefing for user %s", user.id)
+        await db.commit()
+    return sent
+
+
+async def _send_morning_briefings() -> None:
+    await send_due_briefings(local_now())
+
+
 async def _run_permanent_agents() -> None:
     """Runs once a minute (see start_scheduler) and, for every due PermanentAgent (see
     permanent_agent_service.due_agents - "due" = never run, or its interval has elapsed since
@@ -194,6 +230,7 @@ def start_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(_check_expired_timers, "interval", seconds=15, id="expired_timers")
     scheduler.add_job(_check_birthdays, "cron", hour=8, minute=0, id="birthdays")
     scheduler.add_job(_check_recurring_reminders, "cron", second=0, id="recurring_reminders")
+    scheduler.add_job(_send_morning_briefings, "cron", second=5, id="morning_briefings")
     scheduler.add_job(_check_automations, "interval", seconds=30, id="automations")
     scheduler.add_job(_run_permanent_agents, "interval", seconds=60, id="permanent_agents")
     scheduler.add_job(_check_inbound_email, "interval", seconds=120, id="inbound_email")

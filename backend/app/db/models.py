@@ -43,6 +43,16 @@ class User(Base):
     # Whether the user hid the "Einrichtung" checklist (see app/services/onboarding_service.py).
     # Stored server-side rather than in the browser so hiding it once hides it on every device.
     onboarding_dismissed: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # Used for the weather card on the Übersicht and in the morning briefing (see
+    # app/services/overview_service.py) - free text, geocoded on use like any weather query.
+    home_city: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Morning briefing push (app/services/scheduler.py::_send_morning_briefings): wall-clock time
+    # in settings.timezone; briefing_last_sent_date (ISO date) guards against a second push the
+    # same day, e.g. after a restart inside the minute.
+    briefing_enabled: Mapped[bool] = mapped_column(default=False, server_default=false())
+    briefing_hour: Mapped[int] = mapped_column(default=7, server_default="7")
+    briefing_minute: Mapped[int] = mapped_column(default=0, server_default="0")
+    briefing_last_sent_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     @property
     def sso_linked(self) -> bool:
