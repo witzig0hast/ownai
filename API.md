@@ -36,7 +36,12 @@ Response `200`: gleiche Form wie `/auth/login`
 Fehler: `401 invalid_refresh_token`
 
 ### `GET /users/me`  *(Bearer)*
-Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime, "sso_linked": bool }`
+Response `200`: `{ "id": uuid, "email": string, "display_name": string, "is_admin": bool, "approval_status": "pending" | "approved" | "declined", "created_at": datetime, "sso_linked": bool, "home_city": string | null, "briefing_enabled": bool, "briefing_hour": int, "briefing_minute": int }`
+
+### `PATCH /users/me`  *(Bearer)*
+Request (alle Felder optional, nur gesetzte werden geändert): `{ "display_name": string, "home_city": string, "briefing_enabled": bool, "briefing_hour": int (0-23), "briefing_minute": int (0-59) }` — `home_city: ""` löscht den Wohnort. Response `200`: wie `GET /users/me`.
+
+`briefing_hour`/`briefing_minute` sind Wanduhrzeit in der Server-Zeitzone (`TIMEZONE`, Standard `Europe/Berlin`); zu dieser Zeit kommt einmal täglich das Morgen-Briefing als Push (Text wie `GET /overview/briefing`, Klick öffnet `/overview`).
 
 ### SSO-Login (optional)
 
@@ -71,6 +76,35 @@ Response `200`: `{ "items": [ { "key": string, "title": string, "description": s
 
 ### `PUT /users/me/setup-status`  *(Bearer)*
 Request: `{ "dismissed": bool }` — Checkliste aus-/wieder einblenden (serverseitig gespeichert, gilt also auf allen Geräten). Response `200`: wie `GET`.
+
+## Übersicht
+
+### `GET /overview`  *(Bearer)*
+Alles für die Startseite in einem Aufruf. Jeder Abschnitt fällt einzeln aus statt die ganze Antwort (z.B. CalDAV nicht erreichbar → `calendar.error`), Netzwerk-Abschnitte laufen parallel mit ~6 s Timeout.
+Response `200`:
+```json
+{
+  "display_name": "Karim",
+  "today": "2026-10-24",
+  "calendar": { "connected": true, "events": [ { "title": "...", "start": datetime, "end": datetime, "location": "..." | null, "all_day": false } ], "error": null },
+  "lists": [ { "id": uuid, "name": "Einkauf", "kind": "shopping", "open_count": 3, "open_items": [ { "id": uuid, "content": "Milch" } ] } ],
+  "reminders": [ { "id": uuid, "label": "Müll", "next_at": datetime } ],
+  "birthdays": [ { "contact_id": uuid, "name": "Lisa", "date": "2026-10-27", "days_until": 3, "turns": 36 | null } ],
+  "expenses": { "month_total": 30.0, "count": 2, "by_category": [ { "category": "Auto", "total": 20.5 } ] },
+  "weather": { "home_city": "Berlin" | null, "data": Weather | null, "error": string | null },
+  "pending_actions": 0
+}
+```
+`lists`: Listen mit offenen Einträgen zuerst, `open_items` max. 6. `reminders`: nächste 5 Termine aktiver Erinnerungen (in `TIMEZONE`). `birthdays`: nächste 30 Tage, max. 5. `weather.data` hat die Form von `GET /weather`, nur wenn `home_city` gesetzt ist.
+
+### `GET /overview/briefing`  *(Bearer)*
+Response `200`: `{ "text": string }` — das Tagesbriefing als vorlesbarer Fließtext, aus `GET /overview` zusammengesetzt (ohne Sprachmodell: sofort verfügbar, auch wenn Ollama nicht läuft).
+
+## Suche
+
+### `GET /search/all?q={string}`  *(Bearer)*
+`q` mindestens 2 Zeichen. Groß-/Kleinschreibung egal, `%`/`_` werden wörtlich gesucht. Durchsucht nur die eigenen Daten.
+Response `200`: `{ "results": [ { "type": "conversation" | "memory" | "contact" | "list_item" | "reminder" | "expense", "id": uuid, "title": string, "snippet": string | null, "href": string, "date": datetime | date | null } ] }` — pro Typ max. 8; Unterhaltungen treffen über Titel oder Nachrichtentext (nur Nutzer/Assistent, ein Treffer pro Unterhaltung mit Textausschnitt). `href` ist der Web-Pfad zum Treffer (z.B. `/chat?c=<id>`). Nicht zu verwechseln mit `GET /search` (Web-Suche über SearXNG).
 
 ## Geräte
 

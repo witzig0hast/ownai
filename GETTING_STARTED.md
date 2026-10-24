@@ -71,7 +71,7 @@ Erstmal **ohne Caddy**, direkt per IP:Port — reicht völlig zum Testen im eige
 docker compose up -d web
 ```
 
-Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen — du landest direkt auf dem „Sprechen"-Screen (Live Talk) mit der Einrichtungs-Checkliste obendrüber; für den ersten Test reicht aber auch einfach eine Text-Nachricht im „Chat"-Tab. Das ist der erste echte End-to-End-Test des ganzen Systems.
+Browser: `http://<server-ip>:3000` öffnen (die Server-IP in deinem lokalen Netz, `hostname -I` zeigt sie dir) — oder `http://localhost:3000`, falls du direkt am Server sitzt. Registrieren, einloggen — du landest auf der „Übersicht" mit der Einrichtungs-Checkliste obendrüber; für den ersten Test reicht eine Text-Nachricht im „Chat"-Tab oder ein Tipp auf einen der Vorschläge unter „Sprechen". Das ist der erste echte End-to-End-Test des ganzen Systems.
 
 Live Talk (der Mikro-Kreis auf „Sprechen") braucht zusätzlich HTTPS oder `localhost` — siehe „Sprachsteuerung testen" weiter unten.
 

@@ -301,6 +301,33 @@ the `{"error":{"code","message"}}` envelope).
     (`public/sw.js`), subscribes via the Push API and registers the subscription with the
     backend (`POST /push/subscribe`). States the iOS "must be installed to Home Screen"
     caveat directly in the UI.
+- **Übersicht** (`/overview`, the landing page after login, `src/app/overview/page.tsx`): one
+  `GET /overview` call feeds cards for today's events, weather (home city set inline or in Konto),
+  lists (items can be ticked off/added in place), reminders, birthdays and this month's spending,
+  plus "Tagesbriefing vorlesen" (`GET /overview/briefing` → `speakAndWait`). Each card links to
+  `/overview/<section>` (`src/app/overview/[section]/page.tsx`), which renders the former settings
+  tab component for calendar, lists, reminders, expenses, contacts or weather - those moved out of
+  Settings, and Settings redirects old `?tab=` links there.
+- **Navigation** (`src/components/NavBar.tsx`): desktop has one top bar; phones get a bottom tab
+  bar (Übersicht · Sprechen · Chat · Mehr, the last opening a bottom sheet with the rest).
+  `AppShell` pads `main` by the bar's height plus `env(safe-area-inset-bottom)`; the layout uses
+  `viewport-fit=cover` so the installed iOS app extends under notch and home indicator.
+- **Search** (`/search`, magnifier in the header): debounced `GET /search/all`, each keystroke
+  aborts the previous request; results grouped by type with the match highlighted. Conversation
+  hits link to `/chat?c=<id>`, which the chat page honours on load.
+- **Share target**: `public/manifest.webmanifest` declares `share_target` (POST multipart to
+  `/share-target`). `public/sw.js` - registered on every app start by `src/lib/serviceWorker.ts`,
+  not only for push - intercepts that POST, stores title/text/url/image in Cache Storage and
+  redirects to `/share` (`src/app/share/page.tsx`), which reads and deletes it and offers "Im Chat
+  besprechen", "Webseite zusammenfassen" (links) and "Als Ausgabe erfassen" (images, OCR via
+  `/vision/describe`). `src/app/share-target/route.ts` handles the same POST server-side, text
+  only, when the worker isn't controlling the page yet. Not available on iOS (no Web Share Target).
+- **Dark mode** (`src/lib/theme.ts`): System/Hell/Dunkel per device in localStorage. Tailwind's
+  `dark:` variant is a `@custom-variant` on the `.dark` class (globals.css); `THEME_INIT_SCRIPT`
+  in `app/layout.tsx` sets it before first paint.
+- **Dates** (`src/lib/format.ts`): one German formatter ("heute, 09:45", "gestern", weekday within
+  a week) instead of per-file `toLocaleString()`; `recencyGroup()` drives the chat sidebar's
+  Heute/Gestern/Diese Woche/Älter headings.
 - **Setup checklist** (`src/components/SetupChecklist.tsx`): driven by
   `GET /users/me/setup-status`, shown collapsed above the mic on `/voice` and expanded at the top
   of `/settings` (re-fetched whenever the settings tab changes, so finishing a step ticks it off

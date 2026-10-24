@@ -46,7 +46,7 @@ function Card({
   return (
     <section
       style={{ animationDelay: `${delay}ms` }}
-      className="animate-fade-in-up flex flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+      className="animate-fade-in-up mb-4 flex break-inside-avoid flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
@@ -271,7 +271,9 @@ function OverviewContent() {
       ) : null}
 
       {data ? (
-        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+        // CSS columns rather than a grid: cards differ a lot in height (a long list vs. "no events"),
+        // and a grid row would leave a hole next to the tallest card.
+        <div className="gap-4 md:columns-2 xl:columns-3">
           <Card title="Heute" href="/overview/calendar" linkLabel="Kalender">
             {!data.calendar.connected ? (
               <Muted>

@@ -65,12 +65,14 @@ Backend-Entwicklung/Tests lokal ohne Docker: [`backend/README.md`](./backend/REA
 
 ## Was drin ist
 
-- **Sprechen** (Live Talk, freihändig) und **Chat** (Text, Bilder, Spracheingabe) mit drei Modi (Allgemein, Zuhause, Organisation)
+- **Übersicht** als Startseite: Termine heute, Wetter, Listen zum Abhaken, Erinnerungen, Geburtstage, Monatsausgaben; **Morgen-Briefing** zum Vorlesen oder täglich als Push
+- **Sprechen** (Live Talk, freihändig, mit antippbaren Vorschlägen) und **Chat** (Text, Bilder, Spracheingabe) mit drei Modi (Allgemein, Zuhause, Organisation)
+- **Suche über alles** (Unterhaltungen, Gedächtnis, Kontakte, Listen, Erinnerungen, Ausgaben) und **Teilen an OwnAI** aus anderen Apps (Android, Chrome/Edge am PC)
 - Werkzeuge für Kalender (CalDAV), Home Assistant, Timer, Erinnerungen, Listen, Ausgaben, Kontakte, Wetter, Web-Suche (SearXNG), RSS, Dateien, E-Mail
 - **Gedächtnis** über Unterhaltungen hinweg, **Automatisierungen** (Home-Assistant-Regeln), dauerhafte **Agenten**, **Agent Bus** für externe Programme
 - **Eingehende E-Mails** mit Bestätigungspflicht für alles mit Folgen
 - Mehrbenutzer mit Admin-Freischaltung, optional **SSO** (beliebiger OIDC-Provider, z.B. Authentik), Login-Sperre gegen Passwort-Raten
-- Web-Push, Einrichtungs-Checkliste für neue Nutzer, Hilfe-Seite in der App
+- Web-Push, Einrichtungs-Checkliste für neue Nutzer, Hilfe-Seite in der App, Leiste unten am Handy, Dunkelmodus-Schalter, Ausgaben-Diagramm
 - Admin: Registrierung/Freischaltung, System-Pause, **Systemstatus** aller Abhängigkeiten
 - Betrieb: `scripts/backup.sh` / `scripts/restore.sh`, Logs-Tab für Nutzer
 
@@ -87,7 +89,7 @@ Details und Cronjob-Beispiel: [`GETTING_STARTED.md`](./GETTING_STARTED.md#9-back
 
 | Baustein | Stand | Verifiziert |
 |---|---|---|
-| `backend/` | Voll ausgebaut, aktiv genutzt | 263 Tests grün, `ruff` sauber, Migrationen gegen frische DB geprüft, live gegen echtes Ollama/Authentik betrieben |
+| `backend/` | Voll ausgebaut, aktiv genutzt | 284 Tests grün, `ruff` sauber, Migrationen gegen frische DB geprüft, live gegen echtes Ollama/Authentik betrieben |
 | `web/` (PWA, auch fürs iPad) | Voll ausgebaut, **primärer Client** | `npm run build` + `lint` + `tsc` grün, live im Einsatz |
 | `mobile/android/` | Grundfunktionen: Chat, Kalender, Sprache, Timer-Alarme, Benachrichtigungs-Weiterleitung für „Vorschläge" | Seit den frühen Ausbaustufen nicht mitgezogen — SSO, Bestätigungen, Gedächtnis, Listen, Agenten usw. gibt es nur im Web. Für alles darüber hinaus die Web-App als PWA auf dem Handy installieren. In dieser Umgebung nie kompiliert (kein Android SDK) |
 | `mobile/ios/` | Eingefroren (siehe `DECISIONS.md` #7) | Das iPad nutzt die Web-App als PWA |

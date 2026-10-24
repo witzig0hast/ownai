@@ -82,8 +82,13 @@ export default function HelpPage() {
             <Section title="Erste Schritte" defaultOpen>
               <p>
                 OwnAI ist nur so nützlich wie das, was du verbindest. Die <strong>Einrichtungs-Checkliste</strong>{" "}
-                (auf „Sprechen“ und in den Einstellungen) zeigt, was noch fehlt - Kalender, E-Mail, Home
+                (auf der Übersicht und in den Einstellungen) zeigt, was noch fehlt - Kalender, E-Mail, Home
                 Assistant, Web-Suche.
+              </p>
+              <p>
+                Am Handy erreichst du alles über die Leiste unten: <strong>Übersicht</strong>,{" "}
+                <strong>Sprechen</strong>, <strong>Chat</strong> und unter <strong>Mehr</strong> Einstellungen,
+                Hilfe und Abmelden. Oben rechts ist die Suche.
               </p>
               <p>
                 <strong>Als App installieren:</strong> Am iPad/iPhone in Safari „Teilen → Zum Home-Bildschirm“, am
@@ -93,18 +98,32 @@ export default function HelpPage() {
               <RestoreChecklistButton />
             </Section>
 
+            <Section title="Übersicht und Morgen-Briefing">
+              <p>
+                Die <strong>Übersicht</strong> ist deine Startseite: Termine heute, Wetter, offene Listen (direkt
+                abhaken oder ergänzen), die nächsten Erinnerungen, Geburtstage und was du diesen Monat ausgegeben
+                hast. Jede Karte führt zur vollständigen Ansicht.
+              </p>
+              <p>
+                „Tagesbriefing vorlesen“ fasst das alles in ein paar Sätzen zusammen. Unter{" "}
+                <TabLink tab="account">Konto</TabLink> kannst du dir das Briefing jeden Morgen zu einer festen
+                Uhrzeit als Push schicken lassen und deinen Wohnort fürs Wetter eintragen.
+              </p>
+            </Section>
+
             <Section title="Sprechen oder schreiben">
               <p>
                 <strong>Sprechen</strong> ist ein Live-Gespräch: Mikrofon antippen, reden, die Antwort wird
                 vorgelesen. Das Mikrofon kannst du zwischendurch stummschalten. Funktioniert nur über https (oder
-                localhost), sonst blockiert der Browser das Mikrofon.
+                localhost), sonst blockiert der Browser das Mikrofon - die antippbaren Vorschläge darunter gehen
+                aber immer.
               </p>
               <p>
                 <strong>Chat</strong> ist das Gleiche als Text, mit Verlauf, Bild-Upload (Text erkennen/Bild
                 beschreiben) und Spracheingabe per Knopf. Unterhaltungen lassen sich archivieren oder löschen.
               </p>
               <p>
-                Pro Unterhaltung wählst du einen <strong>Modus</strong>: <em>Allgemein</em> (alle Werkzeuge),{" "}
+                Pro Unterhaltung wählst du über dem Eingabefeld einen <strong>Modus</strong>: <em>Allgemein</em> (alle Werkzeuge),{" "}
                 <em>Zuhause</em> (Fokus Smart Home &amp; Timer) oder <em>Organisation</em> (Kalender, Dateien,
                 E-Mail).
               </p>
@@ -123,7 +142,24 @@ export default function HelpPage() {
                 <li>E-Mail: <Example>Schick Tom eine Mail, dass ich später komme</Example></li>
                 <li>Dateien: <Example>Schreib mir eine Packliste als Datei</Example></li>
               </ul>
-              <p>Alles davon kannst du auch direkt in den jeweiligen Einstellungs-Bereichen ansehen und bearbeiten.</p>
+              <p>Alles davon kannst du auch direkt über die Übersicht ansehen und bearbeiten.</p>
+            </Section>
+
+            <Section title="Suchen und Teilen">
+              <p>
+                Die <strong>Suche</strong> (Lupe oben) findet Unterhaltungen, Gespeichertes aus dem Gedächtnis,
+                Kontakte, Listeneinträge, Erinnerungen und Ausgaben auf einmal.
+              </p>
+              <p>
+                <strong>Teilen an OwnAI:</strong> Ist OwnAI als App installiert, taucht es auf Android und in
+                Chrome/Edge am PC im „Teilen“-Menü anderer Apps auf. Links kannst du dann zusammenfassen lassen,
+                Fotos von Kassenbons direkt als Ausgabe erfassen. iPhone und iPad bieten das für Web-Apps leider
+                nicht an.
+              </p>
+              <p>
+                <strong>Dunkelmodus:</strong> unter <TabLink tab="account">Konto → Darstellung</TabLink>, pro
+                Gerät.
+              </p>
             </Section>
 
             <Section title="Gedächtnis">
