@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ArtifactPanel } from "@/components/ArtifactPanel";
 import { AuthProvider } from "@/lib/auth-context";
 import { ArtifactPanelProvider } from "@/lib/artifactPanel";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 // Makes the app installable (Windows/Edge/Chrome "Install app", iPad Safari
@@ -34,7 +35,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="de" className="h-full antialiased">
+    // suppressHydrationWarning: THEME_INIT_SCRIPT adds the "dark" class before React hydrates.
+    <html lang="de" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="flex h-full flex-col overflow-hidden font-sans">
         <AuthProvider>
           <ArtifactPanelProvider>

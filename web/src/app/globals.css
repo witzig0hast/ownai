@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* dark: utilities follow the .dark class on <html> (set from the user's choice, see lib/theme.ts)
+   instead of only the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,11 +16,10 @@
     sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  color-scheme: dark;
 }
 
 /* Form controls carry an intrinsic min-width (~20ch for inputs), so inside a flex row they
@@ -255,14 +258,12 @@ textarea,
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
-@media (prefers-color-scheme: dark) {
-  .animate-shimmer {
-    background: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.06) 25%,
-      rgba(255, 255, 255, 0.12) 37%,
-      rgba(255, 255, 255, 0.06) 63%
-    );
-    background-size: 400% 100%;
-  }
+.dark .animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.12) 37%,
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
 }

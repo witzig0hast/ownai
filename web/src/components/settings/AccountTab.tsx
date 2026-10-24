@@ -6,6 +6,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import * as authApi from "@/lib/api/auth";
 import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { getThemePreference, setThemePreference, type ThemePreference } from "@/lib/theme";
 import { getExistingSubscription, isPushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 
 type PushState = "checking" | "unsupported" | "subscribed" | "unsubscribed";
@@ -300,12 +301,55 @@ function BriefingCard() {
   );
 }
 
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "Wie System" },
+  { value: "light", label: "Hell" },
+  { value: "dark", label: "Dunkel" },
+];
+
+function AppearanceCard() {
+  // Lazy initializer: localStorage is only readable in the browser, and this tab only ever
+  // renders client-side after login.
+  const [theme, setTheme] = useState<ThemePreference>(() =>
+    typeof window === "undefined" ? "system" : getThemePreference(),
+  );
+
+  return (
+    <div className="animate-fade-in-up mt-4 rounded-2xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800">
+      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Darstellung</p>
+      <p className="mt-0.5 mb-3 text-xs text-zinc-500">Gilt für dieses Gerät.</p>
+      <div className="flex gap-1 rounded-full bg-zinc-100 p-1 dark:bg-zinc-900" role="radiogroup" aria-label="Darstellung">
+        {THEME_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={theme === o.value}
+            onClick={() => {
+              setTheme(o.value);
+              setThemePreference(o.value);
+            }}
+            className={`flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+              theme === o.value
+                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AccountTab() {
   return (
     <div className="max-w-md">
       <ProfileCard />
       <PushNotificationsCard />
       <BriefingCard />
+      <AppearanceCard />
       <SsoCard />
       <p className="mt-3 text-xs text-zinc-400">
         Eine eigene E-Mail-Adresse für den Assistenten kannst du unter{" "}

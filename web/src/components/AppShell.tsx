@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { NavBar } from "@/components/NavBar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { watchSystemTheme } from "@/lib/theme";
 import { warmupOnce } from "@/lib/warmup";
 
 /** Standard layout for authenticated pages: requires a session, then renders the nav + page
@@ -18,6 +19,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     warmupOnce().catch(() => {});
   }, []);
+
+  useEffect(() => watchSystemTheme(), []);
 
   return (
     <ProtectedRoute>
