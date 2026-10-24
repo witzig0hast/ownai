@@ -23,30 +23,61 @@ export interface ApiFetchOptions extends Omit<RequestInit, "body"> {
   skipAuth?: boolean;
 }
 
+// "unreachable" (no network, backend restarting, request aborted by a navigation) must NOT end
+// the session - only the server actually rejecting the refresh token does. Treating every
+// failure as "logged out" signed phone users out whenever they opened the app without signal.
+type RefreshOutcome = { accessToken: string } | "rejected" | "unreachable";
+
 // Ensures at most one refresh request is in flight, even if several API
 // calls hit a 401 at the same time.
-let inFlightRefresh: Promise<string | null> | null = null;
+let inFlightRefresh: Promise<RefreshOutcome> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(): Promise<RefreshOutcome> {
   const tokens = getTokens();
-  if (!tokens) return null;
+  if (!tokens) return "rejected";
 
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: tokens.refreshToken }),
     });
-    if (!res.ok) {
-      clearTokens();
-      return null;
-    }
-    const data = (await res.json()) as AuthTokens;
-    setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token });
-    return data.access_token;
   } catch {
+    return "unreachable";
+  }
+  if (res.status >= 500) return "unreachable";
+  if (!res.ok) {
     clearTokens();
-    return null;
+    return "rejected";
+  }
+  const data = (await res.json()) as AuthTokens;
+  setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token });
+  return { accessToken: data.access_token };
+}
+
+function sharedRefresh(): Promise<RefreshOutcome> {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshAccessToken().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+}
+
+export const NETWORK_ERROR_CODE = "network_error";
+
+function unreachableError(): ApiError {
+  return new ApiError(NETWORK_ERROR_CODE, "Server gerade nicht erreichbar - bitte gleich nochmal versuchen.", 0);
+}
+
+async function fetchOrThrow(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    // An abort is the caller's own doing (e.g. search-as-you-type) - pass it through as is.
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw unreachableError();
   }
 }
 
@@ -90,17 +121,12 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   };
 
   const tokens = getTokens();
-  let res = await fetch(`${API_BASE_URL}${path}`, buildInit(tokens?.accessToken ?? null));
+  let res = await fetchOrThrow(`${API_BASE_URL}${path}`, buildInit(tokens?.accessToken ?? null));
 
   if (res.status === 401 && !skipAuth) {
-    if (!inFlightRefresh) {
-      inFlightRefresh = refreshAccessToken().finally(() => {
-        inFlightRefresh = null;
-      });
-    }
-    const newAccessToken = await inFlightRefresh;
-
-    if (!newAccessToken) {
+    const outcome = await sharedRefresh();
+    if (outcome === "unreachable") throw unreachableError();
+    if (outcome === "rejected") {
       clearTokens();
       if (typeof window !== "undefined" && window.location.pathname !== "/login") {
         // Full navigation is intentional here: this module runs outside
@@ -109,10 +135,10 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/login";
       }
-      throw new ApiError("unauthorized", "Session expired. Please log in again.", 401);
+      throw new ApiError("unauthorized", "Sitzung abgelaufen - bitte neu anmelden.", 401);
     }
 
-    res = await fetch(`${API_BASE_URL}${path}`, buildInit(newAccessToken));
+    res = await fetchOrThrow(`${API_BASE_URL}${path}`, buildInit(outcome.accessToken));
   }
 
   if (!res.ok) {
@@ -141,20 +167,16 @@ export async function apiFetchBlob(path: string, body?: unknown): Promise<Blob |
   };
 
   const tokens = getTokens();
-  let res = await fetch(`${API_BASE_URL}${path}`, buildInit(tokens?.accessToken ?? null));
+  let res = await fetchOrThrow(`${API_BASE_URL}${path}`, buildInit(tokens?.accessToken ?? null));
 
   if (res.status === 401) {
-    if (!inFlightRefresh) {
-      inFlightRefresh = refreshAccessToken().finally(() => {
-        inFlightRefresh = null;
-      });
-    }
-    const newAccessToken = await inFlightRefresh;
-    if (!newAccessToken) {
+    const outcome = await sharedRefresh();
+    if (outcome === "unreachable") throw unreachableError();
+    if (outcome === "rejected") {
       clearTokens();
-      throw new ApiError("unauthorized", "Session expired. Please log in again.", 401);
+      throw new ApiError("unauthorized", "Sitzung abgelaufen - bitte neu anmelden.", 401);
     }
-    res = await fetch(`${API_BASE_URL}${path}`, buildInit(newAccessToken));
+    res = await fetchOrThrow(`${API_BASE_URL}${path}`, buildInit(outcome.accessToken));
   }
 
   if (!res.ok) {

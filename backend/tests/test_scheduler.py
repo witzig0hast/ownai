@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from httpx import AsyncClient
@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.db.models import Automation, Contact, PermanentAgent, RecurringReminder, Timer, User
 from app.db.session import async_session_maker
 from app.services import home_assistant_service, ollama_client, push_service, scheduler
+from app.utils import local_now, local_today
 
 _WEEKDAY_BY_INDEX = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -101,7 +102,7 @@ async def test_birthday_today_triggers_push_once(client: AsyncClient, auth_heade
         lambda subscription, payload: pushed.append((subscription.endpoint, payload)) or None,
     )
 
-    today = date.today()
+    today = local_today()
     async with async_session_maker() as db:
         user = (await db.execute(select(User))).scalar_one()
         contact = Contact(
@@ -139,7 +140,7 @@ async def test_contact_without_matching_birthday_is_not_notified(client: AsyncCl
         push_service, "_send_sync", lambda subscription, payload: pushed.append(subscription.endpoint) or None
     )
 
-    other_day = (date.today().day % 28) + 1  # some day that (almost certainly) isn't today
+    other_day = (local_today().day % 28) + 1  # some day that (almost certainly) isn't today
     async with async_session_maker() as db:
         user = (await db.execute(select(User))).scalar_one()
         db.add(Contact(user_id=user.id, name="Kein Geburtstag heute", birthday_month=1, birthday_day=other_day))
@@ -167,7 +168,9 @@ async def test_daily_reminder_due_now_triggers_push_once(client: AsyncClient, au
         lambda subscription, payload: pushed.append((subscription.endpoint, payload)) or None,
     )
 
-    now = datetime.now()
+    # Wall-clock time in settings.timezone - what the scheduler matches against, not the
+    # container's UTC clock.
+    now = local_now()
     async with async_session_maker() as db:
         user = (await db.execute(select(User))).scalar_one()
         reminder = RecurringReminder(
@@ -204,7 +207,7 @@ async def test_inactive_reminder_is_never_notified(client: AsyncClient, auth_hea
         push_service, "_send_sync", lambda subscription, payload: pushed.append(subscription.endpoint) or None
     )
 
-    now = datetime.now()
+    now = local_now()
     async with async_session_maker() as db:
         user = (await db.execute(select(User))).scalar_one()
         db.add(
@@ -233,7 +236,7 @@ async def test_weekly_reminder_on_wrong_weekday_is_not_notified(client: AsyncCli
         push_service, "_send_sync", lambda subscription, payload: pushed.append(subscription.endpoint) or None
     )
 
-    now = datetime.now()
+    now = local_now()
     other_weekday = _WEEKDAY_BY_INDEX[(now.weekday() + 1) % 7]
     async with async_session_maker() as db:
         user = (await db.execute(select(User))).scalar_one()

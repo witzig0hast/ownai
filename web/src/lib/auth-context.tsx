@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { ApiError } from "./api-client";
 import * as authApi from "./api/auth";
 import { clearTokens, getTokens, getUser, setTokens, setUser as persistUser } from "./auth-storage";
 import type { User } from "./types";
@@ -53,10 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setUserState(freshUser);
         persistUser(freshUser);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
-        clearTokens();
-        setUserState(null);
+        // Only a real "not authenticated" ends the session (apiFetch has already tried a refresh
+        // by then). No signal, the backend restarting, or this request being cut off by a quick
+        // navigation used to log the user out here; now the cached profile simply stays.
+        if (err instanceof ApiError && err.status === 401) {
+          clearTokens();
+          setUserState(null);
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
