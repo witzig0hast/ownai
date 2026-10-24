@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Expense, User
 from app.errors import NotFound
 from app.schemas.expense import ExpenseCreateRequest
+from app.utils import local_today
 
 UNCATEGORIZED = "Sonstiges"
 
@@ -16,7 +17,7 @@ async def add_expense(db: AsyncSession, user: User, payload: ExpenseCreateReques
         amount=payload.amount,
         description=payload.description.strip(),
         category=payload.category.strip() if payload.category else None,
-        spent_at=payload.spent_at or date.today(),
+        spent_at=payload.spent_at or local_today(),
     )
     db.add(expense)
     await db.commit()

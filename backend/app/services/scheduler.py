@@ -1,11 +1,13 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.db.models import Automation, Timer, User
 from app.db.session import async_session_maker
+from app.utils import local_now, local_today
 from app.services import (
     automation_service,
     contact_service,
@@ -51,9 +53,9 @@ async def _check_birthdays() -> None:
     contact whose birthday is today - the third proactive channel alongside expired timers and
     Agent Bus messages. `Contact.last_birthday_push_date` (set to today's ISO date after a push)
     guards against sending twice if the job somehow runs more than once on the same day (e.g. a
-    restart). Runs in server time - there's no per-user timezone stored yet, so "today" is the
-    scheduler process's local date."""
-    today = date.today()
+    restart). "Today" is in settings.timezone (one zone for the whole installation; there's no
+    per-user timezone), not the container's UTC clock."""
+    today = local_today()
     async with async_session_maker() as db:
         contacts = await contact_service.contacts_with_birthday_on(db, today)
         if not contacts:
@@ -77,10 +79,10 @@ async def _check_birthdays() -> None:
 async def _check_recurring_reminders() -> None:
     """Runs once a minute (see start_scheduler) and pushes a proactive notification for every
     active RecurringReminder whose recurrence/hour/minute matches now - a repeatable counterpart
-    to Timer's one-off countdown. Matched against local server time (like _check_birthdays; no
-    per-user timezone stored yet). `RecurringReminder.last_triggered_date` guards against firing
+    to Timer's one-off countdown. Matched against wall-clock time in settings.timezone (like
+    _check_birthdays). `RecurringReminder.last_triggered_date` guards against firing
     twice within the same minute-resolution poll on the same day."""
-    now = datetime.now()
+    now = local_now()
     async with async_session_maker() as db:
         due = await reminder_service.reminders_due_at(db, now)
         if not due:
@@ -187,7 +189,8 @@ def start_scheduler() -> AsyncIOScheduler:
     apply today, but is worth knowing before scaling out to multiple workers/replicas (would need
     a DB-level lock or moving this to a dedicated worker process)."""
     global _scheduler
-    scheduler = AsyncIOScheduler()
+    # Cron triggers (the 8:00 birthday push) in the user's zone, not the container's UTC clock.
+    scheduler = AsyncIOScheduler(timezone=get_settings().timezone)
     scheduler.add_job(_check_expired_timers, "interval", seconds=15, id="expired_timers")
     scheduler.add_job(_check_birthdays, "cron", hour=8, minute=0, id="birthdays")
     scheduler.add_job(_check_recurring_reminders, "cron", second=0, id="recurring_reminders")

@@ -86,6 +86,11 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
+    # IANA time zone that "heute", reminder times ("jeden Montag um 8"), the birthday push and the
+    # time given to the LLM refer to. The container's own clock is UTC, so without this a
+    # reminder set for 8:30 fired at 8:30 UTC (10:30 in Germany in summer).
+    timezone: str = "Europe/Berlin"
+
     # Brute-force protection for POST /auth/login (see app/auth/rate_limit.py). Failed attempts
     # are counted per (email, client IP) within a sliding window, plus a looser per-email cap
     # across all IPs so a distributed guess run is throttled too.

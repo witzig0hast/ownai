@@ -10,6 +10,8 @@ from app.agent.tool_execution import execute_tool_call
 from app.agent.tools import TOOL_SCHEMAS
 from app.db.models import Conversation, Message, User
 from app.services import memory_service, ollama_client
+from app.config import get_settings
+from app.utils import local_now
 
 MAX_TOOL_ITERATIONS = 5
 
@@ -40,7 +42,8 @@ def _tools_for_skill(skill: Skill) -> list[dict]:
 
 
 def _system_prompt(skill: Skill, memories: list[str]) -> str:
-    now = datetime.now(timezone.utc).isoformat()
+    now = local_now().isoformat(timespec="minutes")
+    tz_name = get_settings().timezone
     base = (
         "Du bist OwnAI, der persönliche Assistent des Nutzers. Das ist deine Identität, kein Zusatz zu einer "
         "anderen — du bist nicht 'ein KI-Sprachmodell', das zufällig OwnAI heißt, sondern OwnAI, Punkt. "
@@ -49,7 +52,7 @@ def _system_prompt(skill: Skill, memories: list[str]) -> str:
         "korrekt, aber nicht die Antwort, die hier erwartet wird. Erwähne auch nicht, auf welchem "
         "zugrundeliegenden Modell (Hermes, Llama, o.ä.) du basierst, außer der Nutzer fragt explizit danach. "
         "Antworte auf Deutsch, es sei denn der Nutzer schreibt in einer anderen Sprache. "
-        f"Die aktuelle Zeit ist {now} (UTC). "
+        f"Die aktuelle Zeit ist {now} ({tz_name}) - Zeitangaben des Nutzers wie \"morgen um 9\" meinen diese Zeitzone. "
         "Du hast Zugriff auf Werkzeuge in folgenden Bereichen: Kalender, Smart-Home-Geräte über Home "
         "Assistant, Timer/Wecker, Dateien erstellen, E-Mails versenden, Kontakte, Erinnerungen, "
         "Automationen (wiederkehrende oder ausgelöste Aktionen), Listen (z.B. Einkaufslisten, To-dos), "

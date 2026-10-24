@@ -1,7 +1,10 @@
 import asyncio
 from collections.abc import Coroutine
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
+
+from app.config import get_settings
 
 # asyncio.create_task() does not itself keep its Task alive - with no other reference, it can be
 # garbage-collected mid-run (a well-known asyncio footgun, see the "Important" note on
@@ -17,6 +20,20 @@ def fire_and_forget(coro: Coroutine[Any, Any, Any]) -> None:
     task = asyncio.create_task(coro)
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
+
+def local_tz() -> ZoneInfo:
+    return ZoneInfo(get_settings().timezone)
+
+
+def local_now() -> datetime:
+    """Timezone-aware "now" in the user's configured zone (settings.timezone) - for anything a
+    person reads as wall-clock time: reminder hours, "today", the LLM's sense of the date."""
+    return datetime.now(local_tz())
+
+
+def local_today() -> date:
+    return local_now().date()
 
 
 def parse_iso_datetime(value: str) -> datetime:
