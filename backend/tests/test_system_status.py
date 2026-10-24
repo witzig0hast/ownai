@@ -93,3 +93,16 @@ async def test_sso_check_is_live_not_cached(monkeypatch):
 
     result = await system_status_service._run("sso", "SSO", True, system_status_service._check_sso)
     assert result.status == "error"
+
+
+def test_connection_errors_are_described_in_plain_german():
+    import socket
+
+    describe = system_status_service.describe_error
+    assert describe(httpx.ConnectError("All connection attempts failed")).startswith("Nicht erreichbar")
+    assert describe(ConnectionRefusedError(111, "Connection refused")).startswith("Verbindung abgelehnt")
+    assert describe(socket.gaierror(-2, "Name or service not known")).startswith("Hostname nicht auflösbar")
+    response = httpx.Response(503, request=httpx.Request("GET", "http://x"))
+    assert "503" in describe(httpx.HTTPStatusError("boom", request=response.request, response=response))
+    assert describe(TimeoutError()).startswith("Zeitüberschreitung")
+    assert describe(httpx.ReadTimeout("t")).startswith("Zeitüberschreitung")

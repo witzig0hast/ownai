@@ -6,6 +6,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
 import * as calendarApi from "@/lib/api/calendar";
 import type { CalendarEvent } from "@/lib/types";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 const CALENDAR_ENABLED_STORAGE_KEY = "ownai.calendarEnabled";
 
@@ -23,7 +24,7 @@ function dateInputToIsoRangeEnd(value: string): string {
 
 function formatEventTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }

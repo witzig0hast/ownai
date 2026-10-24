@@ -8,10 +8,11 @@ import { ApiError } from "@/lib/api-client";
 import * as devicesApi from "@/lib/api/devices";
 import * as suggestionsApi from "@/lib/api/suggestions";
 import type { Suggestion } from "@/lib/types";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }
@@ -20,7 +21,7 @@ function formatTime(iso: string): string {
 function formatDateTime(iso: unknown): string {
   if (typeof iso !== "string") return String(iso);
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }

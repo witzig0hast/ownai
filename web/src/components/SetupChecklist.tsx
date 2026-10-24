@@ -16,7 +16,7 @@ import type { SetupStatus } from "@/lib/api/onboarding";
  */
 export function SetupChecklist({ variant, refreshKey }: { variant: "voice" | "settings"; refreshKey?: string }) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
-  const [expanded, setExpanded] = useState(variant === "settings");
+  const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {

@@ -6,11 +6,12 @@ import { Modal } from "@/components/Modal";
 import { ApiError } from "@/lib/api-client";
 import * as agentsApi from "@/lib/api/permanentAgents";
 import type { AgentLogEntry, AgentPreset, PermanentAgent } from "@/lib/types";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 function formatTime(iso: string | null): string {
   if (!iso) return "Noch nie gelaufen";
   try {
-    return new Date(iso).toLocaleString("de-DE");
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }

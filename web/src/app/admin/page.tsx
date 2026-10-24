@@ -10,10 +10,11 @@ import { ApiError } from "@/lib/api-client";
 import * as adminApi from "@/lib/api/admin";
 import { useAuth } from "@/lib/auth-context";
 import type { AppSettings, User } from "@/lib/types";
+import { formatDate as fmtDate } from "@/lib/format";
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDate(iso);
   } catch {
     return iso;
   }

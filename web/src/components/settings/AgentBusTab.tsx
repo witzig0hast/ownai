@@ -6,10 +6,11 @@ import { Modal } from "@/components/Modal";
 import { ApiError } from "@/lib/api-client";
 import * as agentBusApi from "@/lib/api/agentBus";
 import type { AgentIdentity, AgentMessage } from "@/lib/types";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }

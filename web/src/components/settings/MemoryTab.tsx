@@ -5,10 +5,11 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
 import * as memoryApi from "@/lib/api/memory";
 import type { Memory } from "@/lib/types";
+import { formatDate as fmtDate } from "@/lib/format";
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString();
+    return fmtDate(iso);
   } catch {
     return iso;
   }

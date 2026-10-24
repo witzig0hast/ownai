@@ -14,6 +14,7 @@ import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message, Skill } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
 import { warmupOnce } from "@/lib/warmup";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 const AUTO_READ_STORAGE_KEY = "ownai.autoReadReplies";
 
@@ -51,7 +52,7 @@ function SpeakerIcon() {
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }
@@ -766,7 +767,7 @@ export default function ChatPage() {
                           ? "Aufnahme läuft..."
                           : describingImage
                             ? "Analysiere Bild..."
-                            : "Message OwnAI..."
+                            : "Nachricht an OwnAI..."
                     }
                     rows={1}
                     disabled={sending}

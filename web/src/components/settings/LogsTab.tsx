@@ -5,6 +5,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { ApiError } from "@/lib/api-client";
 import * as logsApi from "@/lib/api/logs";
 import type { LogEntry } from "@/lib/types";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 const LEVELS: { key: string; label: string }[] = [
   { key: "", label: "Alle Stufen" },
@@ -15,7 +16,7 @@ const LEVELS: { key: string; label: string }[] = [
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("de-DE");
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }

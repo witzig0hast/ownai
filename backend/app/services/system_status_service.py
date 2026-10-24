@@ -115,6 +115,25 @@ async def _check_scheduler() -> tuple[Status, str | None]:
     return "error", "Hintergrund-Jobs (Timer, Erinnerungen, Automationen, Agenten) laufen nicht."
 
 
+def describe_error(exc: BaseException) -> str:
+    """Turns the usual connection failures into something an admin can act on - the raw
+    messages ("All connection attempts failed", "[Errno 111] Connection refused") say nothing
+    about what to check. Keeps the original text in brackets for searching/debugging."""
+    raw = str(exc) or exc.__class__.__name__
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"Antwortet mit Fehler {exc.response.status_code} - Dienst läuft, aber lehnt die Anfrage ab."
+    if isinstance(exc, ConnectionRefusedError) or "Connection refused" in raw:
+        return f"Verbindung abgelehnt - läuft der Dienst und stimmen Host/Port? ({raw})"
+    if isinstance(exc, socket.gaierror) or "Name or service not known" in raw or "nodename nor servname" in raw:
+        return f"Hostname nicht auflösbar - Adresse in der .env prüfen. ({raw})"
+    # Before the OSError branch: TimeoutError is an OSError subclass.
+    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+        return "Zeitüberschreitung - keine Antwort."
+    if isinstance(exc, (httpx.ConnectError, OSError)) or "connection attempts failed" in raw:
+        return f"Nicht erreichbar - läuft der Dienst, und ist er aus dem Container erreichbar? ({raw})"
+    return raw
+
+
 async def _run(
     key: str, label: str, optional: bool, check: Callable[[], Awaitable[tuple[Status, str | None]]]
 ) -> DependencyStatus:
@@ -124,7 +143,7 @@ async def _run(
     except TimeoutError:
         status, detail = "error", "Zeitüberschreitung - keine Antwort."
     except Exception as exc:  # noqa: BLE001 - any failure of a dependency is a status, not a crash
-        status, detail = "error", str(exc) or exc.__class__.__name__
+        status, detail = "error", describe_error(exc)
     latency = int((time.monotonic() - started) * 1000) if status == "ok" else None
     return DependencyStatus(key=key, label=label, status=status, detail=detail, optional=optional, latency_ms=latency)
 

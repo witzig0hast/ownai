@@ -156,8 +156,10 @@ export function ArtifactPanel() {
       <aside
         role="dialog"
         aria-label={title || "Artefakt"}
-        className={`fixed top-0 right-0 z-40 flex h-full w-full max-w-md transform flex-col border-l border-zinc-200 bg-white shadow-2xl transition-transform duration-300 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
-          isOpen ? "translate-x-0" : "translate-x-full"
+        className={`fixed top-0 right-0 z-40 flex h-full w-full max-w-md transform flex-col border-l border-zinc-200 bg-white shadow-2xl transition-[transform,visibility] duration-300 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
+          // invisible once closed: otherwise its shadow-2xl leaks in as a grey strip along the
+          // right edge of every page, and it stays in the tab order/a11y tree while off-screen.
+          isOpen ? "visible translate-x-0" : "invisible translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">

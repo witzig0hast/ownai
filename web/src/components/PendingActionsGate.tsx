@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/Modal";
 import * as pendingActionsApi from "@/lib/api/pendingActions";
 import type { PendingAction } from "@/lib/types";
+import { formatDateTime as fmtDateTime } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 30000;
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return fmtDateTime(iso);
   } catch {
     return iso;
   }
