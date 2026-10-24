@@ -294,7 +294,7 @@ function ChatFabPortal({ open, onToggle }: { open: boolean; onToggle: () => void
     <>
       <ChatFab open={open} onToggle={onToggle} />
       {open ? (
-        <div className="animate-scale-in fixed right-5 bottom-20 z-10 h-[28rem] w-[22rem] max-w-[calc(100vw-2.5rem)]">
+        <div className="animate-scale-in fixed right-5 bottom-36 z-10 h-[28rem] md:bottom-20 w-[22rem] max-w-[calc(100vw-2.5rem)]">
           <SetupHelperChat />
         </div>
       ) : null}
@@ -309,7 +309,7 @@ function ChatFab({ open, onToggle }: { open: boolean; onToggle: () => void }) {
       type="button"
       onClick={onToggle}
       aria-label={open ? "Hilfe-Chat schließen" : "Hilfe-Chat öffnen"}
-      className="fixed right-5 bottom-5 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl active:scale-95"
+      className="fixed right-5 bottom-20 z-10 flex h-14 w-14 md:bottom-5 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl active:scale-95"
     >
       <span className={`transition-transform duration-300 ${open ? "rotate-90" : "rotate-0"}`}>
         {open ? (

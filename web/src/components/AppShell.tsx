@@ -23,7 +23,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <ProtectedRoute>
       <div className="flex min-h-full flex-1 flex-col">
         <NavBar />
-        <main className="flex flex-1 flex-col overflow-hidden">{children}</main>
+        {/* Bottom padding = the phone bottom tab bar's height (see NavBar), so nothing ends up behind it. */}
+        <main className="flex flex-1 flex-col overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
       </div>
     </ProtectedRoute>
   );

@@ -27,11 +27,14 @@ export const viewport: Viewport = {
   themeColor: "#0f172a",
   width: "device-width",
   initialScale: 1,
+  // Lets the layout extend under the notch/home indicator in the installed iOS app; NavBar and
+  // AppShell pad with env(safe-area-inset-*) accordingly.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="de" className="h-full antialiased">
       <body className="flex h-full flex-col overflow-hidden font-sans">
         <AuthProvider>
           <ArtifactPanelProvider>

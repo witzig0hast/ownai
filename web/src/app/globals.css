@@ -193,6 +193,20 @@ textarea,
   animation: slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Bottom sheet ("Mehr" on phones). */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Slide-in-from-right for the Artifact Panel's contents refreshing. */
 @keyframes slide-in-right {
   from {
