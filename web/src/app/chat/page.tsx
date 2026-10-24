@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { AppShell } from "@/components/AppShell";
 import { CodeBlock } from "@/components/CodeBlock";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -14,7 +14,7 @@ import { isTtsSupported, speak, stopSpeaking, unlockSpeech } from "@/lib/tts";
 import type { Conversation, Message, Skill } from "@/lib/types";
 import { useVoiceRecorder } from "@/lib/useVoiceRecorder";
 import { warmupOnce } from "@/lib/warmup";
-import { formatDateTime as fmtDateTime } from "@/lib/format";
+import { formatDateTime as fmtDateTime, recencyGroup } from "@/lib/format";
 
 const AUTO_READ_STORAGE_KEY = "ownai.autoReadReplies";
 
@@ -166,8 +166,13 @@ function ConversationSidebar({
         ) : (
           <ul className="space-y-0.5">
             {conversations.map((c, i) => (
+              <Fragment key={c.id}>
+              {i === 0 || recencyGroup(c.updated_at) !== recencyGroup(conversations[i - 1].updated_at) ? (
+                <li className="px-3 pt-3 pb-1 text-xs font-semibold tracking-wide text-zinc-400 uppercase first:pt-1">
+                  {recencyGroup(c.updated_at)}
+                </li>
+              ) : null}
               <li
-                key={c.id}
                 className="animate-fade-in-up group relative"
                 style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
               >
@@ -188,7 +193,7 @@ function ConversationSidebar({
                     {formatTime(c.updated_at)}
                   </span>
                 </button>
-                <div className="absolute top-1/2 right-3 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="absolute top-1/2 right-3 flex -translate-y-1/2 gap-1 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -213,6 +218,7 @@ function ConversationSidebar({
                   </button>
                 </div>
               </li>
+              </Fragment>
             ))}
           </ul>
         )}
@@ -636,29 +642,6 @@ export default function ChatPage() {
                 </svg>
                 Unterhaltungen
               </button>
-              {skills.length > 0 ? (
-                <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-                  <label htmlFor="skill-picker" className="text-xs font-medium text-zinc-500">
-                    Skill
-                  </label>
-                  <select
-                    id="skill-picker"
-                    value={conversations.find((c) => c.id === selectedId)?.skill ?? "general"}
-                    disabled={skillUpdating}
-                    onChange={(e) => {
-                      const conversation = conversations.find((c) => c.id === selectedId);
-                      if (conversation) handleSkillChange(conversation, e.target.value);
-                    }}
-                    className="rounded-xl border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
-                  >
-                    {skills.map((s) => (
-                      <option key={s.key} value={s.key} title={s.description}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
               <div
                 ref={messagesContainerRef}
                 onScroll={(e) => {
@@ -718,6 +701,36 @@ export default function ChatPage() {
                 {voiceRecorder.error ? <ErrorMessage message={voiceRecorder.error} /> : null}
               </div>
               <form onSubmit={handleSend} className="p-3">
+                {skills.length > 0 ? (
+                  <div className="mb-2 flex items-center gap-1.5 overflow-x-auto" role="radiogroup" aria-label="Modus">
+                    <span className="shrink-0 text-xs text-zinc-400">Modus:</span>
+                    {skills.map((sk) => {
+                      const current = conversations.find((c) => c.id === selectedId)?.skill ?? "general";
+                      const active = current === sk.key;
+                      return (
+                        <button
+                          key={sk.key}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          title={sk.description}
+                          disabled={skillUpdating}
+                          onClick={() => {
+                            const conversation = conversations.find((c) => c.id === selectedId);
+                            if (conversation && !active) handleSkillChange(conversation, sk.key);
+                          }}
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-all disabled:opacity-50 ${
+                            active
+                              ? "bg-indigo-500 text-white"
+                              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                          }`}
+                        >
+                          {sk.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
                 <div className="flex items-end gap-1.5 rounded-2xl border border-zinc-300 bg-white p-1.5 shadow-sm transition-colors focus-within:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:focus-within:border-zinc-600">
                   <input
                     ref={imageInputRef}
