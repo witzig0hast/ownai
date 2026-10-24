@@ -16,6 +16,10 @@ export interface User {
   approval_status: "pending" | "approved" | "declined";
   created_at: string;
   sso_linked: boolean;
+  home_city: string | null;
+  briefing_enabled: boolean;
+  briefing_hour: number;
+  briefing_minute: number;
 }
 
 export interface AuthTokens {

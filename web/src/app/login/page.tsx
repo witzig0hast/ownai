@@ -21,7 +21,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/voice");
+      router.replace("/overview");
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      router.replace("/voice");
+      router.replace("/overview");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
     } finally {

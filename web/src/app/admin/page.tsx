@@ -248,7 +248,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isLoading && user && !user.is_admin) {
-      router.replace("/voice");
+      router.replace("/overview");
     }
   }, [isLoading, user, router]);
 

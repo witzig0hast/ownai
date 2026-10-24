@@ -55,7 +55,7 @@ export default function SsoCallbackPage() {
 
       try {
         await loginWithTokens(accessToken, refreshToken);
-        router.replace("/voice");
+        router.replace("/overview");
       } catch {
         setError("Anmeldung fehlgeschlagen - bitte erneut versuchen.");
         setStatus("error");

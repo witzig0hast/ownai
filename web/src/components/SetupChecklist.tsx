@@ -10,11 +10,11 @@ import type { SetupStatus } from "@/lib/api/onboarding";
  * before the assistant can actually do much. Hidden once everything is done or the user hid it
  * (stored server-side, so it stays hidden on every device; the help page can bring it back).
  *
- * `variant="voice"` starts collapsed as a one-line banner so it doesn't crowd the mic button;
- * `variant="settings"` starts expanded. `refreshKey` re-fetches when it changes - the settings
- * page passes the active tab, so finishing a step there ticks it off without a reload.
+ * Always starts collapsed to one line plus progress bar - expanded by default it pushed whole
+ * pages a screen down on phones. `refreshKey` re-fetches when it changes - the settings page
+ * passes the active tab, so finishing a step there ticks it off without a reload.
  */
-export function SetupChecklist({ variant, refreshKey }: { variant: "voice" | "settings"; refreshKey?: string }) {
+export function SetupChecklist({ refreshKey }: { refreshKey?: string }) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);

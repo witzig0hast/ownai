@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, type ComponentType } from "react";
+import { Suspense, useEffect, type ComponentType } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,18 +8,12 @@ import { SetupChecklist } from "@/components/SetupChecklist";
 import { AccountTab } from "@/components/settings/AccountTab";
 import { AgentBusTab } from "@/components/settings/AgentBusTab";
 import { AutomationsTab } from "@/components/settings/AutomationsTab";
-import { CalendarTab } from "@/components/settings/CalendarTab";
-import { ContactsTab } from "@/components/settings/ContactsTab";
 import { EmailTab } from "@/components/settings/EmailTab";
-import { ExpensesTab } from "@/components/settings/ExpensesTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
-import { ListsTab } from "@/components/settings/ListsTab";
 import { LogsTab } from "@/components/settings/LogsTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
 import { PermanentAgentsTab } from "@/components/settings/PermanentAgentsTab";
-import { RemindersTab } from "@/components/settings/RemindersTab";
 import { RssTab } from "@/components/settings/RssTab";
-import { WeatherTab } from "@/components/settings/WeatherTab";
 import { WebClipperTab } from "@/components/settings/WebClipperTab";
 
 interface TabDef {
@@ -29,17 +23,15 @@ interface TabDef {
   component: ComponentType;
 }
 
-// Grouped so 16 tabs read as four small, recognizable areas instead of one long row. The key is
-// also the `?tab=` value, which is what the setup checklist and the help page link to - keep
-// keys stable even if labels change.
+// Grouped into small, recognizable areas. The key is also the `?tab=` value, which the setup
+// checklist and the help page link to - keep keys stable even if labels change. Day-to-day data
+// (calendar, lists, reminders, expenses, contacts, weather) lives under /overview instead.
 const GROUPS: { label: string; tabs: TabDef[] }[] = [
   {
     label: "Verbindungen",
     tabs: [
       { key: "integrations", label: "Dienste", description: "Kalender (CalDAV), Home Assistant und Web-Suche verbinden.", component: IntegrationsTab },
       { key: "email", label: "E-Mail", description: "Eigenes Postfach zum Senden und für eingehende Mails.", component: EmailTab },
-      { key: "calendar", label: "Kalender", description: "Termine ansehen und anlegen.", component: CalendarTab },
-      { key: "weather", label: "Wetter", description: "Wettervorhersage für einen Ort abrufen.", component: WeatherTab },
       { key: "rss", label: "News", description: "RSS-Feeds, die der Assistent für dich zusammenfasst.", component: RssTab },
       { key: "clipper", label: "Web-Clipper", description: "Webseiten per Lesezeichen an den Assistenten schicken.", component: WebClipperTab },
     ],
@@ -48,28 +40,22 @@ const GROUPS: { label: string; tabs: TabDef[] }[] = [
     label: "Assistent",
     tabs: [
       { key: "memory", label: "Gedächtnis", description: "Was sich der Assistent dauerhaft über dich merkt.", component: MemoryTab },
-      { key: "reminders", label: "Erinnerungen", description: "Wiederkehrende Erinnerungen per Push.", component: RemindersTab },
       { key: "automations", label: "Automatisierungen", description: "Wenn-Dann-Regeln auf Basis von Home Assistant.", component: AutomationsTab },
       { key: "permanent-agents", label: "Agenten", description: "Agenten, die regelmäßig selbstständig Aufgaben erledigen.", component: PermanentAgentsTab },
       { key: "agent-bus", label: "Agent Bus", description: "Andere Programme/KIs mit deinem Assistenten sprechen lassen.", component: AgentBusTab },
     ],
   },
   {
-    label: "Persönliches",
+    label: "Konto & System",
     tabs: [
-      { key: "contacts", label: "Kontakte", description: "Personen, Geburtstage und Notizen.", component: ContactsTab },
-      { key: "lists", label: "Listen", description: "Einkaufs- und To-do-Listen.", component: ListsTab },
-      { key: "expenses", label: "Ausgaben", description: "Ausgaben erfassen und auswerten.", component: ExpensesTab },
-    ],
-  },
-  {
-    label: "System",
-    tabs: [
-      { key: "account", label: "Konto", description: "Profil, Push-Benachrichtigungen und SSO.", component: AccountTab },
+      { key: "account", label: "Konto", description: "Profil, Wohnort, Morgen-Briefing, Push, Darstellung und SSO.", component: AccountTab },
       { key: "logs", label: "Logs", description: "Was im Hintergrund passiert ist - hilfreich bei Problemen.", component: LogsTab },
     ],
   },
 ];
+
+// Old ?tab= links (bookmarks, older help texts) for sections that moved to the Übersicht.
+const MOVED_TO_OVERVIEW = new Set(["calendar", "weather", "reminders", "contacts", "lists", "expenses"]);
 
 const ALL_TABS = GROUPS.flatMap((g) => g.tabs);
 const DEFAULT_TAB = "integrations";
@@ -79,6 +65,10 @@ function SettingsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requested = searchParams.get("tab");
+
+  useEffect(() => {
+    if (requested && MOVED_TO_OVERVIEW.has(requested)) router.replace(`/overview/${requested}`);
+  }, [requested, router]);
   const active = ALL_TABS.find((t) => t.key === requested) ?? ALL_TABS.find((t) => t.key === DEFAULT_TAB)!;
   const ActiveTab = active.component;
 
@@ -139,7 +129,7 @@ function SettingsContent() {
       </nav>
 
       <div className="min-w-0 flex-1">
-        <SetupChecklist variant="settings" refreshKey={active.key} />
+        <SetupChecklist refreshKey={active.key} />
         <div className="mb-4">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{active.label}</h2>
           <p className="text-xs text-zinc-500">{active.description}</p>

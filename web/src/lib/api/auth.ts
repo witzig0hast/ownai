@@ -22,6 +22,14 @@ export function me(): Promise<User> {
   return apiFetch<User>("/users/me");
 }
 
+export type UserUpdate = Partial<
+  Pick<User, "display_name" | "home_city" | "briefing_enabled" | "briefing_hour" | "briefing_minute">
+>;
+
+export function updateMe(patch: UserUpdate): Promise<User> {
+  return apiFetch<User>("/users/me", { method: "PATCH", body: patch });
+}
+
 export function ssoStatus(): Promise<{ enabled: boolean }> {
   return apiFetch<{ enabled: boolean }>("/auth/sso/status", { skipAuth: true });
 }

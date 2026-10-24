@@ -10,10 +10,10 @@ export default function Home() {
 
   useEffect(() => {
     if (isLoading) return;
-    router.replace(isAuthenticated ? "/voice" : "/login");
+    router.replace(isAuthenticated ? "/overview" : "/login");
   }, [isLoading, isAuthenticated, router]);
 
   return (
-    <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">Loading...</div>
+    <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">Lade...</div>
   );
 }

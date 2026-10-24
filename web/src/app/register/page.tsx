@@ -22,7 +22,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/voice");
+      router.replace("/overview");
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -38,7 +38,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password, displayName);
-      router.replace("/voice");
+      router.replace("/overview");
     } catch (err) {
       if (err instanceof ApiError && err.code === "registration_pending") {
         setAwaitingApproval(true);
