@@ -1,6 +1,6 @@
-// OwnAI's Web Push service worker. Kept deliberately tiny - it only shows a notification for
-// an incoming push and focuses/opens the app on click. No caching/offline logic here; that's a
-// separate concern this project doesn't currently take on.
+// OwnAI's service worker. Kept deliberately tiny: it shows Web Push notifications, focuses/opens
+// the app on click, and receives things shared to the installed app (manifest "share_target").
+// No caching/offline logic here; that's a separate concern this project doesn't currently take on.
 //
 // iOS Safari note: Web Push only fires here at all if this site was added to the Home Screen
 // ("Zum Home-Bildschirm hinzufügen") - a background tab in Safari itself never receives push,
@@ -42,3 +42,37 @@ self.addEventListener("notificationclick", (event) => {
     })(),
   );
 });
+
+// Share target: the OS share sheet POSTs title/text/url and optionally an image here. A page
+// can't read a POST body, so the worker parks the payload in Cache Storage and redirects to
+// /share, which picks it up once and deletes it. (web/src/app/share-target/route.ts handles
+// the same POST server-side, minus the image, for the rare case this worker isn't active yet.)
+const SHARE_CACHE = "ownai-share";
+
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== "POST" || url.pathname !== "/share-target") return;
+
+  event.respondWith(
+    (async () => {
+      const form = await event.request.formData();
+      const cache = await caches.open(SHARE_CACHE);
+      const meta = {
+        title: form.get("title") || "",
+        text: form.get("text") || "",
+        url: form.get("url") || "",
+        hasFile: false,
+      };
+      const file = form.getAll("files").find((f) => typeof f !== "string");
+      if (file) {
+        meta.hasFile = true;
+        await cache.put("/__share/file", new Response(file, { headers: { "Content-Type": file.type || "image/jpeg" } }));
+      }
+      await cache.put("/__share/meta", new Response(JSON.stringify(meta), { headers: { "Content-Type": "application/json" } }));
+      return Response.redirect("/share", 303);
+    })(),
+  );
+});
+
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));

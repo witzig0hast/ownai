@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { NavBar } from "@/components/NavBar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { registerServiceWorker } from "@/lib/serviceWorker";
 import { watchSystemTheme } from "@/lib/theme";
 import { warmupOnce } from "@/lib/warmup";
 
@@ -21,6 +22,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => watchSystemTheme(), []);
+
+  useEffect(() => registerServiceWorker(), []);
 
   return (
     <ProtectedRoute>
