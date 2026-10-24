@@ -67,6 +67,34 @@ function CodeIcon() {
   );
 }
 
+const SUGGESTIONS = [
+  "Was steht heute an?",
+  "Wie wird das Wetter?",
+  "Was ist auf der Einkaufsliste?",
+  "Erinnere mich in einer Stunde ans Trinken",
+];
+
+function SuggestionChips({ onPick, disabled }: { onPick: (text: string) => void; disabled: boolean }) {
+  return (
+    <div className="animate-fade-in-up flex w-full max-w-md flex-col items-center gap-2">
+      <p className="text-xs text-zinc-400">Oder antippen:</p>
+      <div className="flex flex-wrap justify-center gap-2">
+        {SUGGESTIONS.map((text) => (
+          <button
+            key={text}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(text)}
+            className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 transition-all hover:scale-105 hover:border-indigo-300 hover:bg-indigo-50 active:scale-95 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-indigo-950/40"
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function VoicePage() {
   const {
     state,
@@ -82,6 +110,7 @@ export default function VoicePage() {
     stop,
     toggleMute,
     interrupt,
+    sendText,
   } = useLiveTalk();
   const { openArtifact } = useArtifactPanel();
 
@@ -128,7 +157,7 @@ export default function VoicePage() {
     <AppShell>
       <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto p-8">
         {!isSupported ? (
-          <ErrorMessage message="Live Talk braucht Mikrofonzugriff (getUserMedia) und Web Audio - dein Browser oder diese Verbindung unterstützt das nicht. Läuft die Seite über http:// statt https:// oder localhost, blockieren Browser den Mikrofonzugriff komplett." />
+          <ErrorMessage message="Live Talk braucht Mikrofonzugriff (getUserMedia) und Web Audio - dein Browser oder diese Verbindung unterstützt das nicht. Läuft die Seite über http:// statt https:// oder localhost, blockieren Browser den Mikrofonzugriff komplett. Die Vorschläge unten funktionieren trotzdem." />
         ) : (
           <>
             <button
@@ -206,65 +235,74 @@ export default function VoicePage() {
               )}
             </div>
 
-            {(lastUserText || lastAssistantText) && (
-              <div className="animate-fade-in-up w-full max-w-md space-y-3 text-center">
-                {lastUserText ? (
-                  <p className="text-sm text-zinc-500">
-                    <span className="font-medium text-zinc-700 dark:text-zinc-300">Du:</span> {lastUserText}
-                  </p>
-                ) : null}
-                {displayAssistantText ? (
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    <span className="font-medium">OwnAI:</span> {displayAssistantText}
-                  </p>
-                ) : null}
-                {fileToolCalls.length > 0 || codeSegment ? (
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    {conversationId
-                      ? fileToolCalls.map((tc, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() =>
-                              openArtifact({
-                                type: "file",
-                                conversationId,
-                                fileId: tc.result.id as string,
-                                filename: tc.result.filename as string,
-                                sizeBytes:
-                                  typeof tc.result.size_bytes === "number" ? tc.result.size_bytes : undefined,
-                              })
-                            }
-                            className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                          >
-                            <FileIcon /> {tc.result.filename as string}
-                          </button>
-                        ))
-                      : null}
-                    {codeSegment && codeSegment.type === "code" ? (
+          </>
+        )}
+        {(lastUserText || lastAssistantText) && (
+          <div className="animate-fade-in-up w-full max-w-md space-y-3 text-center">
+            {lastUserText ? (
+              <p className="text-sm text-zinc-500">
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">Du:</span> {lastUserText}
+              </p>
+            ) : null}
+            {displayAssistantText ? (
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                <span className="font-medium">OwnAI:</span> {displayAssistantText}
+              </p>
+            ) : null}
+            {fileToolCalls.length > 0 || codeSegment ? (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {conversationId
+                  ? fileToolCalls.map((tc, i) => (
                       <button
+                        key={i}
                         type="button"
                         onClick={() =>
-                          codeSegment.type === "code" &&
-                          openArtifact({ type: "code", language: codeSegment.language, code: codeSegment.value })
+                          openArtifact({
+                            type: "file",
+                            conversationId,
+                            fileId: tc.result.id as string,
+                            filename: tc.result.filename as string,
+                            sizeBytes:
+                              typeof tc.result.size_bytes === "number" ? tc.result.size_bytes : undefined,
+                          })
                         }
                         className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       >
-                        <CodeIcon /> Code anzeigen
+                        <FileIcon /> {tc.result.filename as string}
                       </button>
-                    ) : null}
-                  </div>
+                    ))
+                  : null}
+                {codeSegment && codeSegment.type === "code" ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      codeSegment.type === "code" &&
+                      openArtifact({ type: "code", language: codeSegment.language, code: codeSegment.value })
+                    }
+                    className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 transition-all hover:scale-105 hover:bg-zinc-100 active:scale-95 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    <CodeIcon /> Code anzeigen
+                  </button>
                 ) : null}
               </div>
-            )}
-
-            {error ? (
-              <div className="w-full max-w-md">
-                <ErrorMessage message={error} />
-              </div>
             ) : null}
-          </>
+          </div>
         )}
+
+        {error ? (
+          <div className="w-full max-w-md">
+            <ErrorMessage message={error} />
+          </div>
+        ) : null}
+        {state === "idle" ? (
+          <SuggestionChips
+            disabled={false}
+            onPick={(text) => {
+              unlockSpeech(); // inside the click handler, like the mic button (see tts.ts)
+              void sendText(text);
+            }}
+          />
+        ) : null}
       </div>
     </AppShell>
   );

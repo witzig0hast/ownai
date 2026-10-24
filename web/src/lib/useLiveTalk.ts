@@ -133,6 +133,30 @@ class LiveTalkEngine {
     stopSpeaking();
   }
 
+  /** One tapped/typed turn outside a live mic session (the suggestion chips on /voice): send,
+   * show, read aloud, back to idle. Needs no microphone at all. Reuses the current
+   * conversation, so a follow-up chip or a live session afterwards keeps the context. */
+  async sendText(text: string): Promise<void> {
+    if (this.sessionActive) return;
+    this.callbacks.setError(null);
+    this.callbacks.setLastUserText(text);
+    this.callbacks.setLastAssistantText(null);
+    this.callbacks.setLastToolCalls(null);
+    this.callbacks.setState("thinking");
+    try {
+      const conversationId = await this.ensureConversation();
+      const reply = await chatApi.sendMessage(conversationId, text);
+      this.callbacks.setLastAssistantText(reply.content);
+      this.callbacks.setLastToolCalls(reply.tool_calls);
+      this.callbacks.setState("speaking");
+      await speakAndWait(reply.content);
+    } catch (err) {
+      this.callbacks.setError(err instanceof ApiError ? err.message : "Etwas ist schiefgelaufen.");
+    } finally {
+      if (!this.sessionActive) this.callbacks.setState("idle");
+    }
+  }
+
   private beginTurn(): void {
     if (!this.sessionActive || !this.stream) return;
 
@@ -258,6 +282,7 @@ interface UseLiveTalkResult {
   stop: () => void;
   toggleMute: () => void;
   interrupt: () => void;
+  sendText: (text: string) => Promise<void>;
 }
 
 /** React-facing wrapper around {@link LiveTalkEngine} - see the /voice screen for the UI this drives. */
@@ -310,5 +335,6 @@ export function useLiveTalk(): UseLiveTalkResult {
     stop: () => engineRef.current!.stop(),
     toggleMute: () => engineRef.current!.toggleMute(),
     interrupt: () => engineRef.current!.interrupt(),
+    sendText: (text: string) => engineRef.current!.sendText(text),
   };
 }
