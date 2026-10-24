@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { ExpensesChart } from "@/components/ExpensesChart";
 import { ApiError } from "@/lib/api-client";
 import * as expensesApi from "@/lib/api/expenses";
 import type { Expense, ExpensesList } from "@/lib/types";
@@ -123,18 +124,7 @@ export function ExpensesTab() {
         <p className="text-sm text-zinc-500">Noch keine Ausgaben.</p>
       ) : (
         <>
-          <div className="animate-fade-in-up mb-3 rounded-2xl border border-zinc-200 p-3 text-sm shadow-sm dark:border-zinc-800">
-            <p className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
-              Gesamt: {formatAmount(data.total)} €
-            </p>
-            <ul className="text-xs text-zinc-500">
-              {Object.entries(data.by_category).map(([cat, sum]) => (
-                <li key={cat}>
-                  {cat}: {formatAmount(sum)} €
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ExpensesChart expenses={data.expenses} />
 
           <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
             {data.expenses.map((e: Expense) => (
