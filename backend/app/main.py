@@ -32,6 +32,7 @@ from app.api import (
     push,
     reminders,
     rss,
+    search,
     searxng,
     sso,
     timer,
@@ -133,6 +134,7 @@ api_v1_routers = (
     pending_actions.router,
     onboarding.router,
     overview.router,
+    search.router,
     health.router,
 )
 for router in api_v1_routers:

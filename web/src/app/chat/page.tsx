@@ -420,7 +420,10 @@ export default function ChatPage() {
         if (cancelled) return;
         setConversations(list);
         if (!showArchived && list.length > 0) {
-          setSelectedId((current) => current ?? list[0].id);
+          // ?c=<id> (from search results) opens that conversation instead of the newest one.
+          const requested = new URLSearchParams(window.location.search).get("c");
+          const initial = list.find((c) => c.id === requested)?.id ?? list[0].id;
+          setSelectedId((current) => current ?? initial);
         }
       } catch (err) {
         if (cancelled) return;
